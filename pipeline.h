@@ -33,7 +33,8 @@ enum port_source_kind {
   PORT_SOURCE_INLINE,
   PORT_SOURCE_DOCUMENT,
   PORT_SOURCE_DATA,
-  PORT_SOURCE_PIPE
+  PORT_SOURCE_PIPE,
+  PORT_SOURCE_UNRESOLVED
 } port_source_kind;
 
 typedef struct output_port_instance {
@@ -54,6 +55,10 @@ typedef struct port_source {
     } load;
     xmlDocPtr doc;
     output_port_instance *pipe;
+    struct {
+      const char *step;
+      const char *port;
+    } ref;
   } x;
 } port_source;
 
@@ -87,26 +92,48 @@ typedef struct pstep_option_decl {
   xmlXPathCompExprPtr defval;
 } pstep_option_decl;
 
-typedef struct pipeline_step_type {
+typedef struct pipeline_decl {
   const char *ns;
   const char *name;
+  xmlListPtr /* pstep_option_decl */ options;
+  xmlListPtr /* port_declaration */ ports;
+  struct pipeline_step *body;
+} pipeline_decl;
+
+typedef struct pipeline_step_type {
+  pipeline_decl decl;
   pstep_instantiate_func instantiate;
   pstep_destroy_func destroy;
   pstep_execute_func execute;
-  xmlListPtr /* pstep_option_decl */ options;
-  xmlListPtr /* port_declaration */ ports;
 } pipeline_step_type;
 
 typedef struct pipeline_option {
   pstep_option_decl *decl;
-  const char *value;
+  port_connection value;
 } pipeline_option;
 
 enum pipeline_step_kind {
+  PSTEP_END,
+  PSTEP_ATOMIC,
+  PSTEP_CALL,
+  PSTEP_FOREACH,
+  PSTEP_VIEWPORT,
+  PSTEP_CHOOSE,
+  PSTEP_GROUP,
+  PSTEP_TRY
 };
 
 typedef struct pipeline_step {
   enum pipeline_step_kind kind;
+  xmlListPtr /* input_port_instance */ inputs;
+  xmlListPtr /* output_port_instance */ outputs;
+  xmlListPtr /* pipeline_option */ options;
+  union {
+    pipeline_step_type *atomic;
+    pipeline_decl *call;
+    struct pipeline_step *group;
+    j
+  } x;
 } pipeline_step;
 
 
