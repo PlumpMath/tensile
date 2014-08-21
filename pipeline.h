@@ -29,6 +29,10 @@ extern "C"
 {
 #endif
 
+#include <libxml/list.h>
+#include <libxml/hash.h>
+#include <libxml/xpath.h>
+
 enum port_source_kind {
   PORT_SOURCE_INLINE,
   PORT_SOURCE_DOCUMENT,
@@ -92,12 +96,20 @@ typedef struct pstep_option_decl {
   xmlXPathCompExprPtr defval;
 } pstep_option_decl;
 
+typedef struct pipeline_library {
+  const char *uri;
+  xmlHashTablePtr /* pipeline_decl */types;
+  xmlHashTablePtr /* pipeline_decl */pipelines;
+  xmlModulePtr dyn_library;
+} pipeline_library;
+
 typedef struct pipeline_decl {
   const char *ns;
   const char *name;
   xmlListPtr /* pstep_option_decl */ options;
   xmlListPtr /* port_declaration */ ports;
-  struct pipeline_step *body;
+  xmlListPtr /* pipeline_step */ *body;
+  xmlListPtr /* pipeline_library* */ *imports;
 } pipeline_decl;
 
 typedef struct pipeline_step_type {
@@ -116,12 +128,24 @@ enum pipeline_step_kind {
   PSTEP_END,
   PSTEP_ATOMIC,
   PSTEP_CALL,
+  PSTEP_ASSIGN,
   PSTEP_FOREACH,
   PSTEP_VIEWPORT,
   PSTEP_CHOOSE,
   PSTEP_GROUP,
   PSTEP_TRY
 };
+
+typedef struct pipeline_assignment {
+  const char *ns;
+  const char *name;
+  port_connection source;
+} pipeline_assignment;
+
+typedef struct pipeline_branch {
+  port_connection test;
+  xmlListPtr /* pipeline_step */ body;
+} pipeline_branch;
 
 typedef struct pipeline_step {
   enum pipeline_step_kind kind;
@@ -131,8 +155,22 @@ typedef struct pipeline_step {
   union {
     pipeline_step_type *atomic;
     pipeline_decl *call;
-    struct pipeline_step *group;
-    j
+    pipeline_assignment assign;
+    xmlListPtr /* pipeline_step */ body;
+    struct {
+      xmlXPathCompExprPtr match;
+      xmlListPtr /* pipeline_step */ body;
+    } viewport;
+    struct {
+      xmlListPtr /* pipeline_assignment */ assign;
+      xmlListPtr /* pipeline_branch */ branches;
+      xmlListPtr /* pipeline_step */ otherwise;
+    } choose;
+    struct {
+      xmlListPtr /* pipeline_assignment */ assign;
+      pipeline_step *try;
+      pipeline_step *catch;
+    } trycatch;
   } x;
 } pipeline_step;
 
