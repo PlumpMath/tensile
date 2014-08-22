@@ -20,8 +20,26 @@
  * @author Artem V. Andreev <artem@AA5779.spb.edu>
  */
 
+#include <stdbool.h>
 #include <libxml/xpath.h>
 #include <libxml/xpathInternals.h>
+
+static bool split_qname(xmlXPathContextPtr ctx,
+                        char *qname,
+                        const char **uri,
+                        const char **local) {
+  char *sep = strchr(qname, ':');
+  if (sep == NULL) {
+    *uri = NULL;
+    *local = qname;
+    return true;
+  } else {
+    *sep = '\0';
+    *uri = xmlXPathNsLookup(ctx, qname);
+    *local = sep + 1;
+    return *uri != NULL;
+  }
+}
 
 static void pipeline_xpath_system_property(xmlXPathParserContextPtr ctxt, 
                                            int nargs) {
