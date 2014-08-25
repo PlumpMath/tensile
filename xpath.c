@@ -20,31 +20,355 @@
  * @author Artem V. Andreev <artem@AA5779.spb.edu>
  */
 
-#include <stdbool.h>
+#include <string.h>
+#include <stdlib.h>
 #include <libxml/xpath.h>
+#include <libxml/tree.h>
+#include <libxml/uri.h>
 #include <libxml/xpathInternals.h>
+#include "pipeline.h"
+#include "version.h"
 
-static bool split_qname(xmlXPathContextPtr ctx,
-                        char *qname,
-                        const char **uri,
-                        const char **local) {
-  char *sep = strchr(qname, ':');
+static void split_qname(xmlXPathParserContextPtr ctx,
+                        xmlChar *qname,
+                        const xmlChar **uri,
+                        const xmlChar **local) {
+  xmlChar *sep = (xmlChar *)xmlStrchr(qname, ':');
   if (sep == NULL) {
     *uri = NULL;
     *local = qname;
-    return true;
   } else {
     *sep = '\0';
-    *uri = xmlXPathNsLookup(ctx, qname);
+    *uri = xmlXPathNsLookup(ctx->context, qname);
+    if (*uri == NULL)
+      xmlXPathSetError(ctx, XPATH_UNDEF_PREFIX_ERROR);
     *local = sep + 1;
-    return *uri != NULL;
   }
 }
 
-static void pipeline_xpath_system_property(xmlXPathParserContextPtr ctxt, 
-                                           int nargs) {
-  if (nargs != 1) {
-    xmlXPathSetArityError(ctxt);
-    return;
+static xmlChar *detect_language(void) {
+  static const char *varnames[] = {
+    "LANGUAGE",
+    "LANG",
+    "LC_MESSAGES",
+    "LC_ALL",
+    "LC_CTYPE",
+    NULL
+  };
+  const char **iter;
+  const char *lang = NULL;
+  const char *sep;
+
+  for (iter = varnames; lang != NULL && *iter != NULL; iter++) {
+    lang = getenv(*iter);
+  }
+  if (lang == NULL)
+    return xmlCharStrdup("");
+  sep = strchr(lang, '.');
+  if (sep == NULL) 
+    return xmlCharStrdup(lang);
+  else {
+    xmlChar *result = xmlMalloc(sep - lang + 1);
+    memcpy(result, lang, sep - lang);
+    result[sep - lang] = '\0';
+    return result;
   }
 }
+
+static void pipeline_xpath_system_property(xmlXPathParserContextPtr ctx, 
+                                           int nargs) {
+  xmlChar *qname;
+  const xmlChar *uri;
+  const xmlChar *local;
+  
+  if (nargs != 1) {
+    xmlXPathSetArityError(ctx);
+    return;
+  }
+  qname = xmlXPathPopString(ctx);
+  if (xmlXPathCheckError(ctx))
+    return;
+  split_qname(ctx, qname, &uri, &local);
+  xmlFree(qname);
+  if (xmlXPathCheckError(ctx))
+    return;
+  if (xmlStrcmp(uri, (const xmlChar *)W3C_XPROC_NAMESPACE) != 0) {
+    xmlXPathReturnEmptyString(ctx);
+    return;
+  }
+  if (xmlStrcmp(local, (const xmlChar *)"episode") == 0) {
+    xmlXPathReturnString(ctx, xmlCharStrdup(xproc_episode));
+  } else if (xmlStrcmp(local, (const xmlChar *)"language") == 0) {
+    xmlXPathReturnString(ctx, detect_language());
+  } else if (xmlStrcmp(local, (const xmlChar *)"product-name") == 0) {
+    xmlXPathReturnString(ctx, xmlCharStrdup(XPROC_PRODUCT_NAME));
+  } else if (xmlStrcmp(local, (const xmlChar *)"product-version") == 0) {
+    xmlXPathReturnString(ctx, xmlCharStrdup(XPROC_PRODUCT_VERSION));
+  } else if (xmlStrcmp(local, (const xmlChar *)"vendor") == 0) {
+    xmlXPathReturnString(ctx, xmlCharStrdup(XPROC_VENDOR));
+  } else if (xmlStrcmp(local, (const xmlChar *)"vendor-uri") == 0) {
+    xmlXPathReturnString(ctx, xmlCharStrdup(XPROC_VENDOR_URI));
+  } else if (xmlStrcmp(local, (const xmlChar *)"version") == 0) {
+    xmlXPathReturnString(ctx, xmlCharStrdup(XPROC_SUPPORTED_VERSION_S));
+  } else if (xmlStrcmp(local, (const xmlChar *)"xpath-version") == 0) {
+    xmlXPathReturnString(ctx, xmlCharStrdup(XPROC_SUPPORTED_XPATH_VERSION_S));
+  } else {
+    xmlXPathReturnEmptyString(ctx);
+  }
+}
+
+static void pipeline_xpath_step_available(xmlXPathParserContextPtr ctx, 
+                                           int nargs) {
+  xmlChar *qname;
+  const xmlChar *uri;
+  const xmlChar *local;
+  pipeline_exec_context *p_context = ctx->context->extra;
+  
+  if (nargs != 1) {
+    xmlXPathSetArityError(ctx);
+    return;
+  }
+  if (p_context == NULL) {
+    xmlXPathReturnFalse(ctx);
+    return;
+  }
+  qname = xmlXPathPopString(ctx);
+  if (xmlXPathCheckError(ctx))
+    return;
+  split_qname(ctx, qname, &uri, &local);
+  xmlFree(qname);
+  if (xmlXPathCheckError(ctx))
+    return;
+
+  xmlXPathReturnBoolean(ctx, 
+                        pipeline_lookup_type(p_context->decl,
+                                             uri, local) != NULL);
+}
+
+static void pipeline_xpath_value_available(xmlXPathParserContextPtr ctx,
+                                           int nargs) {
+  xmlChar *qname;
+  const xmlChar *uri;
+  const xmlChar *local;
+  pipeline_exec_context *p_context = ctx->context->extra;
+  bool fail_if_unknown = true;
+  
+  if (nargs > 2 || nargs < 1) {
+    xmlXPathSetArityError(ctx);
+    return;
+  }
+  if (p_context == NULL) {
+    xmlXPathReturnFalse(ctx);
+    return;
+  }
+
+  if (nargs == 2) {
+    fail_if_unknown = xmlXPathPopBoolean(ctx);
+    if (xmlXPathCheckError(ctx))
+      return;
+  }
+  qname = xmlXPathPopString(ctx);
+  if (xmlXPathCheckError(ctx))
+    return;
+  split_qname(ctx, qname, &uri, &local);
+  xmlFree(qname);
+  if (xmlXPathCheckError(ctx))
+    return;
+  
+  if (xmlHashLookup2(p_context->bindings,
+                     (xmlChar *)local, (xmlChar *)uri) != NULL)
+    xmlXPathReturnTrue(ctx);
+  else if (!fail_if_unknown) 
+    xmlXPathReturnFalse(ctx);
+  else {
+    xmlXPathSetError(ctx, XPATH_UNDEF_VARIABLE_ERROR);
+  }
+}
+
+static void pipeline_xpath_iter_position(xmlXPathParserContextPtr ctx,
+                                         int nargs) {
+  pipeline_exec_context *p_context = ctx->context->extra;
+
+  if (nargs > 0) {
+    xmlXPathSetArityError(ctx);
+    return;
+  }
+
+  xmlXPathReturnNumber(ctx, p_context ? p_context->iter_position : 1);
+}
+
+static void pipeline_xpath_iter_size(xmlXPathParserContextPtr ctx,
+                                     int nargs) {
+  pipeline_exec_context *p_context = ctx->context->extra;
+
+  if (nargs > 0) {
+    xmlXPathSetArityError(ctx);
+    return;
+  }
+
+  xmlXPathReturnNumber(ctx, p_context ? p_context->iter_size : 1);
+}
+
+static void pipeline_xpath_base_uri(xmlXPathParserContextPtr ctx,
+                                    int nargs) {
+  xmlNodePtr node = xmlXPathGetContextNode(ctx);
+  xmlChar *base;
+  
+  if (nargs > 1) {
+    xmlXPathSetArityError(ctx);
+    return;  
+  }
+  if (nargs == 1) {
+    xmlNodeSetPtr nodes = xmlXPathPopNodeSet(ctx);
+    
+    if (xmlXPathCheckError(ctx)) 
+      return;
+    node = xmlXPathNodeSetItem(nodes, 0);
+    xmlXPathFreeNodeSet(nodes);
+    if (node == NULL) {
+      xmlXPathReturnEmptyString(ctx);
+      return;
+    }
+  }
+  base = xmlNodeGetBase(xmlXPathGetDocument(ctx), node);
+  if (base == NULL)
+    xmlXPathReturnEmptyString(ctx);
+  else
+    xmlXPathReturnString(ctx, base);
+}
+
+static void pipeline_xpath_resolve_uri(xmlXPathParserContextPtr ctx,
+                                    int nargs) {
+  xmlChar *base = NULL;
+  xmlChar *uri;
+  xmlChar *result;
+  
+  if (nargs > 2) {
+    xmlXPathSetArityError(ctx);
+    return;  
+  }
+  if (nargs == 2) {
+    base = xmlXPathPopString(ctx);
+    if (xmlXPathCheckError(ctx))
+      return;
+  } else {
+    base = xmlNodeGetBase(xmlXPathGetDocument(ctx), 
+                          xmlXPathGetContextNode(ctx));
+  }
+  // if no base, just leave URI string as is
+  if (base == NULL)
+    return;
+  uri = xmlXPathPopString(ctx);
+  if (xmlXPathCheckError(ctx)) {
+    xmlFree(base);
+    return;
+  }
+  result = xmlBuildURI(uri, base);
+  xmlFree(uri);
+  xmlFree(base);
+  if (result == NULL) {
+    xmlXPathSetError(ctx, XPATH_INVALID_OPERAND);
+    return;
+  }
+  xmlXPathReturnString(ctx, result);
+}
+
+static void pipeline_xpath_version_available(xmlXPathParserContextPtr ctx,
+                                             int nargs) {
+  double val;
+  if (nargs != 1) {
+    xmlXPathSetArityError(ctx);
+    return;
+  }
+  val = xmlXPathPopNumber(ctx);
+  if (xmlXPathCheckError(ctx))
+    return;
+  
+  xmlXPathReturnBoolean(ctx, val <= XPROC_SUPPORTED_VERSION);
+}
+
+static void pipeline_xpath_xpath_version_available(xmlXPathParserContextPtr ctx,
+                                                   int nargs) {
+  double val;
+  if (nargs != 1) {
+    xmlXPathSetArityError(ctx);
+    return;
+  }
+  val = xmlXPathPopNumber(ctx);
+  if (xmlXPathCheckError(ctx))
+    return;
+  
+  xmlXPathReturnBoolean(ctx, val <= XPROC_SUPPORTED_XPATH_VERSION);
+}
+
+static xmlXPathObjectPtr pipeline_xpath_lookup_binding(void *ctxt,
+                                                       const xmlChar *name,
+                                                       const xmlChar *ns_uri) {
+  xmlXPathObjectPtr obj = 
+    xmlHashLookup2(((pipeline_exec_context *)ctxt)->bindings, name, ns_uri);
+  return obj ? xmlXPathObjectCopy(obj) : NULL;
+}
+
+
+void pipeline_xpath_update_doc(xmlXPathContextPtr ctx, xmlDocPtr doc) {
+  static xmlDocPtr xproc_empty_doc = NULL;
+  
+  if (!doc) {
+    if (!xproc_empty_doc)
+      xproc_empty_doc = xmlNewDoc((const xmlChar *)"1.0");
+    doc = xproc_empty_doc;
+  }
+  ctx->doc = doc;
+  ctx->node = xmlDocGetRootElement(ctx->doc);
+}
+
+void pipeline_xpath_update_context(xmlXPathContextPtr ctx, pipeline_exec_context *pctxt) {
+  ctx->extra = pctxt;
+  xmlXPathRegisterVariableLookup(ctx, 
+                                 pipeline_xpath_lookup_binding, pctxt);
+}
+
+xmlXPathContext *pipeline_xpath_create_static_context(xmlDocPtr xproc_doc, 
+                                                      xmlNodePtr xproc_node) {
+  xmlXPathContextPtr newctx;
+  xmlNsPtr *nslist;
+  static const struct {
+    const char *name;
+    xmlXPathFunction func;
+  } xpath_functions[] = {
+    {"system-property", pipeline_xpath_system_property},
+    {"step-available", pipeline_xpath_step_available},
+    {"value-available", pipeline_xpath_value_available},
+    {"iteration-position", pipeline_xpath_iter_position},
+    {"iteration-size", pipeline_xpath_iter_size},
+    {"base-uri", pipeline_xpath_base_uri},
+    {"resolve-uri", pipeline_xpath_resolve_uri},
+    {"version-available", pipeline_xpath_version_available},
+    {"xpath-version-available", pipeline_xpath_xpath_version_available},
+  };
+  unsigned i = 0;
+
+  newctx = xmlXPathNewContext(NULL);
+  if (newctx == NULL)
+    return NULL;
+  pipeline_xpath_update_doc(newctx, NULL);
+  newctx->contextSize = newctx->proximityPosition = 1;
+  newctx->extra = NULL;
+  nslist = xmlGetNsList(xproc_doc, xproc_node);
+  if (nslist != NULL) {
+    xmlNsPtr *ns;
+    for (ns = nslist; *ns != NULL; ns++) {
+      xmlXPathRegisterNs(newctx, (*ns)->prefix, (*ns)->href);
+    }
+    xmlFree(nslist);
+  }
+  for (i = 0; i < sizeof(xpath_functions) / sizeof(*xpath_functions); i++) {
+    xmlXPathRegisterFuncNS(newctx, 
+                           (const xmlChar *)xpath_functions[i].name, 
+                           (const xmlChar *)W3C_XPROC_NAMESPACE,
+                           xpath_functions[i].func);
+  }
+  pipeline_run_hooks("on_xpath_create_static_context", newctx);
+  return newctx;
+}
+

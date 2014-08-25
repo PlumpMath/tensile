@@ -9,6 +9,8 @@ CPPFLAGS = $(XML_CPPFLAGS)
 LDFLAGS = 
 LIBS = $(XML_LIBS)
 
+C_SOURCES = xpath.c
+
 include $(C_SOURCES:.c=.d)
 
 %.d : %.c
