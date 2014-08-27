@@ -31,14 +31,14 @@
 
 static void split_qname(xmlXPathParserContextPtr ctx,
                         xmlChar *qname,
-                        const xmlChar **uri,
-                        const xmlChar **local) {
-  xmlChar *sep = (xmlChar *)xmlStrchr(qname, ':');
+                        /*@out@*/ const xmlChar **uri,
+                        /*@out@*/ const xmlChar **local) {
+  xmlChar *sep = (xmlChar *)xmlStrchr(qname, (xmlChar)':');
   if (sep == NULL) {
     *uri = NULL;
     *local = qname;
   } else {
-    *sep = '\0';
+    *sep = (xmlChar)'\0';
     *uri = xmlXPathNsLookup(ctx->context, qname);
     if (*uri == NULL)
       xmlXPathSetError(ctx, XPATH_UNDEF_PREFIX_ERROR);
@@ -47,20 +47,20 @@ static void split_qname(xmlXPathParserContextPtr ctx,
 }
 
 static xmlChar *detect_language(void) {
-  static const char *varnames[] = {
+  static const char * varnames[] = {
     "LANGUAGE",
     "LANG",
     "LC_MESSAGES",
     "LC_ALL",
     "LC_CTYPE",
-    NULL
   };
-  const char **iter;
+  unsigned i;
   const char *lang = NULL;
   const char *sep;
 
-  for (iter = varnames; lang != NULL && *iter != NULL; iter++) {
-    lang = getenv(*iter);
+  for (i = 0; lang == NULL && 
+         i < (unsigned)(sizeof(varnames) / sizeof(*varnames)); i++) {
+    lang = getenv(varnames[i]);
   }
   if (lang == NULL)
     return xmlCharStrdup("");
@@ -68,9 +68,9 @@ static xmlChar *detect_language(void) {
   if (sep == NULL) 
     return xmlCharStrdup(lang);
   else {
-    xmlChar *result = xmlMalloc(sep - lang + 1);
-    memcpy(result, lang, sep - lang);
-    result[sep - lang] = '\0';
+    xmlChar *result = xmlMalloc((size_t)(sep - lang + 1));
+    memcpy(result, lang, (size_t)(sep - lang));
+    result[sep - lang] = (xmlChar)'\0';
     return result;
   }
 }
@@ -86,8 +86,10 @@ static void pipeline_xpath_system_property(xmlXPathParserContextPtr ctx,
     return;
   }
   qname = xmlXPathPopString(ctx);
-  if (xmlXPathCheckError(ctx))
+  if (xmlXPathCheckError(ctx)) {
+    xmlFree(qname);
     return;
+  }
   split_qname(ctx, qname, &uri, &local);
   xmlFree(qname);
   if (xmlXPathCheckError(ctx))
@@ -133,8 +135,10 @@ static void pipeline_xpath_step_available(xmlXPathParserContextPtr ctx,
     return;
   }
   qname = xmlXPathPopString(ctx);
-  if (xmlXPathCheckError(ctx))
+  if (xmlXPathCheckError(ctx)) {
+    xmlFree(qname);
     return;
+  }
   split_qname(ctx, qname, &uri, &local);
   xmlFree(qname);
   if (xmlXPathCheckError(ctx))
@@ -168,8 +172,11 @@ static void pipeline_xpath_value_available(xmlXPathParserContextPtr ctx,
       return;
   }
   qname = xmlXPathPopString(ctx);
-  if (xmlXPathCheckError(ctx))
+  if (xmlXPathCheckError(ctx)) {
+    xmlFree(qname);
     return;
+  }
+  
   split_qname(ctx, qname, &uri, &local);
   xmlFree(qname);
   if (xmlXPathCheckError(ctx))
@@ -194,7 +201,7 @@ static void pipeline_xpath_iter_position(xmlXPathParserContextPtr ctx,
     return;
   }
 
-  xmlXPathReturnNumber(ctx, p_context ? p_context->iter_position : 1);
+  xmlXPathReturnNumber(ctx, p_context ? (double)p_context->iter_position : 1.0);
 }
 
 static void pipeline_xpath_iter_size(xmlXPathParserContextPtr ctx,
@@ -206,7 +213,7 @@ static void pipeline_xpath_iter_size(xmlXPathParserContextPtr ctx,
     return;
   }
 
-  xmlXPathReturnNumber(ctx, p_context ? p_context->iter_size : 1);
+  xmlXPathReturnNumber(ctx, p_context ? (double)p_context->iter_size : 1.0);
 }
 
 static void pipeline_xpath_base_uri(xmlXPathParserContextPtr ctx,
@@ -221,8 +228,10 @@ static void pipeline_xpath_base_uri(xmlXPathParserContextPtr ctx,
   if (nargs == 1) {
     xmlNodeSetPtr nodes = xmlXPathPopNodeSet(ctx);
     
-    if (xmlXPathCheckError(ctx)) 
+    if (xmlXPathCheckError(ctx)) {
+      xmlXPathFreeNodeSet(nodes);
       return;
+    }
     node = xmlXPathNodeSetItem(nodes, 0);
     xmlXPathFreeNodeSet(nodes);
     if (node == NULL) {
@@ -249,8 +258,10 @@ static void pipeline_xpath_resolve_uri(xmlXPathParserContextPtr ctx,
   }
   if (nargs == 2) {
     base = xmlXPathPopString(ctx);
-    if (xmlXPathCheckError(ctx))
+    if (xmlXPathCheckError(ctx)) {
+      xmlFree(base);
       return;
+    }
   } else {
     base = xmlNodeGetBase(xmlXPathGetDocument(ctx), 
                           xmlXPathGetContextNode(ctx));
@@ -261,6 +272,7 @@ static void pipeline_xpath_resolve_uri(xmlXPathParserContextPtr ctx,
   uri = xmlXPathPopString(ctx);
   if (xmlXPathCheckError(ctx)) {
     xmlFree(base);
+    xmlFree(uri);
     return;
   }
   result = xmlBuildURI(uri, base);
@@ -311,7 +323,7 @@ static xmlXPathObjectPtr pipeline_xpath_lookup_binding(void *ctxt,
 
 
 void pipeline_xpath_update_doc(xmlXPathContextPtr ctx, xmlDocPtr doc) {
-  static xmlDocPtr xproc_empty_doc = NULL;
+  static /*@ owned @*/ xmlDocPtr xproc_empty_doc = NULL;
   
   if (!doc) {
     if (!xproc_empty_doc)
@@ -322,7 +334,7 @@ void pipeline_xpath_update_doc(xmlXPathContextPtr ctx, xmlDocPtr doc) {
   ctx->node = xmlDocGetRootElement(ctx->doc);
 }
 
-void pipeline_xpath_update_context(xmlXPathContextPtr ctx, pipeline_exec_context *pctxt) {
+void pipeline_xpath_update_context(xmlXPathContextPtr ctx, /*@ dependent @*/ pipeline_exec_context *pctxt) {
   ctx->extra = pctxt;
   xmlXPathRegisterVariableLookup(ctx, 
                                  pipeline_xpath_lookup_binding, pctxt);
@@ -358,15 +370,15 @@ xmlXPathContext *pipeline_xpath_create_static_context(xmlDocPtr xproc_doc,
   if (nslist != NULL) {
     xmlNsPtr *ns;
     for (ns = nslist; *ns != NULL; ns++) {
-      xmlXPathRegisterNs(newctx, (*ns)->prefix, (*ns)->href);
+      (void)xmlXPathRegisterNs(newctx, (*ns)->prefix, (*ns)->href);
     }
     xmlFree(nslist);
   }
-  for (i = 0; i < sizeof(xpath_functions) / sizeof(*xpath_functions); i++) {
-    xmlXPathRegisterFuncNS(newctx, 
-                           (const xmlChar *)xpath_functions[i].name, 
-                           (const xmlChar *)W3C_XPROC_NAMESPACE,
-                           xpath_functions[i].func);
+  for (i = 0; i < (unsigned)(sizeof(xpath_functions) / sizeof(*xpath_functions)); i++) {
+    (void)xmlXPathRegisterFuncNS(newctx, 
+                                 (const xmlChar *)xpath_functions[i].name, 
+                                 (const xmlChar *)W3C_XPROC_NAMESPACE,
+                                 xpath_functions[i].func);
   }
   pipeline_run_hooks("on_xpath_create_static_context", newctx);
   return newctx;

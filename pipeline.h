@@ -48,20 +48,22 @@ enum port_source_kind {
 } port_source_kind;
 
 typedef struct output_port_instance {
-  struct pipeline_step *owner;
-  struct port_declaration *decl;
-  struct input_port_instance *connected;
+  /*@ dependent @*/ struct pipeline_step *owner;
+  /*@ dependent @*/ struct port_declaration *decl;
+  /*@ dependent @*/ /*@ null @*/ struct input_port_instance *connected;
 } output_port_instance;
+
+typedef struct port_source_info {
+  /*@ owned @*/ const xmlChar *uri;
+  /*@ owned @*/ /*@ null @*/ const xmlChar *wrapper;
+  /*@ owned @*/ /*@ null @*/ const xmlChar *wrapper_ns;
+  /*@ owned @*/ /*@ null @*/ const xmlChar *content_type;
+} port_source_info;
 
 typedef struct port_source {
   enum port_source_kind kind;
   union {
-    struct {
-      const xmlChar *uri;
-      const xmlChar *wrapper;
-      const xmlChar *wrapper_ns;
-      const xmlChar *content_type;
-    } load;
+    port_source_info load;
     xmlDocPtr doc;
     output_port_instance *pipe;
     struct {
@@ -72,12 +74,16 @@ typedef struct port_source {
 } port_source;
 
 typedef struct port_connection {
-  unsigned refcnt;
-  xmlXPathCompExprPtr filter;
+  /*@refs@*/ unsigned refcnt;
+  /*@null@*/ /*@owned@*/ xmlXPathCompExprPtr filter;
   xmlListPtr /* port_source */ sources; 
 } port_connection;
 
-static inline port_connection *use_port_connection(port_connection *p) {
+typedef /*@refcounted@*/ port_connection *port_connection_ptr;
+
+/*@unused@*/ /*@null@*/ /*@ newref @*/
+static inline port_connection_ptr
+use_port_connection(/*@ returned @*/ /*@ null @*/ port_connection_ptr p) {
   if (p)
     p->refcnt++;
   return p;
@@ -86,7 +92,8 @@ static inline port_connection *use_port_connection(port_connection *p) {
 enum port_kind {
   PORT_INPUT_DOCUMENT,
   PORT_INPUT_PARAMETERS,
-  PORT_OUTPUT
+  PORT_OUTPUT,
+  PORT_N_KINDS
 };
 
 typedef struct port_declaration {
@@ -98,11 +105,11 @@ typedef struct port_declaration {
 } port_declaration;
 
 typedef struct input_port_instance {
-  struct pipeline_step *owner;
-  struct port_declaration *decl;
-  xmlListPtr /* xmlDocPtr */ queue;
+  /*@ dependent @*/ struct pipeline_step *owner;
+  /*@ dependent @*/ struct port_declaration *decl;
+  /*@ owned @*/ xmlListPtr /* xmlDocPtr */ queue;
   bool complete;
-  port_connection *connection;
+  /*@ owned @*/ /*@ null @*/ port_connection *connection;
 } input_port_instance;
 
 typedef struct pstep_option_decl {
@@ -138,8 +145,9 @@ typedef struct pipeline_decl {
   const pipeline_atomic_type *type;
   xmlListPtr /* pstep_option_decl */ options;
   xmlListPtr /* port_declaration */ ports;
-  xmlListPtr /* pipeline_step */ *body;
-  xmlListPtr /* pipeline_library* */ *imports;
+  port_declaration *primaries[PORT_N_KINDS];
+  xmlListPtr /* pipeline_step */ body;
+  xmlListPtr /* pipeline_library* */ imports;
 } pipeline_decl;
 
 extern pipeline_decl *pipeline_lookup_type(const pipeline_decl *source, 
@@ -151,7 +159,6 @@ typedef struct pipeline_option {
 } pipeline_option;
 
 enum pipeline_step_kind {
-  PSTEP_END,
   PSTEP_ATOMIC,
   PSTEP_CALL,
   PSTEP_ASSIGN,
@@ -163,8 +170,8 @@ enum pipeline_step_kind {
 };
 
 typedef struct pipeline_assignment {
-  const char *ns;
-  const char *name;
+  const xmlChar *ns;
+  const xmlChar *name;
   port_connection *source;
 } pipeline_assignment;
 
@@ -174,9 +181,12 @@ typedef struct pipeline_branch {
 } pipeline_branch;
 
 typedef struct pipeline_step {
+  const xmlChar *name;
   enum pipeline_step_kind kind;
   xmlListPtr /* input_port_instance */ inputs;
+  input_port_instance *primary_inputs[2];
   xmlListPtr /* output_port_instance */ outputs;
+  output_port_instance *primary_output;
   xmlListPtr /* pipeline_option */ options;
   union {
     struct {
@@ -215,10 +225,12 @@ typedef struct pipeline_exec_context {
 
 extern void pipeline_run_hooks(const char *name, void *data);
 
-extern void pipeline_xpath_update_doc(xmlXPathContextPtr ctx, xmlDocPtr doc);
-extern void pipeline_xpath_update_context(xmlXPathContextPtr ctx, pipeline_exec_context *pctxt);
-extern xmlXPathContext *pipeline_xpath_create_static_context(xmlDocPtr xproc_doc, 
-                                                             xmlNodePtr xproc_node);
+extern void pipeline_xpath_update_doc(xmlXPathContextPtr ctx, 
+                                      /*@ null @*/ /*@ dependent @*/ xmlDocPtr doc);
+extern void pipeline_xpath_update_context(xmlXPathContextPtr ctx, 
+                                          /*@ dependent @*/ pipeline_exec_context *pctxt);
+extern /*@ null @*/ xmlXPathContext *pipeline_xpath_create_static_context(xmlDocPtr xproc_doc, 
+                                                                          xmlNodePtr xproc_node);
 
 extern char xproc_episode[];
 
