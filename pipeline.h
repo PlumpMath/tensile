@@ -48,8 +48,8 @@ enum port_source_kind {
 } port_source_kind;
 
 typedef struct output_port_instance {
-  /*@ dependent @*/ struct pipeline_step *owner;
-  /*@ dependent @*/ struct port_declaration *decl;
+  /*@ dependent @*/ const struct pipeline_step *owner;
+  /*@ dependent @*/ const struct port_declaration *decl;
   /*@ dependent @*/ /*@ null @*/ struct input_port_instance *connected;
 } output_port_instance;
 
@@ -84,8 +84,10 @@ typedef /*@refcounted@*/ port_connection *port_connection_ptr;
 /*@unused@*/ /*@null@*/ /*@ newref @*/
 static inline port_connection_ptr
 use_port_connection(/*@ returned @*/ /*@ null @*/ port_connection_ptr p) {
-  if (p)
-    p->refcnt++;
+  if (!p)
+    return NULL;
+  
+  p->refcnt++;
   return p;
 }
 
@@ -101,27 +103,27 @@ typedef struct port_declaration {
   const xmlChar *name;
   bool sequence;
   bool primary;
-  port_connection *default_connection;
+  /*@ null @*/ port_connection_ptr default_connection;
 } port_declaration;
 
 typedef struct input_port_instance {
-  /*@ dependent @*/ struct pipeline_step *owner;
-  /*@ dependent @*/ struct port_declaration *decl;
+  /*@ dependent @*/ const struct pipeline_step *owner;
+  /*@ dependent @*/ const struct port_declaration *decl;
   /*@ owned @*/ xmlListPtr /* xmlDocPtr */ queue;
   bool complete;
-  /*@ owned @*/ /*@ null @*/ port_connection *connection;
+  /*@ null @*/ port_connection_ptr connection;
 } input_port_instance;
 
 typedef struct pstep_option_decl {
-  const xmlChar *name;
-  xmlXPathCompExprPtr defval;
+  /*@ owned @*/ const xmlChar *name;
+  /*@ null @*/ /*@ owned @*/ xmlXPathCompExprPtr defval;
 } pstep_option_decl;
 
 typedef struct pipeline_library {
   const xmlChar *uri;
   xmlHashTablePtr /* pipeline_decl */types;
   xmlHashTablePtr /* pipeline_decl */pipelines;
-  xmlModulePtr dyn_library;
+  /*@ null @*/ xmlModulePtr dyn_library;
 } pipeline_library;
 
 struct pipeline_step;
@@ -139,13 +141,14 @@ typedef struct pipeline_atomic_type {
   pstep_execute_func execute;
 } pipeline_atomic_type;
 
+typedef /*@ null @*/ /*@ dependent @*/ port_declaration *port_declaration_aux_ptr;
 typedef struct pipeline_decl {
-  const xmlChar *ns;
-  const xmlChar *name;
-  const pipeline_atomic_type *type;
+  /*@ null @*/ /*@ owned @*/ const xmlChar *ns;
+  /*@ null @*/ /*@ owned @*/ const xmlChar *name;
+  /*@ null @*/ /*@ dependent @*/ const pipeline_atomic_type *type;
   xmlListPtr /* pstep_option_decl */ options;
   xmlListPtr /* port_declaration */ ports;
-  port_declaration *primaries[PORT_N_KINDS];
+  port_declaration_aux_ptr primaries[PORT_N_KINDS];
   xmlListPtr /* pipeline_step */ body;
   xmlListPtr /* pipeline_library* */ imports;
 } pipeline_decl;
@@ -154,8 +157,8 @@ extern pipeline_decl *pipeline_lookup_type(const pipeline_decl *source,
                                            const xmlChar *ns, const xmlChar *name);
 
 typedef struct pipeline_option {
-  pstep_option_decl *decl;
-  port_connection *value;
+  /*@ dependent @*/ const pstep_option_decl *decl;
+  /*@ null @*/ port_connection_ptr value;
 } pipeline_option;
 
 enum pipeline_step_kind {
@@ -170,45 +173,47 @@ enum pipeline_step_kind {
 };
 
 typedef struct pipeline_assignment {
-  const xmlChar *ns;
-  const xmlChar *name;
-  port_connection *source;
+  /*@ owned @*/ const xmlChar *ns;
+  /*@ owned @*/ const xmlChar *name;
+  port_connection_ptr source;
 } pipeline_assignment;
 
 typedef struct pipeline_branch {
-  port_connection *test;
-  xmlListPtr /* pipeline_step */ body;
+  port_connection_ptr test;
+  /*@ owned @*/ xmlListPtr /* pipeline_step */ body;
 } pipeline_branch;
 
+typedef /*@ null @*/ /*@ dependent @*/ input_port_instance *input_port_instance_aux_ptr;
+typedef /*@ null @*/ /*@ dependent @*/ output_port_instance *output_port_instance_aux_ptr;
 typedef struct pipeline_step {
-  const xmlChar *name;
+  /*@ owned @*/ const xmlChar *name;
   enum pipeline_step_kind kind;
-  xmlListPtr /* input_port_instance */ inputs;
-  input_port_instance *primary_inputs[2];
-  xmlListPtr /* output_port_instance */ outputs;
-  output_port_instance *primary_output;
-  xmlListPtr /* pipeline_option */ options;
+  /*@ owned @*/ xmlListPtr /* input_port_instance */ inputs;
+  input_port_instance_aux_ptr primary_inputs[2];
+  /*@ owned @*/ xmlListPtr /* output_port_instance */ outputs;
+  output_port_instance_aux_ptr primary_output;
+  /*@ owned @*/ xmlListPtr /* pipeline_option */ options;
   union {
     struct {
-      pipeline_decl *decl;
-      void *data;
+      /*@ dependent @*/ const pipeline_decl *decl;
+      /*@ owned @*/ /*@ null @*/ void *data;
     } atomic;
-    pipeline_decl *call;
-    pipeline_assignment *assign;
-    xmlListPtr /* pipeline_step */ body;
+    /*@ dependent @*/ const pipeline_decl *call;
+    /*@ owned @*/ pipeline_assignment *assign;
+    /*@ owned @*/ xmlListPtr /* pipeline_step */ body;
     struct {
-      xmlXPathCompExprPtr match;
-      xmlListPtr /* pipeline_step */ body;
+      /*@ owned @*/ xmlXPathCompExprPtr match;
+      /*@ owned @*/ xmlListPtr /* pipeline_step */ body;
     } viewport;
     struct {
-      xmlListPtr /* pipeline_assignment */ assign;
-      xmlListPtr /* pipeline_branch */ branches;
-      xmlListPtr /* pipeline_step */ otherwise;
+      /*@ owned @*/ xmlListPtr /* pipeline_assignment */ assign;
+      /*@ owned @*/ xmlListPtr /* pipeline_branch */ branches;
+      /*@ owned @*/ xmlListPtr /* pipeline_step */ otherwise;
     } choose;
     struct {
-      xmlListPtr /* pipeline_assignment */ assign;
-      struct pipeline_step *try;
-      struct pipeline_step *catch;
+      /*@ owned @*/ xmlListPtr /* pipeline_assignment */ assign;
+      /*@ owned @*/ struct pipeline_step *try;
+      /*@ owned @*/ struct pipeline_step *catch;
     } trycatch;
   } x;
 } pipeline_step;
@@ -233,6 +238,48 @@ extern /*@ null @*/ xmlXPathContext *pipeline_xpath_create_static_context(xmlDoc
                                                                           xmlNodePtr xproc_node);
 
 extern char xproc_episode[];
+
+extern /*@ only @*/
+output_port_instance *new_output_port_instance(/*@ dependent @*/ pipeline_step *owner,
+                                                      /*@ dependent @*/ port_declaration *decl,
+                                                      /*@ null @*/ /*@ dependent @*/ 
+                                                      input_port_instance *connected);
+
+extern void destroy_output_port_instance(/*@ null @*/ /*@ only @*/ output_port_instance *p) /*@modifies p @*/;
+
+extern /*@ only @*/ /*@ null @*/
+port_source *new_port_source(enum port_source_kind kind, ...);
+
+extern void destroy_port_source(/*@null@*/ /*@only@*/ port_source *s) 
+  /*@modifies s @*/;
+
+extern /*@ null @*/ /*@ newref @*/
+port_connection_ptr new_port_connection(const xmlChar *filter);
+
+extern void destroy_port_connection(/*@ null @*/ /*@ killref @*/ port_connection_ptr p) 
+  /*@modifies p @*/;
+
+extern /*@ only @*/
+port_declaration *new_port_declaration(enum port_kind kind,
+                                              const xmlChar *name,
+                                              bool sequence,
+                                              bool primary,
+                                              /*@ null @*/ port_connection_ptr default_connection);
+
+extern void destroy_port_declaration(/*@ only @*/ port_declaration *d)
+  /*@modifies d @*/;
+
+extern /*@ only @*/
+input_port_instance *new_input_port_instance(/*@ dependent @*/ const pipeline_step *owner,
+                                                    /*@ dependent @*/ const port_declaration *decl,
+                                                    /*@ null @*/ 
+                                                    port_connection_ptr connection);
+
+extern void destroy_input_port_instance(/*@ only @*/ /*@ null @*/ input_port_instance *p);
+
+extern /*@ only @*/ /*@ null @*/
+pstep_option_decl *new_pstep_option_decl(const xmlChar *name, 
+                                         /*@ null @*/ const xmlChar *defval);
 
 #ifdef __cplusplus
 }

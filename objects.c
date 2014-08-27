@@ -25,6 +25,7 @@
 #include <libxml/xmlmemory.h>
 #include "pipeline.h"
 
+/*@ only @*/
 output_port_instance *new_output_port_instance(/*@ dependent @*/ pipeline_step *owner,
                                                /*@ dependent @*/ port_declaration *decl,
                                                /*@ null @*/ /*@ dependent @*/ input_port_instance *connected) {
@@ -36,11 +37,11 @@ output_port_instance *new_output_port_instance(/*@ dependent @*/ pipeline_step *
   return p;
 }
 
-void destroy_output_port_instance(/*@ only @*/ output_port_instance *p) {
+void destroy_output_port_instance(/*@ null @*/ /*@ only @*/ output_port_instance *p) {
   xmlFree(p);
 }
 
-static void output_port_instance_deallocator(/*@ only @*/ xmlLinkPtr l) {
+static void output_port_instance_deallocator(/*@ owned @*/ xmlLinkPtr l) {
   destroy_output_port_instance(xmlLinkGetData(l));
 }
 
@@ -110,17 +111,17 @@ void destroy_port_source(/*@null@*/ /*@only@*/port_source *s)
       xmlFree((xmlChar *)s->x.ref.port);
       break;
     default:
-      assert(0);
+      abort();
   }
   xmlFree(s);
 }
 
-static void port_source_deallocator(/*@ only @*/ xmlLinkPtr l) {
+static void port_source_deallocator(/*@ owned @*/ xmlLinkPtr l) {
   destroy_port_source(xmlLinkGetData(l));
 }
 
 /*@ null @*/ /*@ newref @*/
-port_connection *new_port_connection(const xmlChar *filter) {
+port_connection_ptr new_port_connection(const xmlChar *filter) {
   port_connection *p = xmlMalloc(sizeof(*p));
 
   p->refcnt = 1;
@@ -137,30 +138,40 @@ port_connection *new_port_connection(const xmlChar *filter) {
   return p;
 }
 
-void destroy_port_connection(/*@ null @*/ port_connection_ptr p) {
+void destroy_port_connection(/*@ null @*/ /*@ killref @*/ port_connection_ptr p) 
+  /*@modifies p @*/ {
+  /*@-mustfreeonly@*/
   if (p == NULL)
     return;
   assert(p->refcnt != 0);
   if (--p->refcnt > 0)
     return;
-
+  /*@=mustfreeonly@*/
+  
   if (p->filter)
     xmlXPathFreeCompExpr(p->filter);
   xmlListDelete(p->sources);
+  /*@-refcounttrans@*/
   xmlFree(p);
+  /*@=refcounttrans@*/
 }
 
+/*@ only @*/
 port_declaration *new_port_declaration(enum port_kind kind,
                                        const xmlChar *name,
                                        bool sequence,
                                        bool primary,
-                                       /*@ only @*/ port_connection *default_connection) {
+                                       /*@ null @*/ port_connection_ptr default_connection) {
   port_declaration *d = xmlMalloc(sizeof(*d));
   d->kind = kind;
   d->name = xmlStrdup(name);
   d->sequence = sequence;
   d->primary = primary;
+  /*@-refcounttrans@*/
+  /*@-newreftrans@*/
   d->default_connection = default_connection;
+  /*@=newreftrans@*/
+  /*@=refcounttrans@*/
   return d;
 }
 
@@ -171,7 +182,7 @@ void destroy_port_declaration(/*@ only @*/ port_declaration *d)
   xmlFree(d);
 }
 
-static void port_declaration_deallocator(/*@ only @*/ xmlLinkPtr l) {
+static void port_declaration_deallocator(/*@ owned @*/ xmlLinkPtr l) {
   destroy_port_source(xmlLinkGetData(l));
 }
 
@@ -181,31 +192,38 @@ static int port_declaration_search_name(const void *data0,
                    ((const port_declaration *)data1)->name);
 }
 
-static void xml_doc_deallocator(xmlLinkPtr l) {
+static void xml_doc_deallocator(/*@ owned @*/ xmlLinkPtr l) {
   xmlFreeDoc(xmlLinkGetData(l));
 }
 
 /*@ only @*/
-input_port_instance *new_input_port_instance(/*@ dependent @*/ pipeline_step *owner,
-                                             /*@ dependent @*/ port_declaration *decl,
-                                             /*@ owned @*/ /*@ null @*/ 
-                                             port_connection *connection) {
+input_port_instance *new_input_port_instance(/*@ dependent @*/ const pipeline_step *owner,
+                                             /*@ dependent @*/ const port_declaration *decl,
+                                             /*@ null @*/ 
+                                             port_connection_ptr connection) {
   input_port_instance *p = xmlMalloc(sizeof(*p));
   p->owner = owner;
   p->decl  = decl;
   p->queue = xmlListCreate(xml_doc_deallocator, NULL);
   p->complete = false;
+  /*@-newreftrans@*/
+  /*@-refcounttrans@*/
   p->connection = connection;
+  /*@=refcounttrans@*/
+  /*@=newreftrans@*/
   return p;
 }
 
-void destroy_input_port_instance(input_port_instance *p) {
+void destroy_input_port_instance(/*@ only @*/ /*@ null @*/ input_port_instance *p) {
+  if (p == NULL)
+    return;
+  
   xmlListDelete(p->queue);
   destroy_port_connection(p->connection);
   xmlFree(p);
 }
 
-static void input_port_instance_deallocator(xmlLinkPtr l) {
+static void input_port_instance_deallocator(/*@ owned @*/ xmlLinkPtr l) {
   destroy_input_port_instance(xmlLinkGetData(l));
 }
 
@@ -215,8 +233,9 @@ static int input_port_instance_search_name(const void *data0,
                    ((const input_port_instance *)data1)->decl->name);
 }
 
+/*@ only @*/ /*@ null @*/
 pstep_option_decl *new_pstep_option_decl(const xmlChar *name, 
-                                         const xmlChar *defval) {
+                                         /*@ null @*/ const xmlChar *defval) {
   pstep_option_decl *pd = xmlMalloc(sizeof(*pd));
 
   if (defval == NULL) {
@@ -232,7 +251,7 @@ pstep_option_decl *new_pstep_option_decl(const xmlChar *name,
   return pd;
 }
 
-void destroy_pstep_option_decl(pstep_option_decl *pd) {
+void destroy_pstep_option_decl(/*@ only @*/ /*@ null @*/ pstep_option_decl *pd) {
   if (pd == NULL)
     return;
   xmlFree((xmlChar *)pd->name);
@@ -241,7 +260,7 @@ void destroy_pstep_option_decl(pstep_option_decl *pd) {
   xmlFree(pd);
 }
 
-static void pstep_option_decl_deallocator(xmlLinkPtr l) {
+static void pstep_option_decl_deallocator(/*@ owned @*/ xmlLinkPtr l) {
   destroy_pstep_option_decl(xmlLinkGetData(l));
 }
 
@@ -260,19 +279,21 @@ pipeline_library *new_pipeline_library(const xmlChar *uri) {
   return l;
 }
 
-static void pipeline_decl_hash_deallocator(void *, xmlChar *);
+static void pipeline_decl_hash_deallocator(/*@ owned @*/ void *, xmlChar *);
 
-void destroy_pipeline_library(pipeline_library *pl) {
+void destroy_pipeline_library(/*@ only @*/ /*@ null @*/ pipeline_library *pl) {
   if (pl == NULL)
     return;
   
   if (pl->dyn_library) {
     void *hook = NULL;
-    if (!xmlModuleSymbol(pl->dyn_library, "on_destroy_library", &hook) &&
+    if (xmlModuleSymbol(pl->dyn_library, "on_destroy_library", &hook) == 0 &&
         hook != NULL) {
+      /*@-castfcnptr@*/
       ((void (*)(pipeline_library *))hook)(pl);
+      /*@=castfcnptr@*/
     }
-    xmlModuleClose(pl->dyn_library);
+    (void)xmlModuleClose(pl->dyn_library);
   }
   xmlHashFree(pl->types, pipeline_decl_hash_deallocator);
   xmlHashFree(pl->pipelines, pipeline_decl_hash_deallocator);
@@ -280,13 +301,13 @@ void destroy_pipeline_library(pipeline_library *pl) {
   xmlFree(pl);
 }
 
-static void pipeline_step_deallocator(xmlLinkPtr l);
+static void pipeline_step_deallocator(/*@ owned @*/ xmlLinkPtr l);
 static int pipeline_step_search_name(const void *data0,
                                      const void *data1);
 
 pipeline_decl *new_pipeline_decl(const xmlChar *ns,
                                  const xmlChar *name,
-                                 const pipeline_atomic_type *type) {
+                                 /*@ dependent @*/ const pipeline_atomic_type *type) {
   pipeline_decl *pd = xmlMalloc(sizeof(*pd));
   pd->ns = xmlStrdup(ns);
   pd->name = xmlStrdup(name);
@@ -298,10 +319,13 @@ pipeline_decl *new_pipeline_decl(const xmlChar *ns,
   pd->body = xmlListCreate(pipeline_step_deallocator, 
                            pipeline_step_search_name);
   pd->imports = xmlListCreate(NULL, NULL);
+  pd->primaries[0] = NULL;
+  pd->primaries[1] = NULL;
+  pd->primaries[2] = NULL;
   return pd;
 }
 
-void destroy_pipeline_decl(pipeline_decl *pd) {
+void destroy_pipeline_decl(/*@ only @*/ /*@ null @*/ pipeline_decl *pd) {
   if (pd == NULL)
     return;
   
@@ -311,30 +335,36 @@ void destroy_pipeline_decl(pipeline_decl *pd) {
   xmlListDelete(pd->ports);
   xmlListDelete(pd->body);
   xmlListDelete(pd->imports);
+  xmlFree(pd);
 }
 
-static void pipeline_decl_hash_deallocator(void *data, 
-                                           xmlChar *name ATTRIBUTE_UNUSED) {
+static void pipeline_decl_hash_deallocator(/*@ owned @*/ void *data, 
+                                           /*@ unused @*/ xmlChar *name ATTRIBUTE_UNUSED) {
   destroy_pipeline_decl(data);
 }
 
 
-pipeline_option *new_pipeline_option(pstep_option_decl *decl,
-                                     port_connection *value) {
+/*@ only @*/
+pipeline_option *new_pipeline_option(/*@ dependent @*/ const pstep_option_decl *decl,
+                                     port_connection_ptr value) {
   pipeline_option *po = xmlMalloc(sizeof(*po));
   po->decl = decl;
+  /*@-newreftrans @*/
+  /*@-refcounttrans @*/
   po->value = value;
+  /*@=refcounttrans @*/
+  /*@=newreftrans @*/
   return po;
 }
 
-void destroy_pipeline_option(pipeline_option *po) {
+void destroy_pipeline_option(/*@ only @*/ /*@ null @*/ pipeline_option *po) {
   if (po == NULL)
     return;
   destroy_port_connection(po->value);
   xmlFree(po);
 }
 
-static void pipeline_option_deallocator(xmlLinkPtr l) {
+static void pipeline_option_deallocator(/*@ owned @*/ xmlLinkPtr l) {
   destroy_pipeline_option(xmlLinkGetData(l));
 }
 
@@ -344,17 +374,22 @@ static int pipeline_option_search_name(const void *data0,
                    ((const pipeline_option *)data1)->decl->name);
 }
 
+/*@ only @*/
 pipeline_assignment *new_pipeline_assignment(const xmlChar *ns,
                                              const xmlChar *name,
-                                             port_connection *source) {
+                                             port_connection_ptr source) {
   pipeline_assignment *pa = xmlMalloc(sizeof(*pa));
   pa->ns = xmlStrdup(ns);
   pa->name = xmlStrdup(name);
+  /*@-newreftrans @*/
+  /*@-refcounttrans @*/
   pa->source = source;
+  /*@=refcounttrans @*/
+  /*@=newreftrans @*/
   return pa;
 }
 
-void destroy_pipeline_assignment(pipeline_assignment *pa) {
+void destroy_pipeline_assignment(/*@ only @*/ /*@ null @*/ pipeline_assignment *pa) {
   if (!pa)
     return;
   xmlFree((void *)pa->ns);
@@ -363,18 +398,23 @@ void destroy_pipeline_assignment(pipeline_assignment *pa) {
   xmlFree(pa);
 }
 
-static void pipeline_assignment_deallocator(xmlLinkPtr l) {
+static void pipeline_assignment_deallocator(/*@ owned @*/ xmlLinkPtr l) {
   destroy_pipeline_assignment(xmlLinkGetData(l));
 }
 
-pipeline_branch *new_pipeline_branch(port_connection *test) {
+/*@ only @*/
+pipeline_branch *new_pipeline_branch(port_connection_ptr test) {
   pipeline_branch *pb = xmlMalloc(sizeof(*pb));
+  /*@-newreftrans @*/
+  /*@-refcounttrans @*/
   pb->test = test;
+  /*@=refcounttrans @*/
+  /*@=newreftrans @*/
   pb->body = xmlListCreate(pipeline_step_deallocator, NULL);
   return pb;
 }
 
-void destroy_pipeline_branch(pipeline_branch *br) {
+void destroy_pipeline_branch(/*@ only @*/ /*@ null @*/ pipeline_branch *br) {
   if (!br)
     return;
   destroy_port_connection(br->test);
@@ -383,11 +423,12 @@ void destroy_pipeline_branch(pipeline_branch *br) {
   
 }
 
-static void pipeline_branch_deallocator(xmlLinkPtr l) {
+static void pipeline_branch_deallocator(/*@ owned @*/ xmlLinkPtr l) {
   destroy_pipeline_branch(xmlLinkGetData(l));
 }
 
-pipeline_step *new_pipeline_step(enum pipeline_step_kind kind, xmlChar *name, ...) {
+/*@ null @*/ /*@ only @*/
+pipeline_step *new_pipeline_step(enum pipeline_step_kind kind, const xmlChar *name, ...) {
   pipeline_step *ps = xmlMalloc(sizeof(*ps));
   va_list args;
   
@@ -430,12 +471,13 @@ pipeline_step *new_pipeline_step(enum pipeline_step_kind kind, xmlChar *name, ..
           xmlListDelete(ps->inputs);
           xmlListDelete(ps->outputs);
           xmlListDelete(ps->options);
+          xmlFree(ps);
           return NULL;
         }
       }
       ps->x.viewport.body = xmlListCreate(pipeline_step_deallocator,
                                           pipeline_step_search_name);
-      
+      break;
     }
     case PSTEP_CHOOSE:
       ps->x.choose.assign = xmlListCreate(pipeline_assignment_deallocator,
@@ -450,20 +492,21 @@ pipeline_step *new_pipeline_step(enum pipeline_step_kind kind, xmlChar *name, ..
                                             NULL);
       ps->x.trycatch.try = va_arg(args, pipeline_step *);
       ps->x.trycatch.catch = va_arg(args, pipeline_step *);
+      break;
     default:
-      assert(0);
+      abort();
   }
   va_end(args);
   return ps;
 }
 
-void destroy_pipeline_step(pipeline_step *step) {
+void destroy_pipeline_step(/*@ only @*/ pipeline_step *step) {
   if (!step)
     return;
   
   switch (step->kind) {
     case PSTEP_ATOMIC:
-      if (step->x.atomic.data)
+      if (step->x.atomic.data != NULL && step->x.atomic.decl->type != NULL)
         step->x.atomic.decl->type->destroy(step);
       break;
     case PSTEP_CALL:
@@ -491,7 +534,7 @@ void destroy_pipeline_step(pipeline_step *step) {
       destroy_pipeline_step(step->x.trycatch.catch);
       break;
     default:
-      assert(0);
+      abort();
   }
   xmlListDelete(step->inputs);
   xmlListDelete(step->outputs);
@@ -500,7 +543,7 @@ void destroy_pipeline_step(pipeline_step *step) {
   xmlFree(step);
 }
 
-static void pipeline_step_deallocator(xmlLinkPtr l) {
+static void pipeline_step_deallocator(/*@ owned @*/ xmlLinkPtr l) {
   destroy_pipeline_step(xmlLinkGetData(l));
 }
 

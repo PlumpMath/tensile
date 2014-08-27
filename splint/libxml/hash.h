@@ -109,8 +109,9 @@ XMLPUBFUN xmlHashTablePtr XMLCALL
 			xmlHashCreateDict(int size,
 					 xmlDictPtr dict);
 XMLPUBFUN void XMLCALL			
-			xmlHashFree	(xmlHashTablePtr table,
-					 xmlHashDeallocator f);
+xmlHashFree	(/*@ only @*/ /*@ null @*/ /*@ out @*/ xmlHashTablePtr table,
+             xmlHashDeallocator f) /*@*/
+  /*@modifies table @*/;
 
 /*
  * Add a new entry to the hash table.
