@@ -17,7 +17,9 @@ include $(C_SOURCES:.c=.d)
 
 .PHONY : lint
 lint : $(C_SOURCES:.c=.o)
-	$(SPLINT) $(SPLINTFLAGS) $(C_SOURCES)
+	set -e; for f in $(C_SOURCES); do \
+		$(SPLINT) $(SPLINTFLAGS) $$f; \
+	done
 
 
 %.o : %.c

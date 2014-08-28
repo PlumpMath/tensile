@@ -737,7 +737,7 @@ XMLPUBFUN void XMLCALL
 XMLPUBFUN xmlDocPtr XMLCALL 	
 		xmlNewDoc		(const xmlChar *version);
 XMLPUBFUN void XMLCALL		
-xmlFreeDoc		(/*@ only @*/ /*@ out @*/ /*@ null @*/ xmlDocPtr cur) /*@*/
+xmlFreeDoc		(/*@ only @*/ /*@ out @*/ /*@ null @*/ xmlDocPtr cur)
   /*@modifies cur @*/; 
 XMLPUBFUN xmlAttrPtr XMLCALL	
 		xmlNewDocProp		(xmlDocPtr doc,

@@ -201,13 +201,14 @@ XMLPUBFUN xmlParserInputBufferCreateFilenameFunc XMLCALL
 extern void XMLCALL xmlFree(/*@null@*/ /*@out@*/ /*@only@*/ void *mem) 
 /*@modifies mem @*/;
 
-extern /*@only@*/ /*@out@ */ void * LIBXML_ATTR_ALLOC_SIZE(1) XMLCALL xmlMalloc(size_t size) /*@*/
+extern /*@only@*/ /*@out@ */ void * LIBXML_ATTR_ALLOC_SIZE(1) XMLCALL xmlMalloc(size_t size)
   /*@ensures maxSet(result) == (size - 1); @*/;
-extern /*@only@*/ /*@out@*/ void * LIBXML_ATTR_ALLOC_SIZE(1) XMLCALL xmlMallocAtomic(size_t size) /*@*/
+extern /*@only@*/ /*@out@*/ void * LIBXML_ATTR_ALLOC_SIZE(1) XMLCALL xmlMallocAtomic(size_t size)
    /*@ensures maxSet(result) == (size - 1); @*/;
 
-extern void * XMLCALL xmlRealloc(void *mem, size_t size);
-extern /* @only@ */ char * XMLCALL xmlMemStrdup(const char *str);
+extern /*@only@*/ void * XMLCALL xmlRealloc(/*@null@*/ /*@only@*/ /*@out@*/ /*@returned@*/ void *mem, size_t size)
+  /*@ensures maxSet(result) >= (size - 1) @*/;
+extern /*@only@*/ char * XMLCALL xmlMemStrdup(const char *str);
 
 
 

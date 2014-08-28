@@ -56,7 +56,7 @@ XMLPUBFUN xmlListPtr XMLCALL
 xmlListCreate		(/*@ null @*/ xmlListDeallocator deallocator,
                      /*@ null @*/ xmlListDataCompare compare);
 XMLPUBFUN void XMLCALL		
-xmlListDelete		(/*@ only @*/ /*@ out @*/ xmlListPtr l) /*@*/
+xmlListDelete		(/*@ only @*/ /*@ out @*/ xmlListPtr l)
   /*@modifies l@*/;
 
 /* Basic Operators */
