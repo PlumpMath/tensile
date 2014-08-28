@@ -47,7 +47,7 @@ static void split_qname(xmlXPathParserContextPtr ctx,
 }
 
 static xmlChar *detect_language(void) {
-  static const char * varnames[] = {
+  static /*@ observer @*/ const char * varnames[] = {
     "LANGUAGE",
     "LANG",
     "LC_MESSAGES",
@@ -201,7 +201,8 @@ static void pipeline_xpath_iter_position(xmlXPathParserContextPtr ctx,
     return;
   }
 
-  xmlXPathReturnNumber(ctx, p_context ? (double)p_context->iter_position : 1.0);
+  xmlXPathReturnNumber(ctx, p_context != NULL ? 
+                       (double)p_context->iter_position : 1.0);
 }
 
 static void pipeline_xpath_iter_size(xmlXPathParserContextPtr ctx,
@@ -213,7 +214,8 @@ static void pipeline_xpath_iter_size(xmlXPathParserContextPtr ctx,
     return;
   }
 
-  xmlXPathReturnNumber(ctx, p_context ? (double)p_context->iter_size : 1.0);
+  xmlXPathReturnNumber(ctx, p_context != NULL ? 
+                       (double)p_context->iter_size : 1.0);
 }
 
 static void pipeline_xpath_base_uri(xmlXPathParserContextPtr ctx,
@@ -318,15 +320,15 @@ static xmlXPathObjectPtr pipeline_xpath_lookup_binding(void *ctxt,
                                                        const xmlChar *ns_uri) {
   xmlXPathObjectPtr obj = 
     xmlHashLookup2(((pipeline_exec_context *)ctxt)->bindings, name, ns_uri);
-  return obj ? xmlXPathObjectCopy(obj) : NULL;
+  return obj != NULL ? xmlXPathObjectCopy(obj) : NULL;
 }
 
 
 void pipeline_xpath_update_doc(xmlXPathContextPtr ctx, xmlDocPtr doc) {
   static /*@ owned @*/ xmlDocPtr xproc_empty_doc = NULL;
   
-  if (!doc) {
-    if (!xproc_empty_doc)
+  if (doc == NULL) {
+    if (xproc_empty_doc == NULL)
       xproc_empty_doc = xmlNewDoc((const xmlChar *)"1.0");
     doc = xproc_empty_doc;
   }
@@ -345,7 +347,7 @@ xmlXPathContext *pipeline_xpath_create_static_context(xmlDocPtr xproc_doc,
   xmlXPathContextPtr newctx;
   xmlNsPtr *nslist;
   static const struct {
-    const char *name;
+    /*@ observer @*/ const char *name;
     xmlXPathFunction func;
   } xpath_functions[] = {
     {"system-property", pipeline_xpath_system_property},

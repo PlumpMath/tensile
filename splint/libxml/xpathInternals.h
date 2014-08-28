@@ -350,7 +350,7 @@ XMLPUBFUN void XMLCALL
 		xmlXPatherror	(xmlXPathParserContextPtr ctxt,
 				 const char *file,
 				 int line,
-				 int no);
+				 xmlXPathError no);
 
 XMLPUBFUN void XMLCALL
 		xmlXPathErr	(xmlXPathParserContextPtr ctxt,

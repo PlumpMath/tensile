@@ -370,7 +370,7 @@ struct _xmlXPathParserContext {
     const xmlChar *cur;			/* the current char being parsed */
     const xmlChar *base;			/* the full expression */
 
-    int error;				/* error code */
+    xmlXPathError error;				/* error code */
 
     xmlXPathContextPtr  context;	/* the evaluation context */
     xmlXPathObjectPtr     value;	/* the current value */

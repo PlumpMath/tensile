@@ -76,20 +76,32 @@ typedef struct port_source {
 typedef struct port_connection {
   /*@refs@*/ unsigned refcnt;
   /*@null@*/ /*@owned@*/ xmlXPathCompExprPtr filter;
-  xmlListPtr /* port_source */ sources; 
+  /*@owned@*/ xmlListPtr /* port_source */ sources; 
 } port_connection;
 
 typedef /*@refcounted@*/ port_connection *port_connection_ptr;
 
-/*@unused@*/ /*@null@*/ /*@ newref @*/
-static inline port_connection_ptr
-use_port_connection(/*@ returned @*/ /*@ null @*/ port_connection_ptr p) {
-  if (!p)
-    return NULL;
-  
+static inline
+/*@newref@*/
+port_connection_ptr
+use_port_connection_nonull(port_connection_ptr p)
+  /*@modifies p @*/
+{
   p->refcnt++;
+  /*@-refcounttrans @*/
   return p;
+  /*@=refcounttrans @*/
 }
+
+static inline
+/*@unused@*/ /*@null@*/ /*@newref@*/
+port_connection_ptr
+use_port_connection(/*@null@*/ port_connection_ptr p) {
+  if (p == NULL)
+    return NULL;
+  return use_port_connection_nonull(p);
+}
+
 
 enum port_kind {
   PORT_INPUT_DOCUMENT,
@@ -280,6 +292,42 @@ extern void destroy_input_port_instance(/*@ only @*/ /*@ null @*/ input_port_ins
 extern /*@ only @*/ /*@ null @*/
 pstep_option_decl *new_pstep_option_decl(const xmlChar *name, 
                                          /*@ null @*/ const xmlChar *defval);
+
+extern void destroy_pstep_option_decl(/*@ only @*/ /*@ null @*/ pstep_option_decl *pd) 
+  /*@modifies pd @*/;
+extern /*@only@*/ pipeline_library *new_pipeline_library(const xmlChar *uri);
+extern void destroy_pipeline_library(/*@ only @*/ /*@ null @*/ pipeline_library *pl)
+  /*@modifies pl @*/;
+
+extern /*@only@*/ pipeline_decl *new_pipeline_decl(const xmlChar *ns,
+                                                   const xmlChar *name,
+                                                   /*@ dependent @*/ /*@null@*/ 
+                                                   const pipeline_atomic_type *type);
+extern void destroy_pipeline_decl(/*@ only @*/ /*@ null @*/ pipeline_decl *pd)
+  /*@modifies pd @*/;
+
+extern /*@ only @*/
+pipeline_option *new_pipeline_option(/*@ dependent @*/ const pstep_option_decl *decl,
+                                     port_connection_ptr value);
+extern void destroy_pipeline_option(/*@ only @*/ /*@ null @*/ pipeline_option *po);
+
+extern /*@ only @*/
+pipeline_assignment *new_pipeline_assignment(const xmlChar *ns,
+                                             const xmlChar *name,
+                                             port_connection_ptr source);
+
+extern void destroy_pipeline_assignment(/*@ only @*/ /*@ null @*/ pipeline_assignment *pa)
+  /*@modifies pa @*/;
+
+extern /*@ only @*/ pipeline_branch *new_pipeline_branch(port_connection_ptr test);
+
+extern void destroy_pipeline_branch(/*@ only @*/ /*@ null @*/ pipeline_branch *br);
+
+extern /*@ null @*/ /*@ only @*/
+pipeline_step *new_pipeline_step(enum pipeline_step_kind kind, const xmlChar *name, ...);
+
+extern void destroy_pipeline_step(/*@ only @*/ /*@ null @*/ pipeline_step *step)
+  /*@modifies step @*/;
 
 #ifdef __cplusplus
 }
