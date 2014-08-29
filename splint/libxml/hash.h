@@ -128,7 +128,7 @@ XMLPUBFUN int XMLCALL
 XMLPUBFUN int XMLCALL		    
 			xmlHashAddEntry2(xmlHashTablePtr table,
 		                         const xmlChar *name,
-		                         const xmlChar *name2,
+                             /*@ null @*/ const xmlChar *name2,
 		                         void *userdata);
 XMLPUBFUN int XMLCALL			
 			xmlHashUpdateEntry2(xmlHashTablePtr table,
