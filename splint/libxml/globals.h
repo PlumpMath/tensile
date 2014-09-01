@@ -299,36 +299,16 @@ XMLPUBVAR int xmlDoValidityCheckingDefaultValue;
 XMLPUBFUN int XMLCALL xmlThrDefDoValidityCheckingDefaultValue(int v);
 
 XMLPUBFUN xmlGenericErrorFunc * XMLCALL __xmlGenericError(void);
-#ifdef LIBXML_THREAD_ENABLED
-#define xmlGenericError \
-(*(__xmlGenericError()))
-#else
 XMLPUBVAR xmlGenericErrorFunc xmlGenericError;
-#endif
 
 XMLPUBFUN xmlStructuredErrorFunc * XMLCALL __xmlStructuredError(void);
-#ifdef LIBXML_THREAD_ENABLED
-#define xmlStructuredError \
-(*(__xmlStructuredError()))
-#else
 XMLPUBVAR xmlStructuredErrorFunc xmlStructuredError;
-#endif
 
 XMLPUBFUN void * * XMLCALL __xmlGenericErrorContext(void);
-#ifdef LIBXML_THREAD_ENABLED
-#define xmlGenericErrorContext \
-(*(__xmlGenericErrorContext()))
-#else
 XMLPUBVAR void * xmlGenericErrorContext;
-#endif
 
 XMLPUBFUN void * * XMLCALL __xmlStructuredErrorContext(void);
-#ifdef LIBXML_THREAD_ENABLED
-#define xmlStructuredErrorContext \
-(*(__xmlStructuredErrorContext()))
-#else
 XMLPUBVAR void * xmlStructuredErrorContext;
-#endif
 
 XMLPUBFUN int * XMLCALL __xmlGetWarningsDefaultValue(void);
 #ifdef LIBXML_THREAD_ENABLED

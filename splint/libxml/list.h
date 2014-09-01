@@ -85,23 +85,29 @@ XMLPUBFUN void XMLCALL
 		xmlListClear		(xmlListPtr l);
 XMLPUBFUN int XMLCALL		
 		xmlListEmpty		(xmlListPtr l);
-XMLPUBFUN xmlLinkPtr XMLCALL	
+XMLPUBFUN /*@dependent@*/ /*@null@*/ xmlLinkPtr XMLCALL	
 		xmlListFront		(xmlListPtr l);
-XMLPUBFUN xmlLinkPtr XMLCALL	
+XMLPUBFUN /*@dependent@*/ /*@null@*/ xmlLinkPtr XMLCALL	
 		xmlListEnd		(xmlListPtr l);
 XMLPUBFUN int XMLCALL		
 		xmlListSize		(xmlListPtr l);
 
 XMLPUBFUN void XMLCALL		
-		xmlListPopFront		(xmlListPtr l);
+		xmlListPopFront		(xmlListPtr l)
+  /*@modifies l @*/;
 XMLPUBFUN void XMLCALL		
-		xmlListPopBack		(xmlListPtr l);
-XMLPUBFUN int XMLCALL		
+		xmlListPopBack		(xmlListPtr l)
+  /*@modifies l @*/;
+XMLPUBFUN int /*@alt void @*/ XMLCALL		
 		xmlListPushFront	(xmlListPtr l,
-					 void *data);
-XMLPUBFUN int XMLCALL		
+                             /*@ owned @*/ /*@ null @*/
+                             void *data)
+  /*@modifies l @*/;
+XMLPUBFUN int /*@alt void @*/ XMLCALL		
 		xmlListPushBack		(xmlListPtr l,
-					 void *data);
+                             /*@ owned @*/ /*@ null @*/
+                             void *data)
+  /*@modifies l @*/;
 
 /* Advanced Operators */
 XMLPUBFUN void XMLCALL		

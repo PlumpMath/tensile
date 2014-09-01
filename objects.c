@@ -536,9 +536,49 @@ static int pipeline_step_search_name(const void *data0,
 
 bool pipeline_library_add_type(pipeline_library *lib,
                                pipeline_decl *decl) {
-  return xmlHashAddEntry2(lib->types,
-                          decl->name == NULL ? 
-                          (const xmlChar *)"" : decl->name,
-                          decl->ns,
-                          decl) == 0;
+  if (xmlHashAddEntry2(lib->types,
+                       decl->name == NULL ? 
+                       (const xmlChar *)"" : decl->name,
+                       decl->ns,
+                       decl) == 0)
+    return true;
+//  pipeline_report_error("cannot add type %s:%s",
+//                        decl->ns == NULL ? "" : (const char *)decl->ns,
+//                        decl->name == NULL ? "" : (const char *)decl->name);
+  return false;
+}
+
+bool pipeline_library_add_pipeline(pipeline_library *lib,
+                                   pipeline_decl *decl) {
+  if (xmlHashAddEntry(lib->pipelines,
+                      decl->name == NULL ? 
+                      (const xmlChar *)"" : decl->name,
+                      decl) == 0)
+    return true;
+//  pipeline_report_error("cannot add pipeline %s",
+//                        decl->name == NULL ? "" : (const char *)decl->name);
+  return false;
+}
+
+void port_connection_add_source(port_connection *pc,
+                                port_source *ps) {
+  xmlListPushBack(pc->sources, ps);
+}
+
+void input_port_instance_push_document(input_port_instance *ipi,
+                                       xmlDocPtr doc) {
+  xmlListPushFront(ipi->queue, doc);
+}
+
+
+xmlDocPtr input_port_instance_fetch_document(input_port_instance *ipi) {
+  xmlLinkPtr front = xmlListFront(ipi->queue);
+  
+  if (front == NULL)
+    return NULL;
+  return (xmlDocPtr)xmlLinkGetData(front);
+}
+
+void input_port_instance_advance_queue(input_port_instance *ipi) {
+  xmlListPopFront(ipi->queue);
 }

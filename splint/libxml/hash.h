@@ -118,51 +118,66 @@ xmlHashFree	(/*@ only @*/ /*@ null @*/ /*@ out @*/ xmlHashTablePtr table,
  */
 XMLPUBFUN int XMLCALL			
 			xmlHashAddEntry	(xmlHashTablePtr table,
-		                         const xmlChar *name,
-		                         void *userdata);
+                             const xmlChar *name,
+                             /*@owned@*/
+                             void *userdata)
+  /*@modifies table @*/;
 XMLPUBFUN int XMLCALL			
 			xmlHashUpdateEntry(xmlHashTablePtr table,
-		                         const xmlChar *name,
-		                         void *userdata,
-					 xmlHashDeallocator f);
+                               const xmlChar *name,
+                               /*@owned@*/
+                               void *userdata,
+                               xmlHashDeallocator f)
+  /*@modifies table @*/;
 XMLPUBFUN int XMLCALL		    
 			xmlHashAddEntry2(xmlHashTablePtr table,
 		                         const xmlChar *name,
                              /*@ null @*/ const xmlChar *name2,
-		                         void *userdata);
+                             /*@owned@*/
+		                         void *userdata)
+  /*@modifies table @*/;
 XMLPUBFUN int XMLCALL			
 			xmlHashUpdateEntry2(xmlHashTablePtr table,
 		                         const xmlChar *name,
 		                         const xmlChar *name2,
+                                /*@owned@*/
 		                         void *userdata,
-					 xmlHashDeallocator f);
+                                xmlHashDeallocator f)
+  /*@modifies table @*/;
 XMLPUBFUN int XMLCALL			
 			xmlHashAddEntry3(xmlHashTablePtr table,
-		                         const xmlChar *name,
-		                         const xmlChar *name2,
-		                         const xmlChar *name3,
-		                         void *userdata);
+                             const xmlChar *name,
+                             const xmlChar *name2,
+                             const xmlChar *name3,
+                             /*@owned@*/
+                             void *userdata)
+  /*@modifies table @*/;
 XMLPUBFUN int XMLCALL			
 			xmlHashUpdateEntry3(xmlHashTablePtr table,
-		                         const xmlChar *name,
-		                         const xmlChar *name2,
-		                         const xmlChar *name3,
-		                         void *userdata,
-					 xmlHashDeallocator f);
+                                const xmlChar *name,
+                                const xmlChar *name2,
+                                const xmlChar *name3,
+                                /*@owned@*/
+                                void *userdata,
+                                xmlHashDeallocator f)
+  /*@modifies table @*/;
 
 /*
  * Remove an entry from the hash table.
  */
 XMLPUBFUN int XMLCALL     
 			xmlHashRemoveEntry(xmlHashTablePtr table, const xmlChar *name,
-                           xmlHashDeallocator f);
+                           xmlHashDeallocator f)
+  /*@modifies table @*/;
 XMLPUBFUN int XMLCALL     
 			xmlHashRemoveEntry2(xmlHashTablePtr table, const xmlChar *name,
-                            const xmlChar *name2, xmlHashDeallocator f);
+                            const xmlChar *name2, xmlHashDeallocator f)
+  /*@modifies table @*/;
 XMLPUBFUN int  XMLCALL    
 			xmlHashRemoveEntry3(xmlHashTablePtr table, const xmlChar *name,
                             const xmlChar *name2, const xmlChar *name3,
-                            xmlHashDeallocator f);
+                            xmlHashDeallocator f)
+  /*@modifies table @*/;
 
 /*
  * Retrieve the userdata.
