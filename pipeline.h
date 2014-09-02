@@ -240,39 +240,8 @@ typedef struct pipeline_exec_context {
   xmlHashTablePtr bindings;
 } pipeline_exec_context;
 
-typedef struct pipeline_error {
-  xmlErrorLevel level;
-  /*@owned@*/ /*@null@*/ const xmlChar *step_name;
-  /*@owned@*/ /*@null@*/ const xmlChar *step_type;
-  /*@owned@*/ /*@null@*/ const xmlChar *step_type_ns;
-  /*@owned@*/ /*@null@*/ const xmlChar *code;
-  /*@owned@*/ /*@null@*/ const xmlChar *code_ns;
-  /*@owned@*/ /*@null@*/ const xmlChar *href;
-  int lineno;
-  int columno;
-  int offset;
-  /*@owned@*/ /*@null@*/ const xmlChar *details;
-} pipeline_error;
 
-extern /*@only@*/ pipeline_error *pipeline_error_new(xmlErrorLevel level,
-                                                     const xmlChar *step_name,
-                                                     const xmlChar *step_type,
-                                                     const xmlChar *step_type_ns,
-                                                     const xmlChar *code,
-                                                     const xmlChar *code_ns,
-                                                     const xmlChar *href,
-                                                     int lineno,
-                                                     int columno,
-                                                     int offset,
-                                                     const xmlChar *details);
-
-extern void pipeline_error_destroy(/*@ null @*/ /*@ only @*/ pipeline_error *err)
-  /*@modifies err @*/;
-
-extern void pipeline_error_print(/*@null@*/ const pipeline_error *err);
-
-extern /*@only@*/ /*@null@*/ 
-pipeline_error *pipeline_error_from_xml_error(/*@null@*/ xmlErrorPtr err);
+extern void pipeline_report_error();
 
 extern void pipeline_run_hooks(const char *name, void *data);
 
@@ -383,11 +352,8 @@ extern void input_port_instance_push_document(input_port_instance *ipi,
                                               xmlDocPtr doc)
   /*@modifies ipi->queue @*/;
 
-extern /*@dependent@*/ /*@null@*/
-xmlDocPtr input_port_instance_fetch_document(input_port_instance *ipi);
-
-extern void input_port_instance_advance_queue(input_port_instance *ipi)
-  /*@modifies ipi->queue @*/;
+extern /*@only@*/ /*@null@*/
+xmlDocPtr input_port_instance_next_document(input_port_instance *ipi);
 
 
 extern /*@null@*/ /*@dependent@*/ pipeline_library *pipeline_library_load(const char *uri);

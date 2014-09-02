@@ -188,10 +188,6 @@ static int port_declaration_search_name(const void *data0,
                    ((const port_declaration *)data1)->name);
 }
 
-static void xml_doc_deallocator(/*@ owned @*/ xmlLinkPtr l) {
-  xmlFreeDoc(xmlLinkGetData(l));
-}
-
 /*@ only @*/
 input_port_instance *input_port_instance_new(/*@ dependent @*/ const pipeline_step *owner,
                                              /*@ dependent @*/ const port_declaration *decl,
@@ -200,7 +196,7 @@ input_port_instance *input_port_instance_new(/*@ dependent @*/ const pipeline_st
   input_port_instance *p = xmlMalloc(sizeof(*p));
   p->owner = owner;
   p->decl  = decl;
-  p->queue = xmlListCreate(xml_doc_deallocator, NULL);
+  p->queue = xmlListCreate(NULL, NULL);
   p->complete = false;
   p->connection = port_connection_use(connection);
   return p;
@@ -210,6 +206,12 @@ void input_port_instance_destroy(/*@ only @*/ /*@ null @*/ input_port_instance *
   if (p == NULL)
     return;
   
+  for (;;) {
+    xmlDocPtr next = input_port_instance_next_document(p);
+    if (next == NULL)
+      break;
+    xmlFreeDoc(next);
+  }
   xmlListDelete(p->queue);
   port_connection_destroy(p->connection);
   xmlFree(p);
@@ -571,14 +573,14 @@ void input_port_instance_push_document(input_port_instance *ipi,
 }
 
 
-xmlDocPtr input_port_instance_fetch_document(input_port_instance *ipi) {
+xmlDocPtr input_port_instance_next_document(input_port_instance *ipi) {
   xmlLinkPtr front = xmlListFront(ipi->queue);
+  xmlDocPtr doc = NULL;
   
   if (front == NULL)
     return NULL;
-  return (xmlDocPtr)xmlLinkGetData(front);
+  doc = (xmlDocPtr)xmlLinkGetData(front);
+  xmlListPopFront(ipi->queue);
+  return doc;
 }
 
-void input_port_instance_advance_queue(input_port_instance *ipi) {
-  xmlListPopFront(ipi->queue);
-}
