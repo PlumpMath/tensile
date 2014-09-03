@@ -364,7 +364,8 @@ xmlXPathContext *pipeline_xpath_create_static_context(xmlDocPtr xproc_doc,
 
   newctx = xmlXPathNewContext(NULL);
   if (newctx == NULL)
-    return NULL;
+    pipeline_report_xml_error(xmlGetLastError());
+  
   pipeline_xpath_update_doc(newctx, NULL);
   newctx->contextSize = newctx->proximityPosition = 1;
   newctx->extra = NULL;

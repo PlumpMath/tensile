@@ -51,7 +51,7 @@ static int output_port_instance_search_name(const void *data0,
                    ((const output_port_instance *)data1)->decl->name);
 }
 
-/*@ only @*/ /*@ null @*/
+/*@ only @*/
 port_source *port_source_new(enum port_source_kind kind, ...) {
   port_source *s = xmlMalloc(sizeof(*s));
   va_list args;
@@ -120,7 +120,7 @@ static void port_source_deallocator(/*@ owned @*/ xmlLinkPtr l) {
   port_source_destroy(xmlLinkGetData(l));
 }
 
-/*@ null @*/ /*@ newref @*/
+/*@ newref @*/
 port_connection_ptr port_connection_new(const xmlChar *filter) {
   port_connection *p = xmlMalloc(sizeof(*p));
 
@@ -131,7 +131,7 @@ port_connection_ptr port_connection_new(const xmlChar *filter) {
     p->filter = xmlXPathCompile(filter);
     if (p->filter == NULL) {
       xmlFree(p);
-      return NULL;
+      pipeline_report_xml_error(xmlGetLastError());
     }
   }
   p->sources = xmlListCreate(port_source_deallocator, NULL);
@@ -227,7 +227,7 @@ static int input_port_instance_search_name(const void *data0,
                    ((const input_port_instance *)data1)->decl->name);
 }
 
-/*@ only @*/ /*@ null @*/
+/*@ only @*/
 pstep_option_decl *pstep_option_decl_new(const xmlChar *name, 
                                          /*@ null @*/ const xmlChar *defval) {
   pstep_option_decl *pd = xmlMalloc(sizeof(*pd));
@@ -238,7 +238,7 @@ pstep_option_decl *pstep_option_decl_new(const xmlChar *name,
     pd->defval = xmlXPathCompile(defval);
     if (pd->defval == NULL) {
       xmlFree(pd);
-      return NULL;
+      pipeline_report_xml_error(xmlGetLastError());
     }
   }
   pd->name = xmlStrdup(name);
@@ -410,7 +410,7 @@ static void pipeline_branch_deallocator(/*@ owned @*/ xmlLinkPtr l) {
   pipeline_branch_destroy(xmlLinkGetData(l));
 }
 
-/*@ null @*/ /*@ only @*/
+/*@ only @*/
 pipeline_step *pipeline_step_new(enum pipeline_step_kind kind, const xmlChar *name, ...) {
   pipeline_step *ps = xmlMalloc(sizeof(*ps));
   va_list args;
@@ -430,6 +430,9 @@ pipeline_step *pipeline_step_new(enum pipeline_step_kind kind, const xmlChar *na
     case PSTEP_ATOMIC:
       ps->x.atomic.decl = va_arg(args, pipeline_decl *);
       ps->x.atomic.data = NULL;
+      break;
+    case PSTEP_ERROR:
+      ps->x.error_code = va_arg(args, xproc_error);
       break;
     case PSTEP_CALL:
       ps->x.call = va_arg(args, pipeline_decl *);
@@ -455,7 +458,7 @@ pipeline_step *pipeline_step_new(enum pipeline_step_kind kind, const xmlChar *na
           xmlListDelete(ps->outputs);
           xmlListDelete(ps->options);
           xmlFree(ps);
-          return NULL;
+          pipeline_report_xml_error(xmlGetLastError());
         }
       }
       ps->x.viewport.body = xmlListCreate(pipeline_step_deallocator,
@@ -536,30 +539,34 @@ static int pipeline_step_search_name(const void *data0,
                    ((const pipeline_step *)data1)->name);
 }
 
-bool pipeline_library_add_type(pipeline_library *lib,
+void pipeline_library_add_type(pipeline_library *lib,
                                pipeline_decl *decl) {
   if (xmlHashAddEntry2(lib->types,
                        decl->name == NULL ? 
                        (const xmlChar *)"" : decl->name,
                        decl->ns,
                        decl) == 0)
-    return true;
-//  pipeline_report_error("cannot add type %s:%s",
-//                        decl->ns == NULL ? "" : (const char *)decl->ns,
-//                        decl->name == NULL ? "" : (const char *)decl->name);
-  return false;
+    return;
+  pipeline_report_xproc_error(NULL,
+                              decl->name,
+                              decl->ns,
+                              XPROC_ERR_STATIC_DUPLICATE_TYPE,
+                              lib->uri,
+                              0, 0, 0);
 }
 
-bool pipeline_library_add_pipeline(pipeline_library *lib,
+void pipeline_library_add_pipeline(pipeline_library *lib,
                                    pipeline_decl *decl) {
   if (xmlHashAddEntry(lib->pipelines,
                       decl->name == NULL ? 
                       (const xmlChar *)"" : decl->name,
                       decl) == 0)
-    return true;
-//  pipeline_report_error("cannot add pipeline %s",
-//                        decl->name == NULL ? "" : (const char *)decl->name);
-  return false;
+    return;
+  pipeline_report_xproc_error(decl->name,
+                              NULL, NULL,
+                              XPROC_ERR_STATIC_DUPLICATE_STEP_NAME,
+                              lib->uri,
+                              0, 0, 0);
 }
 
 void port_connection_add_source(port_connection *pc,
