@@ -524,6 +524,40 @@ xmlDocPtr input_port_instance_next_document(input_port_instance *ipi);
 extern /*@dependent@*/ pipeline_library *pipeline_library_load(const char *uri);
 
 
+extern void pipeline_decl_add_option(pipeline_decl *decl,
+                                     pstep_option_decl *option);
+
+extern void pipeline_decl_add_port(pipeline_decl *decl,
+                                   port_declaration *option);
+
+extern void pipeline_decl_add_step(pipeline_decl *decl,
+                                   pipeline_step *step);
+
+extern void pipeline_decl_import(pipeline_decl *decl,
+                                 const xmlChar *uri);
+
+extern void pipeline_branch_add_step(pipeline_branch *branch,
+                                     pipeline_step *step);
+
+extern void pipeline_step_add_step(pipeline_step *step,
+                                   pipeline_step *innerstep);
+
+extern void pipeline_step_add_option(pipeline_step *step,
+                                     pipeline_option *option);
+
+extern void pipeline_step_add_input_port(pipeline_step *step,
+                                         input_port_instance *inp);
+
+extern void pipeline_step_add_output_port(pipeline_step *step,
+                                          output_port_instance *outp);
+
+extern void pipeline_step_add_assignment(pipeline_step *step,
+                                         pipeline_assignment *assign);
+extern void pipeline_step_add_branch(pipeline_step *step,
+                                     pipeline_branch *branch);
+
+
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
