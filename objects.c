@@ -26,12 +26,11 @@
 #include "pipeline.h"
 
 /*@ only @*/
-output_port_instance *output_port_instance_new(/*@ dependent @*/ pipeline_step *owner,
-                                               /*@ dependent @*/ port_declaration *decl,
+output_port_instance *output_port_instance_new(/*@ dependent @*/ const port_declaration *decl,
                                                /*@ null @*/ /*@ dependent @*/ input_port_instance *connected) {
   output_port_instance *p = xmlMalloc(sizeof(*p));
 
-  p->owner     = owner;
+  p->owner     = NULL;
   p->decl      = decl;
   p->connected = connected;
   return p;
@@ -189,12 +188,11 @@ static int port_declaration_search_name(const void *data0,
 }
 
 /*@ only @*/
-input_port_instance *input_port_instance_new(/*@ dependent @*/ const pipeline_step *owner,
-                                             /*@ dependent @*/ const port_declaration *decl,
+input_port_instance *input_port_instance_new(/*@ dependent @*/ const port_declaration *decl,
                                              /*@ null @*/ 
                                              port_connection_ptr connection) {
   input_port_instance *p = xmlMalloc(sizeof(*p));
-  p->owner = owner;
+  p->owner = NULL;
   p->decl  = decl;
   p->queue = xmlListCreate(NULL, NULL);
   p->complete = false;
@@ -317,6 +315,7 @@ pipeline_decl *pipeline_decl_new(const xmlChar *ns,
   pd->primaries[0] = NULL;
   pd->primaries[1] = NULL;
   pd->primaries[2] = NULL;
+  pd->names = xmlHashCreate(16);
   return pd;
 }
 
@@ -330,6 +329,7 @@ void pipeline_decl_destroy(/*@ only @*/ /*@ null @*/ pipeline_decl *pd) {
   xmlListDelete(pd->ports);
   xmlListDelete(pd->body);
   xmlListDelete(pd->imports);
+  xmlHashFree(pd->names, NULL);
   xmlFree(pd);
 }
 
@@ -623,20 +623,24 @@ void pipeline_decl_add_port(pipeline_decl *decl,
   /*@=enumindex@*/
 }
 
-static void generic_add_step(xmlListPtr target, /*@keep@*/ pipeline_step *step)
-  /*@modifies target @*/ {
+static void generic_add_step(pipeline_decl *decl, xmlListPtr target, /*@keep@*/ pipeline_step *step)
+  /*@modifies decl->names,target @*/ {
   if (step->name != NULL && 
-      xmlListSearch(target, step) != NULL) {
+      xmlHashLookup(decl->names, step->name) != NULL) {
     pipeline_report_xproc_error(step->name, NULL, NULL,
                                 XPROC_ERR_STATIC_DUPLICATE_STEP_NAME,
                                 NULL, 0, 0, 0);
   }
   xmlListPushBack(target, step);
+  /*@-kepttrans@*/
+  if (step->name != NULL)
+    (void)xmlHashAddEntry(decl->names, step->name, step);
+  /*@=kepttrans@*/
 }
 
 void pipeline_decl_add_step(pipeline_decl *decl,
                             pipeline_step *step) {
-  generic_add_step(decl->body, step);
+  generic_add_step(decl, decl->body, step);
   
 }
 
@@ -648,20 +652,67 @@ void pipeline_decl_import(pipeline_decl *decl,
   /*@=dependenttrans@*/
 }
 
-void pipeline_branch_add_step(pipeline_branch *branch,
+void pipeline_branch_add_step(pipeline_decl *decl,
+                              pipeline_branch *branch,
                               pipeline_step *step) {
-  generic_add_step(branch->body, step);
+  generic_add_step(decl, branch->body, step);
 }
 
 
-extern void pipeline_step_add_step(pipeline_step *step,
-                                   pipeline_step *innerstep);
+/*@-mustmod@*/
+void pipeline_step_add_step(pipeline_decl *decl,
+                            pipeline_step *step,
+                            pipeline_step *innerstep) {
+  xmlListPtr target = NULL;
 
-extern void pipeline_step_add_option(pipeline_step *step,
-                                     pipeline_option *option);
+  switch (step->kind) {
+    case PSTEP_FOREACH:
+    case PSTEP_GROUP:
+      target = step->x.body;
+      break;
+    case PSTEP_VIEWPORT:
+      target = step->x.viewport.body;
+      break;
+    case PSTEP_CHOOSE:
+      target = step->x.choose.otherwise;
+      break;
+    default:
+      abort();
+  }
+  generic_add_step(decl, target, innerstep);
+}
+/*@=mustmod@*/
 
-extern void pipeline_step_add_input_port(pipeline_step *step,
-                                         input_port_instance *inp);
+
+void pipeline_step_add_option(pipeline_step *step,
+                              pipeline_option *option) {
+  if (xmlListSearch(step->options, option) != NULL) {
+    pipeline_report_xproc_error(step->name, NULL, NULL,
+                                XPROC_ERR_STATIC_DUPLICATE_BINDING,
+                                NULL, 0, 0, 0);
+  }
+  xmlListPushFront(step->options, option);
+}
+
+void pipeline_step_add_input_port(pipeline_step *step,
+                                  input_port_instance *inp) {
+  assert(inp->owner == NULL);
+  if (inp->decl->primary && 
+      step->primary_inputs[inp->decl->kind == PORT_INPUT_PARAMETERS] != NULL) {
+    pipeline_report_xproc_error(step->name, NULL, NULL,
+                                XPROC_ERR_STATIC_DUPLICATE_PRIMARY_INPUT,
+                                NULL, 0, 0, 0);    
+  }
+  if (xmlListSearch(step->inputs, inp) != NULL) {
+    pipeline_report_xproc_error(step->name, NULL, NULL,
+                                XPROC_ERR_STATIC_DUPLICATE_PORT_NAME,
+                                NULL, 0, 0, 0);
+  }
+  xmlListPushFront(step->inputs, inp);
+  if (inp->decl->primary) 
+    step->primary_inputs[inp->decl->kind == PORT_INPUT_PARAMETERS] = inp;
+  inp->owner = step;
+}
 
 extern void pipeline_step_add_output_port(pipeline_step *step,
                                           output_port_instance *outp);

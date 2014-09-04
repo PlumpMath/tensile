@@ -110,7 +110,7 @@ XMLPUBFUN xmlHashTablePtr XMLCALL
 					 xmlDictPtr dict);
 XMLPUBFUN void XMLCALL			
 xmlHashFree	(/*@ only @*/ /*@ null @*/ /*@ out @*/ xmlHashTablePtr table,
-             xmlHashDeallocator f)
+             /*@ null @*/ xmlHashDeallocator f)
   /*@modifies table @*/;
 
 /*

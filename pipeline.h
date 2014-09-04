@@ -48,7 +48,7 @@ enum port_source_kind {
 } port_source_kind;
 
 typedef struct output_port_instance {
-  /*@ dependent @*/ const struct pipeline_step *owner;
+  /*@ dependent @*/ /*@null@*/ const struct pipeline_step *owner;
   /*@ dependent @*/ const struct port_declaration *decl;
   /*@ dependent @*/ /*@ null @*/ struct input_port_instance *connected;
 } output_port_instance;
@@ -119,7 +119,7 @@ typedef struct port_declaration {
 } port_declaration;
 
 typedef struct input_port_instance {
-  /*@ dependent @*/ const struct pipeline_step *owner;
+  /*@ dependent @*/ /*@null@*/ const struct pipeline_step *owner;
   /*@ dependent @*/ const struct port_declaration *decl;
   /*@ owned @*/ xmlListPtr /* xmlDocPtr */ queue;
   bool complete;
@@ -163,6 +163,7 @@ typedef struct pipeline_decl {
   port_declaration_aux_ptr primaries[PORT_N_KINDS];
   xmlListPtr /* pipeline_step */ body;
   xmlListPtr /* pipeline_library* */ imports;
+  xmlHashTablePtr /* pipeline_step */ names;
 } pipeline_decl;
 
 extern pipeline_decl *pipeline_lookup_type(const pipeline_decl *source, 
@@ -435,10 +436,9 @@ extern xmlXPathContext *pipeline_xpath_create_static_context(xmlDocPtr xproc_doc
 extern char xproc_episode[];
 
 extern /*@ only @*/
-output_port_instance *output_port_instance_new(/*@ dependent @*/ pipeline_step *owner,
-                                                      /*@ dependent @*/ port_declaration *decl,
-                                                      /*@ null @*/ /*@ dependent @*/ 
-                                                      input_port_instance *connected);
+output_port_instance *output_port_instance_new(/*@ dependent @*/ const port_declaration *decl,
+                                               /*@ null @*/ /*@ dependent @*/ 
+                                               input_port_instance *connected);
 
 extern void output_port_instance_destroy(/*@ null @*/ /*@ only @*/ output_port_instance *p) /*@modifies p @*/;
 
@@ -465,10 +465,9 @@ extern void port_declaration_destroy(/*@ only @*/ port_declaration *d)
   /*@modifies d @*/;
 
 extern /*@ only @*/
-input_port_instance *input_port_instance_new(/*@ dependent @*/ const pipeline_step *owner,
-                                                    /*@ dependent @*/ const port_declaration *decl,
-                                                    /*@ null @*/ 
-                                                    port_connection_ptr connection);
+input_port_instance *input_port_instance_new(/*@ dependent @*/ const port_declaration *decl,
+                                             /*@ null @*/ 
+                                             port_connection_ptr connection);
 
 extern void input_port_instance_destroy(/*@ only @*/ /*@ null @*/ input_port_instance *p);
 
@@ -546,16 +545,22 @@ extern void pipeline_decl_add_port(pipeline_decl *decl,
                                    /*@keep@*/ port_declaration *port);
 
 extern void pipeline_decl_add_step(pipeline_decl *decl,
-                                   /*@keep@*/ pipeline_step *step);
+                                   /*@keep@*/ pipeline_step *step)
+  /*@modifies decl @*/;
 
 extern void pipeline_decl_import(pipeline_decl *decl,
-                                 const xmlChar *uri);
+                                 const xmlChar *uri)
+  /*@modifies decl->imports @*/;
 
-extern void pipeline_branch_add_step(pipeline_branch *branch,
-                                     /*@keep@*/ pipeline_step *step);
+extern void pipeline_branch_add_step(pipeline_decl *decl,
+                                     pipeline_branch *branch,
+                                     /*@keep@*/ pipeline_step *step)
+  /*@modifies decl->names,branch @*/;
 
-extern void pipeline_step_add_step(pipeline_step *step,
-                                   /*@keep@*/ pipeline_step *innerstep);
+extern void pipeline_step_add_step(pipeline_decl *decl,
+                                   pipeline_step *step,
+                                   /*@keep@*/ pipeline_step *innerstep)
+  /*@modifies decl->names,step @*/;
 
 extern void pipeline_step_add_option(pipeline_step *step,
                                      /*@keep@*/ pipeline_option *option);
