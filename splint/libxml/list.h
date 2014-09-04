@@ -100,12 +100,12 @@ XMLPUBFUN void XMLCALL
   /*@modifies l @*/;
 XMLPUBFUN int /*@alt void @*/ XMLCALL		
 		xmlListPushFront	(xmlListPtr l,
-                             /*@ owned @*/ /*@ null @*/
+                             /*@ keep @*/ /*@ null @*/
                              void *data)
   /*@modifies l @*/;
 XMLPUBFUN int /*@alt void @*/ XMLCALL		
 		xmlListPushBack		(xmlListPtr l,
-                             /*@ owned @*/ /*@ null @*/
+                             /*@ keep @*/ /*@ null @*/
                              void *data)
   /*@modifies l @*/;
 

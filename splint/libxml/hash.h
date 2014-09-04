@@ -119,13 +119,13 @@ xmlHashFree	(/*@ only @*/ /*@ null @*/ /*@ out @*/ xmlHashTablePtr table,
 XMLPUBFUN int XMLCALL			
 			xmlHashAddEntry	(xmlHashTablePtr table,
                              const xmlChar *name,
-                             /*@owned@*/
+                             /*@keep@*/
                              void *userdata)
   /*@modifies table @*/;
 XMLPUBFUN int XMLCALL			
 			xmlHashUpdateEntry(xmlHashTablePtr table,
                                const xmlChar *name,
-                               /*@owned@*/
+                               /*@keep@*/
                                void *userdata,
                                xmlHashDeallocator f)
   /*@modifies table @*/;
@@ -133,14 +133,14 @@ XMLPUBFUN int XMLCALL
 			xmlHashAddEntry2(xmlHashTablePtr table,
 		                         const xmlChar *name,
                              /*@ null @*/ const xmlChar *name2,
-                             /*@owned@*/
+                             /*@keep@*/
 		                         void *userdata)
   /*@modifies table @*/;
 XMLPUBFUN int XMLCALL			
 			xmlHashUpdateEntry2(xmlHashTablePtr table,
 		                         const xmlChar *name,
 		                         const xmlChar *name2,
-                                /*@owned@*/
+                                /*@keep@*/
 		                         void *userdata,
                                 xmlHashDeallocator f)
   /*@modifies table @*/;
@@ -149,7 +149,7 @@ XMLPUBFUN int XMLCALL
                              const xmlChar *name,
                              const xmlChar *name2,
                              const xmlChar *name3,
-                             /*@owned@*/
+                             /*@keep@*/
                              void *userdata)
   /*@modifies table @*/;
 XMLPUBFUN int XMLCALL			
@@ -157,7 +157,7 @@ XMLPUBFUN int XMLCALL
                                 const xmlChar *name,
                                 const xmlChar *name2,
                                 const xmlChar *name3,
-                                /*@owned@*/
+                                /*@keep@*/
                                 void *userdata,
                                 xmlHashDeallocator f)
   /*@modifies table @*/;

@@ -365,17 +365,27 @@ typedef struct pipeline_exec_context {
 
 
 typedef struct pipeline_error_info {
+  xmlChar *step_name;
+  xmlChar *step_type;
+  xmlChar *step_type_ns;
+  xmlChar *code;
+  xmlChar *code_ns;
+  xmlChar *href;
+  int lineno;
+  int columno;
+  int offset;
+  xmlChar *details;
 } pipeline_error_info;
 
-typedef bool (*pipeline_error_handler)(pipeline_error_info *err,
+typedef void (*pipeline_error_handler)(/*@only@*/ pipeline_error_info *err,
                                        /*@null@*/ void *data);
 
 typedef void (*pipeline_guarded_func)(/*@null@*/ void *data);
 
 extern void pipeline_run_with_error_handler(pipeline_guarded_func body,
-                                            /*@null@*/ /*@dependent@*/ void *data,
+                                            /*@null@*/ void *data,
                                             pipeline_error_handler handler,
-                                            /*@null@*/ /*@dependent@*/ void *handler_data);
+                                            /*@null@*/ void *handler_data);
 
 extern  /*@noreturn@*/
 void pipeline_report_error(/*@null@*/ const xmlChar *step_name,
@@ -399,12 +409,17 @@ void pipeline_report_xproc_error(/*@null@*/ const xmlChar *step_name,
                                  int columno,
                                  int offset);
 
-extern /*@noreturn@*/ void pipeline_report_xml_error(/*@null@*/ /*@in@*/ /*@out@*/ xmlErrorPtr err)
-  /*@modifies err @*/;
-extern /*@noreturn@*/ void pipeline_report_xpath_error( /*@in@*/ /*@out@*/ /*@only@*/ xmlXPathContextPtr ctx)
-  /*@modifies ctx @*/;
+extern /*@noreturn@*/ void pipeline_report_xml_error(/*@null@*/ xmlErrorPtr err);
+extern /*@noreturn@*/ void pipeline_report_xpath_error(xmlXPathContextPtr ctx);
 
 extern /*@noreturn@*/ void pipeline_escalate_error(/*@only@*/ pipeline_error_info *err);
+
+typedef void (*pipeline_cleanup_func)(/*@only@*/ void *data);
+
+extern void pipeline_cleanup_on_error(pipeline_cleanup_func func, 
+                                      /*@keep@*/ void *data);
+
+extern void pipeline_dequeue_cleanup(/*@dependent@*/ const void *data, bool perform);
 
 typedef void (*pipeline_hook_func)(/*@null@*/ void *data);
 
@@ -498,22 +513,22 @@ extern void pipeline_step_destroy(/*@ only @*/ /*@ null @*/ pipeline_step *step)
   /*@modifies step @*/;
 
 extern void pipeline_library_add_type(pipeline_library *lib,
-                                      /*@ owned @*/
+                                      /*@ keep @*/
                                       pipeline_decl *decl)
   /*@modifies lib->types @*/;
 
 extern void pipeline_library_add_pipeline(pipeline_library *lib,
-                                          /*@ owned @*/
+                                          /*@ keep @*/
                                           pipeline_decl *decl)
   /*@modifies lib->pipelines @*/;
 
 extern void port_connection_add_source(port_connection *pc,
-                                /*@owned@*/
+                                /*@keep@*/
                                 port_source *ps)
   /*@modifies pc->sources @*/;
 
 extern void input_port_instance_push_document(input_port_instance *ipi,
-                                              /*@only@*/
+                                              /*@keep@*/
                                               xmlDocPtr doc)
   /*@modifies ipi->queue @*/;
 
@@ -521,40 +536,40 @@ extern /*@only@*/ /*@null@*/
 xmlDocPtr input_port_instance_next_document(input_port_instance *ipi);
 
 
-extern /*@dependent@*/ pipeline_library *pipeline_library_load(const char *uri);
+extern /*@dependent@*/ pipeline_library *pipeline_library_load(const xmlChar *uri);
 
 
 extern void pipeline_decl_add_option(pipeline_decl *decl,
-                                     pstep_option_decl *option);
+                                     /*@keep@*/ pstep_option_decl *option);
 
 extern void pipeline_decl_add_port(pipeline_decl *decl,
-                                   port_declaration *option);
+                                   /*@keep@*/ port_declaration *port);
 
 extern void pipeline_decl_add_step(pipeline_decl *decl,
-                                   pipeline_step *step);
+                                   /*@keep@*/ pipeline_step *step);
 
 extern void pipeline_decl_import(pipeline_decl *decl,
                                  const xmlChar *uri);
 
 extern void pipeline_branch_add_step(pipeline_branch *branch,
-                                     pipeline_step *step);
+                                     /*@keep@*/ pipeline_step *step);
 
 extern void pipeline_step_add_step(pipeline_step *step,
-                                   pipeline_step *innerstep);
+                                   /*@keep@*/ pipeline_step *innerstep);
 
 extern void pipeline_step_add_option(pipeline_step *step,
-                                     pipeline_option *option);
+                                     /*@keep@*/ pipeline_option *option);
 
 extern void pipeline_step_add_input_port(pipeline_step *step,
-                                         input_port_instance *inp);
+                                         /*@keep@*/ input_port_instance *inp);
 
 extern void pipeline_step_add_output_port(pipeline_step *step,
-                                          output_port_instance *outp);
+                                          /*@keep@*/ output_port_instance *outp);
 
 extern void pipeline_step_add_assignment(pipeline_step *step,
-                                         pipeline_assignment *assign);
+                                         /*@keep@*/ pipeline_assignment *assign);
 extern void pipeline_step_add_branch(pipeline_step *step,
-                                     pipeline_branch *branch);
+                                     /*@keep@*/ pipeline_branch *branch);
 
 
 

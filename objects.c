@@ -593,21 +593,66 @@ xmlDocPtr input_port_instance_next_document(input_port_instance *ipi) {
 
 void pipeline_decl_add_option(pipeline_decl *decl,
                               pstep_option_decl *option) {
-  
+  if (xmlListSearch(decl->options, option) != NULL) {
+    pipeline_report_xproc_error(NULL, decl->name, decl->ns,
+                                XPROC_ERR_STATIC_DUPLICATE_BINDING,
+                                NULL, 0, 0, 0);
+  }
+  xmlListPushFront(decl->options, option);
 }
 
 
-extern void pipeline_decl_add_port(pipeline_decl *decl,
-                                   port_declaration *option);
+void pipeline_decl_add_port(pipeline_decl *decl,
+                            port_declaration *port) {
+  /*@+enumindex@*/
+  if (port->primary && decl->primaries[port->kind] != NULL) {
+    pipeline_report_xproc_error(NULL, decl->name, decl->ns,
+                                port->kind == PORT_OUTPUT ?
+                                XPROC_ERR_STATIC_DUPLICATE_PRIMARY_OUTPUT :
+                                XPROC_ERR_STATIC_DUPLICATE_PRIMARY_INPUT,
+                                NULL, 0, 0, 0);    
+  }
+  if (xmlListSearch(decl->ports, port) != NULL) {
+    pipeline_report_xproc_error(NULL, decl->name, decl->ns,
+                                XPROC_ERR_STATIC_DUPLICATE_PORT_NAME,
+                                NULL, 0, 0, 0);
+  }
+  xmlListPushFront(decl->ports, port);
+  if (port->primary) 
+    decl->primaries[port->kind] = port;
+  /*@=enumindex@*/
+}
 
-extern void pipeline_decl_add_step(pipeline_decl *decl,
-                                   pipeline_step *step);
+static void generic_add_step(xmlListPtr target, /*@keep@*/ pipeline_step *step)
+  /*@modifies target @*/ {
+  if (step->name != NULL && 
+      xmlListSearch(target, step) != NULL) {
+    pipeline_report_xproc_error(step->name, NULL, NULL,
+                                XPROC_ERR_STATIC_DUPLICATE_STEP_NAME,
+                                NULL, 0, 0, 0);
+  }
+  xmlListPushBack(target, step);
+}
 
-extern void pipeline_decl_import(pipeline_decl *decl,
-                                 const xmlChar *uri);
+void pipeline_decl_add_step(pipeline_decl *decl,
+                            pipeline_step *step) {
+  generic_add_step(decl->body, step);
+  
+}
 
-extern void pipeline_branch_add_step(pipeline_branch *branch,
-                                     pipeline_step *step);
+void pipeline_decl_import(pipeline_decl *decl,
+                          const xmlChar *uri) {
+  pipeline_library *lib = pipeline_library_load(uri);
+  /*@-dependenttrans@*/
+  xmlListPushBack(decl->imports, lib);
+  /*@=dependenttrans@*/
+}
+
+void pipeline_branch_add_step(pipeline_branch *branch,
+                              pipeline_step *step) {
+  generic_add_step(branch->body, step);
+}
+
 
 extern void pipeline_step_add_step(pipeline_step *step,
                                    pipeline_step *innerstep);

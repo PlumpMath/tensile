@@ -480,14 +480,14 @@ XMLPUBFUN xmlXPathObjectPtr XMLCALL
 		valuePop			(xmlXPathParserContextPtr ctxt);
 XMLPUBFUN int /*@alt void@*/ XMLCALL		  
 		valuePush			(xmlXPathParserContextPtr ctxt,
-                             /*@ owned @*/ xmlXPathObjectPtr value);
+                             /*@ keep @*/ xmlXPathObjectPtr value);
 
 XMLPUBFUN xmlXPathObjectPtr XMLCALL 
 		xmlXPathNewString		(const xmlChar *val);
 XMLPUBFUN xmlXPathObjectPtr XMLCALL 
 		xmlXPathNewCString		(const char *val);
 XMLPUBFUN xmlXPathObjectPtr XMLCALL 
-xmlXPathWrapString		(/*@ owned @*/ xmlChar *val);
+xmlXPathWrapString		(/*@ keep @*/ xmlChar *val);
 XMLPUBFUN xmlXPathObjectPtr XMLCALL 
 		xmlXPathWrapCString		(char * val);
 XMLPUBFUN xmlXPathObjectPtr XMLCALL 
