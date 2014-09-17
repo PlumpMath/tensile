@@ -11,7 +11,7 @@ CPPFLAGS = $(XML_CPPFLAGS)
 LDFLAGS = 
 LIBS = $(XML_LIBS)
 
-C_SOURCES = xpath.c objects.c
+C_SOURCES = xpath.c objects.c errors.c
 
 include $(C_SOURCES:.c=.d)
 

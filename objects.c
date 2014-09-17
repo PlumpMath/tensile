@@ -25,7 +25,13 @@
 #include <libxml/xmlmemory.h>
 #include "pipeline.h"
 
-/*@ only @*/
+static inline void link_object(xmlListPtr list, /*@keep@*/ void *obj) 
+  /*@modifies list @*/ {
+  xmlListPushBack(list, obj);
+  pipeline_dequeue_cleanup(obj, false);
+}
+
+/*@ dependent @*/
 output_port_instance *output_port_instance_new(/*@ dependent @*/ const port_declaration *decl,
                                                /*@ null @*/ /*@ dependent @*/ input_port_instance *connected) {
   output_port_instance *p = xmlMalloc(sizeof(*p));
@@ -33,6 +39,8 @@ output_port_instance *output_port_instance_new(/*@ dependent @*/ const port_decl
   p->owner     = NULL;
   p->decl      = decl;
   p->connected = connected;
+  pipeline_dequeue_cleanup(connected, false);
+  pipeline_cleanup_on_error((pipeline_cleanup_func)output_port_instance_destroy, p);
   return p;
 }
 
@@ -50,7 +58,7 @@ static int output_port_instance_search_name(const void *data0,
                    ((const output_port_instance *)data1)->decl->name);
 }
 
-/*@ only @*/
+/*@ dependent @*/
 port_source *port_source_new(enum port_source_kind kind, ...) {
   port_source *s = xmlMalloc(sizeof(*s));
   va_list args;
@@ -74,6 +82,7 @@ port_source *port_source_new(enum port_source_kind kind, ...) {
       break;
     case PORT_SOURCE_PIPE:
       s->x.pipe = va_arg(args, output_port_instance *);
+      pipeline_dequeue_cleanup(s->x.pipe, false);
       break;
     case PORT_SOURCE_UNRESOLVED:
       s->x.ref.step = xmlStrdup(va_arg(args, xmlChar *));
@@ -83,6 +92,7 @@ port_source *port_source_new(enum port_source_kind kind, ...) {
       abort();
   }
   va_end(args);
+  pipeline_cleanup_on_error((pipeline_cleanup_func)port_source_destroy, s);
   return s;
 }
 
@@ -155,7 +165,7 @@ void port_connection_destroy(/*@ null @*/ /*@ killref @*/ port_connection_ptr p)
   /*@=refcounttrans@*/
 }
 
-/*@ only @*/
+/*@ dependent @*/
 port_declaration *port_declaration_new(enum port_kind kind,
                                        const xmlChar *name,
                                        bool sequence,
@@ -167,6 +177,7 @@ port_declaration *port_declaration_new(enum port_kind kind,
   d->sequence = sequence;
   d->primary = primary;
   d->default_connection = port_connection_use(default_connection);
+  pipeline_cleanup_on_error((pipeline_cleanup_func)port_declaration_destroy, d);
   return d;
 }
 
@@ -187,7 +198,7 @@ static int port_declaration_search_name(const void *data0,
                    ((const port_declaration *)data1)->name);
 }
 
-/*@ only @*/
+/*@ dependent @*/
 input_port_instance *input_port_instance_new(/*@ dependent @*/ const port_declaration *decl,
                                              /*@ null @*/ 
                                              port_connection_ptr connection) {
@@ -197,6 +208,7 @@ input_port_instance *input_port_instance_new(/*@ dependent @*/ const port_declar
   p->queue = xmlListCreate(NULL, NULL);
   p->complete = false;
   p->connection = port_connection_use(connection);
+  pipeline_cleanup_on_error((pipeline_cleanup_func)input_port_instance_destroy, p);
   return p;
 }
 
@@ -225,7 +237,7 @@ static int input_port_instance_search_name(const void *data0,
                    ((const input_port_instance *)data1)->decl->name);
 }
 
-/*@ only @*/
+/*@ dependent @*/
 pstep_option_decl *pstep_option_decl_new(const xmlChar *name, 
                                          /*@ null @*/ const xmlChar *defval) {
   pstep_option_decl *pd = xmlMalloc(sizeof(*pd));
@@ -240,6 +252,7 @@ pstep_option_decl *pstep_option_decl_new(const xmlChar *name,
     }
   }
   pd->name = xmlStrdup(name);
+  pipeline_cleanup_on_error((pipeline_cleanup_func)pstep_option_decl_destroy, pd);
   return pd;
 }
 
@@ -316,6 +329,7 @@ pipeline_decl *pipeline_decl_new(const xmlChar *ns,
   pd->primaries[1] = NULL;
   pd->primaries[2] = NULL;
   pd->names = xmlHashCreate(16);
+  pipeline_cleanup_on_error((pipeline_cleanup_func)pipeline_decl_destroy, pd);
   return pd;
 }
 
@@ -339,12 +353,13 @@ static void pipeline_decl_hash_deallocator(/*@ owned @*/ void *data,
 }
 
 
-/*@ only @*/
+/*@ dependent @*/
 pipeline_option *pipeline_option_new(/*@ dependent @*/ const pstep_option_decl *decl,
                                      port_connection_ptr value) {
   pipeline_option *po = xmlMalloc(sizeof(*po));
   po->decl = decl;
   po->value = port_connection_use(value);
+  pipeline_cleanup_on_error((pipeline_cleanup_func)pipeline_option_destroy, po);
   return po;
 }
 
@@ -365,7 +380,7 @@ static int pipeline_option_search_name(const void *data0,
                    ((const pipeline_option *)data1)->decl->name);
 }
 
-/*@ only @*/
+/*@ dependent @*/
 pipeline_assignment *pipeline_assignment_new(const xmlChar *ns,
                                              const xmlChar *name,
                                              port_connection_ptr source) {
@@ -373,6 +388,7 @@ pipeline_assignment *pipeline_assignment_new(const xmlChar *ns,
   pa->ns = xmlStrdup(ns);
   pa->name = xmlStrdup(name);
   pa->source = port_connection_nonull_use(source);
+  pipeline_cleanup_on_error((pipeline_cleanup_func)pipeline_assignment_destroy, pa);
   return pa;
 }
 
@@ -389,11 +405,12 @@ static void pipeline_assignment_deallocator(/*@ owned @*/ xmlLinkPtr l) {
   pipeline_assignment_destroy(xmlLinkGetData(l));
 }
 
-/*@ only @*/
+/*@ dependent @*/
 pipeline_branch *pipeline_branch_new(port_connection_ptr test) {
   pipeline_branch *pb = xmlMalloc(sizeof(*pb));
   pb->test = port_connection_nonull_use(test);
   pb->body = xmlListCreate(pipeline_step_deallocator, NULL);
+  pipeline_cleanup_on_error((pipeline_cleanup_func)pipeline_branch_destroy, pb);
   return pb;
 }
 
@@ -410,7 +427,7 @@ static void pipeline_branch_deallocator(/*@ owned @*/ xmlLinkPtr l) {
   pipeline_branch_destroy(xmlLinkGetData(l));
 }
 
-/*@ only @*/
+/*@ dependent @*/
 pipeline_step *pipeline_step_new(enum pipeline_step_kind kind, const xmlChar *name, ...) {
   pipeline_step *ps = xmlMalloc(sizeof(*ps));
   va_list args;
@@ -439,6 +456,7 @@ pipeline_step *pipeline_step_new(enum pipeline_step_kind kind, const xmlChar *na
       break;
     case PSTEP_ASSIGN:
       ps->x.assign = va_arg(args, pipeline_assignment *);
+      pipeline_dequeue_cleanup(ps->x.assign, false);
       break;
     case PSTEP_FOREACH:
     case PSTEP_GROUP:
@@ -477,12 +495,15 @@ pipeline_step *pipeline_step_new(enum pipeline_step_kind kind, const xmlChar *na
       ps->x.trycatch.assign = xmlListCreate(pipeline_assignment_deallocator,
                                             NULL);
       ps->x.trycatch.try = va_arg(args, pipeline_step *);
+      pipeline_dequeue_cleanup(ps->x.trycatch.try, false);
       ps->x.trycatch.catch = va_arg(args, pipeline_step *);
+      pipeline_dequeue_cleanup(ps->x.trycatch.catch, false);
       break;
     default:
       abort();
   }
   va_end(args);
+  pipeline_cleanup_on_error((pipeline_cleanup_func)pipeline_step_destroy, ps);
   return ps;
 }
 
@@ -571,7 +592,7 @@ void pipeline_library_add_pipeline(pipeline_library *lib,
 
 void port_connection_add_source(port_connection *pc,
                                 port_source *ps) {
-  xmlListPushBack(pc->sources, ps);
+  link_object(pc->sources, ps);
 }
 
 void input_port_instance_push_document(input_port_instance *ipi,
@@ -598,7 +619,7 @@ void pipeline_decl_add_option(pipeline_decl *decl,
                                 XPROC_ERR_STATIC_DUPLICATE_BINDING,
                                 NULL, 0, 0, 0);
   }
-  xmlListPushFront(decl->options, option);
+  link_object(decl->options, option);
 }
 
 
@@ -617,7 +638,7 @@ void pipeline_decl_add_port(pipeline_decl *decl,
                                 XPROC_ERR_STATIC_DUPLICATE_PORT_NAME,
                                 NULL, 0, 0, 0);
   }
-  xmlListPushFront(decl->ports, port);
+  link_object(decl->ports, port);
   if (port->primary) 
     decl->primaries[port->kind] = port;
   /*@=enumindex@*/
@@ -631,7 +652,7 @@ static void generic_add_step(pipeline_decl *decl, xmlListPtr target, /*@keep@*/ 
                                 XPROC_ERR_STATIC_DUPLICATE_STEP_NAME,
                                 NULL, 0, 0, 0);
   }
-  xmlListPushBack(target, step);
+  link_object(target, step);
   /*@-kepttrans@*/
   if (step->name != NULL)
     (void)xmlHashAddEntry(decl->names, step->name, step);
@@ -659,30 +680,24 @@ void pipeline_branch_add_step(pipeline_decl *decl,
 }
 
 
-/*@-mustmod@*/
 void pipeline_step_add_step(pipeline_decl *decl,
                             pipeline_step *step,
                             pipeline_step *innerstep) {
-  xmlListPtr target = NULL;
-
   switch (step->kind) {
     case PSTEP_FOREACH:
     case PSTEP_GROUP:
-      target = step->x.body;
+      generic_add_step(decl, step->x.body, innerstep);
       break;
     case PSTEP_VIEWPORT:
-      target = step->x.viewport.body;
+      generic_add_step(decl, step->x.viewport.body, innerstep);
       break;
     case PSTEP_CHOOSE:
-      target = step->x.choose.otherwise;
+      generic_add_step(decl, step->x.choose.otherwise, innerstep);
       break;
     default:
       abort();
   }
-  generic_add_step(decl, target, innerstep);
 }
-/*@=mustmod@*/
-
 
 void pipeline_step_add_option(pipeline_step *step,
                               pipeline_option *option) {
@@ -691,14 +706,16 @@ void pipeline_step_add_option(pipeline_step *step,
                                 XPROC_ERR_STATIC_DUPLICATE_BINDING,
                                 NULL, 0, 0, 0);
   }
-  xmlListPushFront(step->options, option);
+  link_object(step->options, option);
 }
 
 void pipeline_step_add_input_port(pipeline_step *step,
                                   input_port_instance *inp) {
+  int pi = (int)(inp->decl->kind == PORT_INPUT_PARAMETERS);
+  
   assert(inp->owner == NULL);
   if (inp->decl->primary && 
-      step->primary_inputs[inp->decl->kind == PORT_INPUT_PARAMETERS] != NULL) {
+      step->primary_inputs[pi] != NULL) {
     pipeline_report_xproc_error(step->name, NULL, NULL,
                                 XPROC_ERR_STATIC_DUPLICATE_PRIMARY_INPUT,
                                 NULL, 0, 0, 0);    
@@ -708,17 +725,49 @@ void pipeline_step_add_input_port(pipeline_step *step,
                                 XPROC_ERR_STATIC_DUPLICATE_PORT_NAME,
                                 NULL, 0, 0, 0);
   }
-  xmlListPushFront(step->inputs, inp);
+  link_object(step->inputs, inp);
   if (inp->decl->primary) 
-    step->primary_inputs[inp->decl->kind == PORT_INPUT_PARAMETERS] = inp;
+    step->primary_inputs[pi] = inp;
   inp->owner = step;
 }
 
-extern void pipeline_step_add_output_port(pipeline_step *step,
-                                          output_port_instance *outp);
+void pipeline_step_add_output_port(pipeline_step *step,
+                                   output_port_instance *outp) {
+  assert(outp->owner == NULL);
+  if (outp->decl->primary && 
+      step->primary_output != NULL) {
+    pipeline_report_xproc_error(step->name, NULL, NULL,
+                                XPROC_ERR_STATIC_DUPLICATE_PRIMARY_INPUT,
+                                NULL, 0, 0, 0);    
+  }
+  if (xmlListSearch(step->outputs, outp) != NULL) {
+    pipeline_report_xproc_error(step->name, NULL, NULL,
+                                XPROC_ERR_STATIC_DUPLICATE_PORT_NAME,
+                                NULL, 0, 0, 0);
+  }
+  link_object(step->outputs, outp);
+  if (outp->decl->primary) 
+    step->primary_output = outp;
+  outp->owner = step;
+}
 
-extern void pipeline_step_add_assignment(pipeline_step *step,
-                                         pipeline_assignment *assign);
-extern void pipeline_step_add_branch(pipeline_step *step,
-                                     pipeline_branch *branch);
+void pipeline_step_add_assignment(pipeline_step *step,
+                                  pipeline_assignment *assign) {
+  switch (step->kind) {
+    case PSTEP_CHOOSE:
+      link_object(step->x.choose.assign, assign);
+      break;
+    case PSTEP_TRY:
+      link_object(step->x.choose.assign, assign);
+      break;
+    default:
+      abort();
+  }
+}
+
+void pipeline_step_add_branch(pipeline_step *step,
+                              pipeline_branch *branch) {
+  assert(step->kind == PSTEP_CHOOSE);
+  link_object(step->x.choose.branches, branch);
+}
 

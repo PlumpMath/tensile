@@ -24,8 +24,45 @@
 #include <setjmp.h>
 #include "pipeline.h"
 
+typedef struct pipeline_cleanup {
+  pipeline_cleanup_func func;
+  /*@owned@*/ void *data;
+} pipeline_cleanup;
+
 typedef struct pipeline_error_context {
   sigjmp_buf location;
-  xmlListPtr cleanups;
-  
+  /*@owned@*/ xmlListPtr cleanups;
+  /*@only@*/ pipeline_error_info *info;
+  struct pipeline_error_context *chain;
 } pipeline_error_context;
+
+static pipeline_error_context *current_context;
+
+void pipeline_run_with_error_handler(pipeline_guarded_func body,
+                                     /*@null@*/ void *data,
+                                     pipeline_error_handler handler,
+                                     /*@null@*/ void *handler_data) {
+  pipeline_error_context context;
+  context.cleanups = xmlListCreate(pipeline_cleanup_destroy, NULL);
+  context.info = NULL;
+  context.chain = current_context;
+  current_context = &context;
+  if (sigsetjmp(context.location, 1) == 0) {
+    body(data);
+
+    assert(context.info == NULL);
+    current_context = context.chain;
+    if (current_context == NULL) {
+      unwind_cleanups(context.cleanups);
+    } else {
+      xmlListMerge(current_context->cleanups, context.cleanups);
+    }
+    return;
+  }
+  current_context = context.chain;
+  unwind_cleanups(context.cleanups);
+  if (handler != NULL) {
+    handler(handler_data, context.info);
+  }
+  pipeline_escalate_error(context.info);
+}
