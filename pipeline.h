@@ -188,7 +188,8 @@ enum pipeline_step_kind {
 
 
 typedef enum xproc_error {
-  XPROC_ERR_STATIC_CONNECTION_LOOP = 1,
+  XPROC_ERR_STATIC_FIRST = 1,
+  XPROC_ERR_STATIC_CONNECTION_LOOP = XPROC_ERR_STATIC_FIRST,
   XPROC_ERR_STATIC_DUPLICATE_STEP_NAME,
   XPROC_ERR_STATIC_UNCONNECTED_INPUT,
   XPROC_ERR_STATIC_DUPLICATE_BINDING,
@@ -196,15 +197,17 @@ typedef enum xproc_error {
   XPROC_ERR_STATIC_NO_PRIMARY_OUTPUT,
   XPROC_ERR_STATIC_INCONSISTENT_OUTPUTS,
   XPROC_ERR_STATIC_INVALID_ATTRIBUTE,
+  XPROC_ERR_STATIC_INCONSISTENT_CATCH_OUTPUTS,
   XPROC_ERR_STATIC_NONCONFORMING_STEP,
   XPROC_ERR_STATIC_DUPLICATE_PORT_NAME,
-  XPROC_ERR_STATIC_DUPLICATE_PRIMARY_OUTPUT,
+  XPROC_ERR_STATIC_DUPLICATE_PRIMARY_OUTPUT = 14,
   XPROC_ERR_STATIC_EMPTY_COMPOUND,
-  XPROC_ERR_STATIC_INCONSISTENT_OPTION_DECL,
+  XPROC_ERR_STATIC_INCONSISTENT_OPTION_DECL = 17,
+  XPROC_ERR_STATIC_MISSING_REQUIRED_OPTION,
   XPROC_ERR_STATIC_INVALID_VARIABLE_CONNECTION,
   XPROC_ERR_STATIC_INVALID_NAMESPACE,
-  XPROC_ERR_STATIC_INVALID_PIPE,
-  XPROC_ERR_STATIC_MALFORMED_INLINE,
+  XPROC_ERR_STATIC_INVALID_PIPE = 22,
+  XPROC_ERR_STATIC_MALFORMED_INLINE = 24,
   XPROC_ERR_STATIC_INVALID_TYPE_NS,
   XPROC_ERR_STATIC_INVALID_LOG,
   XPROC_ERR_STATIC_INCONSISTENT_OPTION,
@@ -223,20 +226,22 @@ typedef enum xproc_error {
   XPROC_ERR_STATIC_PARAMETER_PORT_NOT_SEQUENCE,
   XPROC_ERR_STATIC_INCONSISTENT_NAMESPACE_BINDING,
   XPROC_ERR_STATIC_CONNECTED_INPUT_IN_ATOMIC_STEP,
-  XPROC_ERR_STATIC_DECLARED_STEP_IS_COMPOUND,
-  XPROC_ERR_STATIC_INVALID_EXCEPT_PREFIXES,
+  XPROC_ERR_STATIC_UNDECLARED_STEP = 44,
+  XPROC_ERR_STATIC_DECLARED_STEP_IS_COMPOUND = 48,
+  XPROC_ERR_STATIC_INVALID_EXCEPT_PREFIXES = 51,
   XPROC_ERR_STATIC_CANNOT_IMPORT,
   XPROC_ERR_STATIC_IMPORT_WITHOUT_TYPE,
-  XPROC_ERR_STATIC_UNCONNECTED_PARAMETER_INPUT,
-  XPROC_ERR_STATIC_INVALID_EXCLUDE_INLINE_PREFIXES,
+  XPROC_ERR_STATIC_UNCONNECTED_PARAMETER_INPUT = 55,
+  XPROC_ERR_STATIC_INVALID_EXCLUDE_INLINE_PREFIXES = 57,
   XPROC_ERR_STATIC_NO_DEFAULT_FOR_EXCLUDE_INLINE_PREFIXES,
   XPROC_ERR_STATIC_INVALID_TOPLEVEL_ELEMENT,
   XPROC_ERR_STATIC_UNSUPPORTED_VERSION,
   XPROC_ERR_STATIC_NONSTATIC_USE_WHEN,
   XPROC_ERR_STATIC_UNDEFINED_VERSION,
   XPROC_ERR_STATIC_MALFORMED_VERSION,
-  XPROC_ERR_DYNAMIC_NONXML_OUTPUT = 10001,
-  XPROC_ERR_DYNAMIC_SEQUENCE_IN_VIEWPORT_SOURCE,
+  XPROC_ERR_DYNAMIC_FIRST = 10001,
+  XPROC_ERR_DYNAMIC_NONXML_OUTPUT = XPROC_ERR_DYNAMIC_FIRST,
+  XPROC_ERR_DYNAMIC_SEQUENCE_IN_VIEWPORT_SOURCE = XPROC_ERR_DYNAMIC_FIRST + 2,
   XPROC_ERR_DYNAMIC_NOTHING_IS_CHOSEN,
   XPROC_ERR_DYNAMIC_SEQUENCE_IN_XPATH_CONTEXT,
   XPROC_ERR_DYNAMIC_UNEXPECTED_INPUT_SEQUENCE,
@@ -265,45 +270,52 @@ typedef enum xproc_error {
   XPROC_ERR_DYNAMIC_BAD_DATA,
   XPROC_ERR_DYNAMIC_STEP_FAILED,
   XPROC_ERR_DYNAMIC_RESERVED_NAMESPACE,
-  XPROC_ERR_DYNAMIC_VALUE_NOT_AVAILABLE,
+  XPROC_ERR_DYNAMIC_VALUE_NOT_AVAILABLE = XPROC_ERR_DYNAMIC_FIRST + 32,
   XPROC_ERR_DYNAMIC_INCONSISTENT_NAMESPACE,
-  XPROC_ERR_STEP_MALFORMED_MIME_BOUNDARY = 20001,
+  XPROC_ERR_STEP_FIRST = 20001,
+  XPROC_ERR_STEP_MALFORMED_MIME_BOUNDARY = XPROC_ERR_STEP_FIRST + 1,
   XPROC_ERR_STEP_NO_AUTH_METHOD,
   XPROC_ERR_STEP_INVALID_STATUS_ONLY_FLAG,
   XPROC_ERR_STEP_ENTITY_BODY_NOT_ALLOWED,
   XPROC_ERR_STEP_NO_METHOD,
-  XPROC_ERR_STEP_INVALID_CHARSET,
-  XPROC_ERR_STEP_DIRECTORY_ACCESS_DENIED,
+  XPROC_ERR_STEP_INVALID_CHARSET = XPROC_ERR_STEP_FIRST + 9,
+  XPROC_ERR_STEP_DIRECTORY_ACCESS_DENIED = XPROC_ERR_STEP_FIRST + 11,
   XPROC_ERR_STEP_INCONSISTENT_RENAME,
   XPROC_ERR_STEP_RENAME_RESERVED_NS,
-  XPROC_ERR_STEP_NOT_A_DIRECTORY,
-  XPROC_ERR_STEP_DOCUMENTS_NOT_EQUAL,
+  XPROC_ERR_STEP_NOT_A_DIRECTORY = XPROC_ERR_STEP_FIRST + 16,
+  XPROC_ERR_STEP_DOCUMENTS_NOT_EQUAL = XPROC_ERR_STEP_FIRST + 18,
   XPROC_ERR_STEP_INCONSISTENT_VALUES,
-  XPROC_ERR_STEP_MALFORMED_BODY,
+  XPROC_ERR_STEP_MALFORMED_BODY = XPROC_ERR_STEP_FIRST + 21,
   XPROC_ERR_STEP_INVALID_NODE_TYPE,
-  XPROC_ERR_STEP_INVALID_INSERT,
-  XPROC_ERR_STEP_DTD_VALIDATION_NOT_SUPPORTED,
+  XPROC_ERR_STEP_INVALID_INSERT = XPROC_ERR_STEP_FIRST + 24,
+  XPROC_ERR_STEP_DTD_CANNOT_VALIDATE = XPROC_ERR_STEP_FIRST + 26,
   XPROC_ERR_STEP_TAGS_IN_BODY,
   XPROC_ERR_STEP_XINCLUDE_ERROR,
   XPROC_ERR_STEP_INVALID_OVERRIDE_CONTENT_TYPE,
-  XPROC_ERR_STEP_COMMAND_CANNOT_RUN,
+  XPROC_ERR_STEP_COMMAND_CANNOT_RUN = XPROC_ERR_STEP_FIRST + 32,
+  XPROC_ERR_STEP_CANNOT_CHANGE_DIRECTORY,
   XPROC_ERR_STEP_INCONSISTENT_EXEC_WRAPPER,
+  XPROC_ERR_STEP_UNSUPPORTED_HASH_ALGO,
   XPROC_ERR_STEP_NOT_URLENCODED,
   XPROC_ERR_STEP_UNSUPPORTED_XSLT_VERSION,
+  XPROC_ERR_STEP_SEQUENCE_FOR_XSLT,
   XPROC_ERR_STEP_NOT_A_REQUEST,
-  XPROC_ERR_STEP_CANNOT_STORE,
+  XPROC_ERR_STEP_CANNOT_STORE = XPROC_ERR_STEP_FIRST + 49,
   XPROC_ERR_STEP_UNSUPPORTED_CONTENT_TYPE,
+  XPROC_ERR_STEP_UNSUPPORTED_ENCODING,
   XPROC_ERR_STEP_DOCUMENT_NOT_VALID,
   XPROC_ERR_STEP_SCHEMATRON_ASSERTION_FAIL,
   XPROC_ERR_STEP_UNSUPPORTED_VALIDATION_MODE,
   XPROC_ERR_STEP_CANNOT_APPLY_TEMPLATE,
   XPROC_ERR_STEP_MALFORMED_XQUERY_RESULT,
+  XPROC_ERR_STEP_INVALID_ADD_BASE,
   XPROC_ERR_STEP_INVALID_ADD_ATTRIBUTE,
   XPROC_ERR_STEP_UNSUPPORTED_UUID_VERSION,
   XPROC_ERR_STEP_INVALID_NCNAME,
   XPROC_ERR_STEP_DELETE_NAMESPACE_NODE,
+  XPROC_ERR_STEP_INVALID_PATH_SEPARATOR,
   XPROC_ERR_STEP_COMMAND_EXIT_FAILURE,
-  XPROC_ERR_STEP_INVALID_ARG_SEPARATOR
+  XPROC_ERR_STEP_INVALID_ARG_SEPARATOR = XPROC_ERR_STEP_FIRST + 65
 } xproc_error;
 
 
@@ -377,6 +389,9 @@ typedef struct pipeline_error_info {
   xmlChar *details;
 } pipeline_error_info;
 
+extern void pipeline_error_info_destroy(/*@only@*/ /*@null@*/ 
+        pipeline_error_info *err) /*@modifies err @*/;
+
 typedef void (*pipeline_error_handler)(/*@only@*/ pipeline_error_info *err,
                                        /*@null@*/ void *data);
 
@@ -408,18 +423,34 @@ void pipeline_report_xproc_error(/*@null@*/ const xmlChar *step_name,
                                  int lineno,
                                  int columno,
                                  int offset);
+extern /*@noreturn@*/
+void pipeline_report_xproc_error_node(/*@null@*/ const xmlChar *step_name,
+                                      /*@null@*/ const xmlChar *step_type,
+                                      /*@null@*/ const xmlChar *step_type_ns,
+                                      xproc_error code,
+                                      xmlNodePtr node);
 
+extern /*@noreturn@*/ void pipeline_report_os_error(int err);
 extern /*@noreturn@*/ void pipeline_report_xml_error(/*@null@*/ xmlErrorPtr err);
-extern /*@noreturn@*/ void pipeline_report_xpath_error(xmlXPathContextPtr ctx);
+extern /*@noreturn@*/ void pipeline_report_xpath_error(xmlXPathParserContextPtr ctx);
 
 extern /*@noreturn@*/ void pipeline_escalate_error(/*@only@*/ pipeline_error_info *err);
 
-typedef void (*pipeline_cleanup_func)(/*@only@*/ void *data);
+typedef void (*pipeline_cleanup_func)(/*@only@*/ /*@null@*/ void *data);
 
-extern void pipeline_cleanup_on_error(pipeline_cleanup_func func, 
-                                      /*@owned@*/ void *data);
+extern void pipeline_add_cleanup(pipeline_cleanup_func func, 
+                                 /*@keep@*/ /*@null@*/ void *data,
+                                 /*@dependent@*/ /*@null@*/ const void *frame);
 
-extern void pipeline_dequeue_cleanup(/*@dependent@*/ /*@null@*/ const void *data, bool perform);
+extern void pipeline_make_cleanup_local(/*@null@*/ const void *data, 
+                                        /*@dependent@*/ /*@null@*/ const void *frame);
+extern void pipeline_remove_cleanup(/*@null@*/ const void *data, bool perform);
+extern void pipeline_cleanup_frame(const void *frame);
+
+typedef void (*pipeline_protected_func)(void *data);
+extern void pipeline_run_protected(pipeline_protected_func func,
+                                   pipeline_cleanup_func cleanup,
+                                   void *data);
 
 typedef void (*pipeline_hook_func)(/*@null@*/ void *data);
 
@@ -434,14 +465,14 @@ extern xmlXPathContext *pipeline_xpath_create_static_context(xmlDocPtr xproc_doc
 
 extern char xproc_episode[];
 
-extern /*@ dependent @*/
+extern /*@ dependent @*/ 
 output_port_instance *output_port_instance_new(/*@ dependent @*/ const port_declaration *decl,
                                                /*@ null @*/ /*@ dependent @*/ 
                                                input_port_instance *connected);
 
 extern void output_port_instance_destroy(/*@ null @*/ /*@ only @*/ output_port_instance *p) /*@modifies p @*/;
 
-extern /*@ dependent @*/ 
+extern /*@ dependent @*/
 port_source *port_source_new(enum port_source_kind kind, ...);
 
 extern void port_source_destroy(/*@null@*/ /*@only@*/ port_source *s) 
@@ -480,10 +511,11 @@ extern /*@only@*/ pipeline_library *pipeline_library_new(const xmlChar *uri);
 extern void pipeline_library_destroy(/*@ only @*/ /*@ null @*/ pipeline_library *pl)
   /*@modifies pl @*/;
 
-extern /*@dependent@*/ pipeline_decl *pipeline_decl_new(const xmlChar *ns,
-                                                   const xmlChar *name,
-                                                   /*@ dependent @*/ /*@null@*/ 
-                                                   const pipeline_atomic_type *type);
+extern /*@ dependent @*/
+pipeline_decl *pipeline_decl_new(const xmlChar *ns,
+                                 const xmlChar *name,
+                                 /*@ dependent @*/ /*@null@*/ 
+                                 const pipeline_atomic_type *type);
 extern void pipeline_decl_destroy(/*@ only @*/ /*@ null @*/ pipeline_decl *pd)
   /*@modifies pd @*/;
 
@@ -500,7 +532,8 @@ pipeline_assignment *pipeline_assignment_new(const xmlChar *ns,
 extern void pipeline_assignment_destroy(/*@ only @*/ /*@ null @*/ pipeline_assignment *pa)
   /*@modifies pa @*/;
 
-extern /*@ dependent @*/ pipeline_branch *pipeline_branch_new(port_connection_ptr test);
+extern /*@ dependent @*/
+pipeline_branch *pipeline_branch_new(port_connection_ptr test);
 
 extern void pipeline_branch_destroy(/*@ only @*/ /*@ null @*/ pipeline_branch *br);
 

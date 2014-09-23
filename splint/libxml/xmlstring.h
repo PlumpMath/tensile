@@ -38,12 +38,12 @@ typedef unsigned char xmlChar;
  * xmlChar handling
  */
 XMLPUBFUN xmlChar * XMLCALL
-                xmlStrdup                (const xmlChar *cur);
+xmlStrdup                (/*@null@*/ const xmlChar *cur);
 XMLPUBFUN xmlChar * XMLCALL
-                xmlStrndup               (const xmlChar *cur,
+                xmlStrndup               (/*@null@*/ const xmlChar *cur,
                                          int len);
 XMLPUBFUN xmlChar * XMLCALL
-                xmlCharStrndup           (const char *cur,
+                xmlCharStrndup           (/*@null@*/ const char *cur,
                                          int len);
 XMLPUBFUN xmlChar * XMLCALL
                 xmlCharStrdup            (const char *cur);
@@ -100,11 +100,15 @@ XMLPUBFUN xmlChar * XMLCALL
                 xmlStrncatNew            (const xmlChar *str1,
                                          const xmlChar *str2,
                                          int len);
-XMLPUBFUN int XMLCALL
-                xmlStrPrintf             (xmlChar *buf,
-                                         int len,
-                                         const xmlChar *msg,
-                                         ...);
+XMLPUBFUN int /*@alt void@*/ XMLCALL
+xmlStrPrintf             (/*@out@*/ xmlChar *buf,
+                          int len,
+                          const xmlChar *msg,
+                          ...)
+/*@modifies buf@*/
+    /*@requires maxSet(buf) >= (len - 1)@*/;
+
+
 XMLPUBFUN int XMLCALL
                 xmlStrVPrintf                (xmlChar *buf,
                                          int len,

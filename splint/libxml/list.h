@@ -39,7 +39,7 @@ typedef void (*xmlListDeallocator) (xmlLinkPtr lk);
  *
  * Returns 0 is equality, -1 or 1 otherwise depending on the ordering.
  */
-typedef int  (*xmlListDataCompare) (const void *data0, const void *data1);
+typedef int  (*xmlListDataCompare) (/*@null@*/ const void *data0, /*@null@*/ const void *data1);
 /**
  * xmlListWalker:
  * @data: the data found in the list
@@ -60,27 +60,27 @@ xmlListDelete		(/*@ only @*/ /*@ out @*/ xmlListPtr l)
   /*@modifies l@*/;
 
 /* Basic Operators */
-XMLPUBFUN void * XMLCALL		
+XMLPUBFUN /*@dependent@*/ /*@null@*/ void * XMLCALL		
 		xmlListSearch		(xmlListPtr l,
-					 void *data);
-XMLPUBFUN void * XMLCALL		
+                             /*@null@*/ void *data);
+XMLPUBFUN /*@dependent@*/ /*@null@*/ void * XMLCALL		
 		xmlListReverseSearch	(xmlListPtr l,
-					 void *data);
+                                 /*@null@*/ void *data);
 XMLPUBFUN int XMLCALL		
 		xmlListInsert		(xmlListPtr l,
 					 void *data) ;
 XMLPUBFUN int XMLCALL		
 		xmlListAppend		(xmlListPtr l,
 					 void *data) ;
-XMLPUBFUN int XMLCALL		
+XMLPUBFUN int /*@alt: void@*/ XMLCALL		
 		xmlListRemoveFirst	(xmlListPtr l,
-					 void *data);
-XMLPUBFUN int XMLCALL		
+                             /*@null@*/ void *data);
+XMLPUBFUN int /*@alt: void@*/ XMLCALL		
 		xmlListRemoveLast	(xmlListPtr l,
-					 void *data);
-XMLPUBFUN int XMLCALL		
+                             /*@null@*/ void *data);
+XMLPUBFUN int /*@alt: void@*/ XMLCALL		
 		xmlListRemoveAll	(xmlListPtr l,
-					 void *data);
+                             /*@null@*/ void *data);
 XMLPUBFUN void XMLCALL		
 		xmlListClear		(xmlListPtr l);
 XMLPUBFUN int XMLCALL		

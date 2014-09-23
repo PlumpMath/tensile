@@ -408,7 +408,7 @@ XMLPUBVAR double xmlXPathNINF;
  *
  * Returns the number of nodes in the node-set.
  */
-#define xmlXPathNodeSetGetLength(ns) ((ns) ? (ns)->nodeNr : 0)
+#define xmlXPathNodeSetGetLength(ns) ((ns != NULL) ? (ns)->nodeNr : 0)
 /**
  * xmlXPathNodeSetItem:
  * @ns:  a node-set
@@ -437,13 +437,15 @@ XMLPUBVAR double xmlXPathNINF;
 
 
 XMLPUBFUN void XMLCALL		   
-		    xmlXPathFreeObject		(xmlXPathObjectPtr obj);
+xmlXPathFreeObject		(/*@ only @*/ /*@ out @*/ /*@ null @*/ xmlXPathObjectPtr obj)
+    /*@modifies obj @*/;
 XMLPUBFUN xmlNodeSetPtr XMLCALL	   
 		    xmlXPathNodeSetCreate	(xmlNodePtr val);
 XMLPUBFUN void XMLCALL		   
-		    xmlXPathFreeNodeSetList	(xmlXPathObjectPtr obj);
+xmlXPathFreeNodeSetList	(/*@ only @*/ /*@ out @*/ /*@ null @*/ xmlXPathObjectPtr obj)
+ /*@modifies obj@*/;
 XMLPUBFUN void XMLCALL		   
-xmlXPathFreeNodeSet		(/*@null@*/ /*@out@*/ /*@only@*/ xmlNodeSetPtr obj) /*@modifies obj@*/;
+xmlXPathFreeNodeSet		(/*@null@*/ /*@out@*/ /*@only@*/ /*@ null @*/ xmlNodeSetPtr obj) /*@modifies obj@*/;
 XMLPUBFUN xmlXPathObjectPtr XMLCALL  
 		    xmlXPathObjectCopy		(xmlXPathObjectPtr val);
 XMLPUBFUN int XMLCALL		   
@@ -452,13 +454,13 @@ XMLPUBFUN int XMLCALL
 /**
  * Conversion functions to basic types.
  */
-XMLPUBFUN int XMLCALL		   
+XMLPUBFUN int /*@alt: bool@*/ XMLCALL		   
 		    xmlXPathCastNumberToBoolean	(double val);
-XMLPUBFUN int XMLCALL		   
+XMLPUBFUN int /*@alt: bool@*/ XMLCALL		   
 		    xmlXPathCastStringToBoolean	(const xmlChar * val);
-XMLPUBFUN int XMLCALL		   
+XMLPUBFUN int /*@alt: bool@*/ XMLCALL		   
 		    xmlXPathCastNodeSetToBoolean(xmlNodeSetPtr ns);
-XMLPUBFUN int XMLCALL		   
+XMLPUBFUN int /*@alt: bool@*/ XMLCALL		   
 		    xmlXPathCastToBoolean	(xmlXPathObjectPtr val);
 
 XMLPUBFUN double XMLCALL		   
@@ -494,9 +496,11 @@ XMLPUBFUN xmlXPathObjectPtr XMLCALL
  * Context handling.
  */
 XMLPUBFUN xmlXPathContextPtr XMLCALL 
-xmlXPathNewContext		(/*@ null @*/ xmlDocPtr doc);
+xmlXPathNewContext		(/*@ null @*/ xmlDocPtr doc)
+    /*@modifies: doc @*/;
 XMLPUBFUN void XMLCALL
-		    xmlXPathFreeContext		(xmlXPathContextPtr ctxt);
+xmlXPathFreeContext		(/*@ null @*/ /*@ only @*/ /*@ out @*/ xmlXPathContextPtr ctxt)
+    /*@modifies: ctxt @*/;
 XMLPUBFUN int XMLCALL
 		    xmlXPathContextSetCache(xmlXPathContextPtr ctxt,
 				            int active,

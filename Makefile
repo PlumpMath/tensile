@@ -2,7 +2,7 @@ CC = gcc
 SED = sed
 RM = rm -f
 SPLINT = splint
-SPLINTFLAGS = -checks -posix-lib -isoreserved -declundef -Isplint $(CPPFLAGS)
+SPLINTFLAGS = -checks -posix-lib -isoreserved -declundef -Isplint -I/usr/include/i386-linux-gnu $(CPPFLAGS)
 MFLAGS = -MM
 CFLAGS = -W -Wall -Wmissing-declarations
 XML_CPPFLAGS := $(shell pkg-config --cflags libexslt)
@@ -11,7 +11,7 @@ CPPFLAGS = $(XML_CPPFLAGS)
 LDFLAGS = 
 LIBS = $(XML_LIBS)
 
-C_SOURCES = xpath.c objects.c errors.c
+C_SOURCES = xpath.c objects.c errors.c parser.c
 
 include $(C_SOURCES:.c=.d)
 
