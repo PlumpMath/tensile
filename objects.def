@@ -1,5 +1,0 @@
-STRUCT(output_port_instance)
-    WEAKREF(pipeline_step, owner)
-    WEAKREF(port_declaration, decl)
-    WEAKREF(input_port_instance, connected)
-END
