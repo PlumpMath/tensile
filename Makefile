@@ -1,13 +1,8 @@
 CC = gcc
 SED = sed
 RM = rm -f
-SPLINT = splint
-SPLINTFLAGS = -checks -posix-lib -isoreserved -declundef -Isplint -I/usr/include/i386-linux-gnu $(CPPFLAGS)
-MFLAGS = -MM
 CFLAGS = -W -Wall -Wmissing-declarations
-XML_CPPFLAGS := $(shell pkg-config --cflags libexslt)
-XML_LIBS := $(shell pkg-config --libs libexslt)
-CPPFLAGS = $(XML_CPPFLAGS)
+CPPFLAGS = 
 LDFLAGS = 
 LIBS = $(XML_LIBS)
 
