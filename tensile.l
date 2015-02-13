@@ -29,6 +29,10 @@ import { return TOK_IMPORT; }
 pre { return TOK_PRE; }
 post { return  TOK_POST; }
 default { return TOK_DEFAULT; }
+null { 
+    *yylval = (expr_value){.type = VALUE_NULL };
+    return TOK_NULL; 
+}
 
 \.[[:alnum:]_]+ { return TOK_FIELD; }
 [+-]infinity { return TOK_NUMBER; }

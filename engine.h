@@ -119,14 +119,16 @@ typedef struct expr_node {
         } binop;
         struct {
             const struct predicate_def *pred;
+            bool negate;
             struct expr_node *arg;
         } sortfilter;
         struct {
             const struct predicate_def *pred;
+            bool negate;
             struct expr_node *arg1;
             struct expr_node *arg2;
         } merge;
-    } v;
+    } x;
 } expr_node;
 
 extern expr_node *make_expr_node(enum expr_type t, ...);
@@ -157,7 +159,7 @@ typedef struct signature {
     unsigned min_args;
     unsigned max_args;
     bool vararg;
-    apr_array_header_t *defaults;
+    expr_node **defaults;
 } signature;
 
 
