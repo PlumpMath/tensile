@@ -26,6 +26,7 @@ BINESCAPE \\([abfnrtv\'\"\\]|[0-9]+|[xX][[:xdigit:]]+)
 ":>~" { return TOK_MAX_CI; }
 ".[" { return TOK_VARFIELD; }
 import { return TOK_IMPORT; }
+using { return TOK_USING; }
 pre { return TOK_PRE; }
 post { return  TOK_POST; }
 default { return TOK_DEFAULT; }

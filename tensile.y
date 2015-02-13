@@ -41,6 +41,7 @@
 %token<value> TOK_STRING
 %token<value> TOK_TIMESTAMP
 %token TOK_UMINUS
+%token TOK_USING
 %token TOK_VARFIELD
 
 %left '|'
@@ -59,6 +60,7 @@
 
 %type<list> exprlist
 %type<list> exprlist0
+%type<list> actionargs
 
 %type<expr> expression
 %type<aggr> aggregate
@@ -88,14 +90,20 @@ body:           /*empty */
         |       body assignment ';'
         |       body stage
         |       body macrodef ';'
+        |       body using ';'
                 ;
 
 macrodef:       TOK_ID '(' macroargs ')' '=' macrobody
                 ;
 
 macrobody:      actionlist 
+        |       extimport
         |       '('condition ')'
+        | '('   extimport ')'
                 ;
+
+extimport:      TOK_STRING ':' TOK_STRING
+        ;
 
 macroargs:      /*empty */
         |       vararg
@@ -113,11 +121,15 @@ optmacroargs:   TOK_ID '=' expression
 vararg:         TOK_ID '[' ']'
                 ;
 
+using:          TOK_USING TOK_ID TOK_STRING '=' extimport
+        ;
+
 stage:          TOK_ID '{' stagebody '}'
                 ;
 
 stagebody:      /*empty */
         |       stagebody guard action
+        |       stagebody assignment
         |       stagebody ';'
                 ;
 
@@ -157,20 +169,26 @@ simple_action:  assignment
         |       TOK_ID actionargs
                 ;
 
-actionargs:      /*empty */
-        |       '('exprlist ')'
+actionargs:      /*empty */ { $$ = make_expr_list(); }
+        |       '('exprlist ')' { $$ = $2; }
                 ;
 
 assignment:     expression '=' expression
         |       TOK_DEFAULT expression '=' expression
                 ;
 
-exprlist:       expression
-        |       exprlist ',' expression
+exprlist:       expression { 
+                $$ = make_expr_list();
+                *(expr_node **)apr_array_push($$) = $1;
+                }
+        |       exprlist ',' expression {
+                $$ = $1;
+                *(expr_node **)apr_array_push($$) = $3;
+            }
                 ;
 
-exprlist0:      /*empty */
-        |       exprlist
+exprlist0:      /*empty */ { $$ = make_expr_list(); }
+        |       exprlist { $$ = $1; }
                 ;
 
 expression:     literal { $$ = make_expr_node(EXPR_LITERAL, $1); }
@@ -320,20 +338,20 @@ relop:          TOK_EQ { $$ = &predicate_eq; }
         |       orderop { $$ = $1; }
         ;
 
-orderop:              '<' {$$ = &predicate_match_less; }
-        |       '>' {$$ = &predicate_match_greater; }
-        |       TOK_LE {$$ = &predicate_match_ci; }
-        |       TOK_GE
-        |       TOK_LESS_CI
-        |       TOK_GREATER_CI
-        |       TOK_LE_CI
-        |       TOK_GE_CI
+orderop:              '<' {$$ = &predicate_less; }
+        |       '>' {$$ = &predicate_greater; }
+        |       TOK_LE {$$ = &predicate_le; }
+        |       TOK_GE {$$ = &predicate_ge; }
+        |       TOK_LESS_CI {$$ = &predicate_less_ci; }
+        |       TOK_GREATER_CI {$$ = &predicate_greater_ci; }
+        |       TOK_LE_CI {$$ = &predicate_le_ci; }
+        |       TOK_GE_CI {$$ = &predicate_ge_ci; }
                 ;
 
-sortop:         '$' sortspec
+sortop:         '$' sortspec {  }
         |       '$' '!' sortspec
                 ;
 
-sortspec:       orderop
-        |       TOK_ID
+sortspec:       orderop { $$ = $1; }
+        |       TOK_ID { $$ = lookup_predicate($1); }   
                 ;

@@ -31,7 +31,8 @@ extern "C"
 
 #include <time.h>
 #include <unistr.h>
-#include <apr_tables.h>
+#include <apr_hash.h>
+#include <apr_table.h>
 
 enum value_type {
     VALUE_NULL,
@@ -120,14 +121,9 @@ typedef struct expr_node {
         struct {
             const struct predicate_def *pred;
             bool negate;
-            struct expr_node *arg;
-        } sortfilter;
-        struct {
-            const struct predicate_def *pred;
-            bool negate;
             struct expr_node *arg1;
             struct expr_node *arg2;
-        } merge;
+        } sortfilter;
     } x;
 } expr_node;
 
@@ -155,10 +151,18 @@ typedef struct condition {
     } c;
 } condition;
 
+typedef struct var_bindings {
+    apr_hash_t *binding;
+    struct var_bindings *chain;
+} var_bindings;
+
+
+
 typedef struct signature {
-    unsigned min_args;
-    unsigned max_args;
+    unsigned req_args;
+    unsigned opt_args;
     bool vararg;
+    uint8_t **names;
     expr_node **defaults;
 } signature;
 
@@ -176,10 +180,23 @@ typedef struct predicate_def {
     } u;
 } predicate_def;
 
+enum tree_notify_type {
+    TREE_NOTIFY_CHANGE_VALUE,
+    TREE_NOTIFY_ADD_CHILD,
+    TREE_NOTIFY_DELETE_CHILD,
+    TREE_NOTIFY_SUBTREE_CHANGE
+};
+
+typedef bool (*tree_notify_func)(enum tree_notify_type type, ...);
+
 typedef struct tree_node {
-    apt_table_t *attrs;
+    apt_hash_t *attrs;
+    struct tree_node *parent;
+    tree_notify_func notifier;
     expr_value value;
 } tree_node;
+
+tree_node *lookup_var(const var_bindings *vars, uint8_t *name);
 
 expr_value evaluate_expr_node(const var_bindings *vars, 
                               struct tree_node *ctx, 
