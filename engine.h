@@ -126,6 +126,7 @@ typedef struct expr_value {
 #define NULL_VALUE ((expr_value){.type = VALUE_NULL})
 
 typedef struct binary_data_type {
+    const char *name;
     uint8_t *(*to_string)(exec_context *ctx, binary_data data);
     double (*to_number)(exec_context *ctx, binary_data data);
     expr_value (*loosen)(exec_context *ctx, binary_data data);
@@ -142,6 +143,8 @@ typedef struct binary_data_type {
     bool (*match)(exec_context *ctx, bool inexact, binary_data data, expr_value pattern);
 } binary_data_type;
 
+
+extern const binary_data_type default_binary_data;
 
 enum expr_type {
     EXPR_LITERAL,
@@ -172,10 +175,12 @@ struct expr_node {
 
 extern expr_node *make_expr_node(exec_context *ctx, enum expr_type t, ...)
     ATTR_MALLOC
-    ATTR_NONNULL_1ST;
+    ATTR_NONNULL_1ST
+    ATTR_WARN_UNUSED_RESULT;
 extern apr_array_header_t *make_expr_list(exec_context *ctx)
     ATTR_MALLOC
-    ATTR_NONNULL_1ST;
+    ATTR_NONNULL_1ST
+    ATTR_WARN_UNUSED_RESULT;
 
 typedef struct variable {
     bool local;
@@ -208,11 +213,13 @@ typedef struct tree_node {
     expr_value value;
 } tree_node;
 
-tree_node *lookup_var(exec_context *ctx, uint8_t *name, bool local) ATTR_NONNULL;
+tree_node *lookup_var(exec_context *ctx, uint8_t *name, bool local) ATTR_NONNULL ATTR_WARN_UNUSED_RESULT;
 
 expr_value evaluate_expr_node(exec_context *ctx,
                               const expr_node *expr,
-                              bool lvalue) ATTR_NONNULL;
+                              bool lvalue) 
+    ATTR_NONNULL
+    ATTR_WARN_UNUSED_RESULT;
 
 typedef enum action_result {
     ACTION_PROCEED,
@@ -261,23 +268,39 @@ typedef struct action {
     } c;
 } action;
 
-extern action *make_action(exec_context *ctx, enum action_type type, ...) ATTR_NONNULL_1ST ATTR_MALLOC;
-extern action *seq_actions(exec_context *ctx, action *arg1, action *arg2) ATTR_NONNULL_1ST;
-extern action *alt_actions(exec_context *ctx, action *arg1, action *arg2) ATTR_NONNULL_1ST;
-extern action *alt_def_actions(exec_context *ctx, action *arg1, action *arg2) ATTR_NONNULL_1ST;
+extern action *make_action(exec_context *ctx, enum action_type type, ...) 
+    ATTR_NONNULL_1ST ATTR_MALLOC
+    ATTR_WARN_UNUSED_RESULT;
+extern action *seq_actions(exec_context *ctx, action *arg1, action *arg2) 
+    ATTR_NONNULL_1ST
+    ATTR_WARN_UNUSED_RESULT;
+extern action *alt_actions(exec_context *ctx, action *arg1, action *arg2) 
+    ATTR_NONNULL_1ST
+    ATTR_WARN_UNUSED_RESULT;
+extern action *alt_def_actions(exec_context *ctx, action *arg1, action *arg2) 
+    ATTR_NONNULL_1ST
+    ATTR_WARN_UNUSED_RESULT;
 extern action *make_relation(exec_context *ctx,
                              const action_def *rel, 
                              const expr_node *arg1, 
-                             const expr_node *arg2) ATTR_NONNULL ATTR_MALLOC;
+                             const expr_node *arg2) 
+    ATTR_NONNULL ATTR_MALLOC
+    ATTR_WARN_UNUSED_RESULT;
 extern action *make_call(exec_context *ctx, 
                          const action_def *act, 
-                         ...) ATTR_NONNULL_ARGS((1, 2)) ATTR_SENTINEL ATTR_MALLOC;
+                         ...) 
+    ATTR_NONNULL_ARGS((1, 2)) ATTR_SENTINEL ATTR_MALLOC
+    ATTR_WARN_UNUSED_RESULT;
 
-extern const action_def *lookup_action(exec_context *ctx, const uint8_t *name) ATTR_NONNULL;
+extern const action_def *lookup_action(exec_context *ctx, const uint8_t *name) 
+    ATTR_NONNULL
+    ATTR_WARN_UNUSED_RESULT;
 
 extern const action_def *resolve_dso_sym(exec_context *ctx,
                                          const uint8_t *library, 
-                                         const uint8_t *name) ATTR_NONNULL_ARGS((1, 3));
+                                         const uint8_t *name) 
+    ATTR_NONNULL_ARGS((1, 3))
+    ATTR_WARN_UNUSED_RESULT;
 
 typedef struct stage_contents {
     action *normal;
@@ -289,7 +312,9 @@ typedef struct stage {
     stage_contents contents[SECTION_MAX];
 } stage;
 
-extern stage *make_stage(exec_context *ctx) ATTR_NONNULL ATTR_MALLOC;
+extern stage *make_stage(exec_context *ctx) 
+    ATTR_NONNULL ATTR_MALLOC
+    ATTR_WARN_UNUSED_RESULT;
 
 
 typedef struct sectioned_action {
@@ -312,14 +337,24 @@ enum tensile_error_code {
 };
 
 
-extern expr_value parse_iso_timestamp(exec_context *ctx, const char *ts) ATTR_NONNULL;
-extern expr_value parse_net_timestamp(exec_context *ctx, const char *ts) ATTR_NONNULL;
+extern expr_value parse_iso_timestamp(exec_context *ctx, const char *ts) 
+    ATTR_NONNULL
+    ATTR_WARN_UNUSED_RESULT;
+extern expr_value parse_net_timestamp(exec_context *ctx, const char *ts) 
+    ATTR_NONNULL
+    ATTR_WARN_UNUSED_RESULT;
 
-extern expr_value decode_hex(exec_context *ctx, const char *hex) ATTR_NONNULL;
+extern expr_value decode_hex(exec_context *ctx, const char *hex) 
+    ATTR_NONNULL
+    ATTR_WARN_UNUSED_RESULT;
 
-extern double parse_duration(exec_context *ctx, const char *dur) ATTR_NONNULL;
+extern double parse_duration(exec_context *ctx, const char *dur) 
+    ATTR_NONNULL
+    ATTR_WARN_UNUSED_RESULT;
 
-extern expr_value unquote_string(exec_context *ctx, const char *str) ATTR_NONNULL;
+extern expr_value unquote_string(exec_context *ctx, const char *str) 
+    ATTR_NONNULL
+    ATTR_WARN_UNUSED_RESULT;
 
 #ifdef __cplusplus
 }

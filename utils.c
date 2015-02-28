@@ -26,6 +26,7 @@
 #include <stdarg.h>
 #include <assert.h>
 #include <stdio.h>
+#include <uniname.h>
 #include <apr_date.h>
 #include "engine.h"
 
@@ -123,9 +124,42 @@ expr_value parse_net_timestamp(exec_context *ctx, const char *ts)
     return MAKE_NUM_VALUE((double)apr_time_sec(parsed));
 }
 
+static inline int hex_digit_value(int ch)
+{
+    if (isdigit(ch))
+        return ch - '0';
+    else
+        return tolower(ch) - 'a' + 10;
+}
+
 expr_value decode_hex(exec_context *ctx, const char *hex)
 {
-    
+    size_t len = strlen(hex);
+    uint8_t *data, *ptr;
+    bool even = true;
+
+    len = (len + 1) / 2;
+    data = apr_palloc(ctx->local_pool, len);
+
+    for (ptr = data; *hex != '\0'; hex++, even = !even)
+    {
+        int val;
+        if (!isxdigit(*hex))
+            raise_error(ctx, APR_FROM_OS_ERROR(EINVAL));
+        val = hex_digit_value(*hex);
+        if (even)
+            *ptr = val;
+        else
+        {
+            *ptr = (*ptr << 4) | val;
+            ptr++;
+        }
+    }
+    return MAKE_VALUE(BINARY, ctx->local_pool, 
+                      ((binary_data){.type = &default_binary_data,
+                              .len = len,
+                              .data = data}));
+            
 }
 
 double parse_duration(exec_context *ctx, const char *dur)
@@ -160,7 +194,7 @@ double parse_duration(exec_context *ctx, const char *dur)
                 collect.tm_mday = 7 * val + 1;
                 break;
             default:
-                raise_error(ctx, APR_FROM_OS_ERROR(EINVAL));
+                raise_error(ctx, APR_EINVAL);
         }
     }
     if (*dur != '\0')
@@ -171,7 +205,7 @@ double parse_duration(exec_context *ctx, const char *dur)
             unsigned val;
             
             if (!isdigit(*dur))
-                raise_error(ctx, APR_FROM_OS_ERROR(EINVAL));
+                raise_error(ctx, APR_EINVAL);
             val = strtol(dur, (char **)&dur, 10);
             switch (*dur) 
             {
@@ -193,8 +227,107 @@ double parse_duration(exec_context *ctx, const char *dur)
     return (double)mktime(&collect);
 }
 
-extern expr_value unquote_string(exec_context *ctx, const char *str) ATTR_NONNULL;
+static void decode_unicode_char(exec_context *ctx, const char **str, 
+                                uint8_t **dest, int size)
+{
+    ucs4_t uch = 0;
+    int enclen;
+    int limit = 0;
 
+    if (**str == '+')
+    {
+        for ((*str)++; limit < size; limit++, (*str)++)
+        {
+            if (!isxdigit(**str))
+                break;
+            uch = (uch << 4) | hex_digit_value(**str);
+        }
+        limit++;
+        (*str)--;
+    }
+    else if (**str == '{')
+    {
+        const char *found = strchr(*str + 1, '}');
+        if (found == NULL)
+            raise_error(ctx, APR_EINVAL);
+        else
+        {
+            char name[found - *str];
+
+            memcpy(name, *str + 1, found - *str - 1);
+            name[found - *str - 1] = '\0';
+            uch = unicode_name_character(name);
+            if (uch == UNINAME_INVALID)
+                raise_error(ctx, APR_ENOENT);
+            *str = found;
+            limit = found - *str + 1;
+        }
+    }
+    else
+        raise_error(ctx, APR_EINVAL);
+
+    enclen = u8_uctomb(*dest, uch, 2 + limit);
+    if (enclen == -1)
+        raise_error(ctx, APR_EINVAL);
+    if (enclen == -2)
+        raise_error(ctx, APR_ENOSPC);
+    (*dest) += enclen;
+}
+
+expr_value unquote_string(exec_context *ctx, const char *str)
+{
+    uint8_t *expanded = apr_palloc(ctx->local_pool, strlen(str) + 1);
+    uint8_t *dest;
+    
+    for (dest = expanded; *str != '\0'; str++)
+    {
+        if (*str != '\\')
+            *dest++ = *str;
+        else
+        {
+            str++;
+            if (*str == '\0')
+                raise_error(ctx, APR_EINVAL);
+            if (*str == 'u')
+            {
+                str++;
+                decode_unicode_char(ctx, &str, &dest, 4);
+            }
+            else if (*str == 'U')
+            {
+                str++;
+                decode_unicode_char(ctx, &str, &dest, 8);
+            }
+            else
+            {
+                static const char esc[] = "abfnrtv";
+                static const char codes[] = "\a\b\f\n\r\t\v";
+                const char *found = strchr(esc, *str);
+                
+                *dest++ = found ? codes[found - esc] : *str;
+            }
+        }
+    }
+
+    return MAKE_VALUE(STRING, ctx->local_pool, expanded);
+}
+
+action *make_action(exec_context *ctx, enum action_type type, ...)
+{
+    va_list args;
+    action *new_act = apr_palloc(ctx->static_pool, sizeof(*new_act));
+    
+    va_start(args, type);
+    new_act->type = type;
+    
+    switch (type)
+    {
+        case ACTION_CALL:
+            new_act->c.call.def = va_arg(args, const action_def *);
+            
+    }
+    va_end(args);
+}
 
 void raise_error(exec_context *ctx, apr_status_t code)
 {

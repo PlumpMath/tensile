@@ -141,7 +141,7 @@ script:         body
 
 body:           /*empty */
         |       body ';'
-        |       body assignment ';' { evaluate_expr_node(context, $2, false); }
+        |       body assignment ';' { (void)evaluate_expr_node(context, $2, false); }
         |       body stage
         |       body actiondef ';'
         |       body pragma ';'

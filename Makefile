@@ -5,10 +5,12 @@ BISON = bison -d
 FLEX = flex
 PKGCONFIG = pkg-config
 
-CFLAGS = -W -Wall -Wmissing-declarations
+CFLAGS = -O2 -fstack-protector -fmudflapth -W -Wall -Werror -Wmissing-declarations -Wformat=2 -Winit-self -Wuninitialized \
+	-Wsuggest-attribute=pure -Wsuggest-attribute=const -Wconversion -Wstack-protector -Wpointer-arith -Wwrite-strings \
+	-Wmissing-format-attribute
 CPPFLAGS = $(APR_CPPFLAGS) $(APU_CPPFLAGS)
-LDFLAGS = $(APR_LDFLAGS) $(APU_LDFLAGS)
-LIBS = $(APU_LIBS) $(APR_LIBS) -lm -lfl
+LDFLAGS = $(APR_LDFLAGS) $(APU_LDFLAGS) -Wl,-export-dynamic
+LIBS = $(APU_LIBS) $(APR_LIBS) -lm -lfl -lunistring -lmudflap
 MFLAGS = -MM
 
 APR_PKGCONFIG = $(PKGCONFIG) apr-1
