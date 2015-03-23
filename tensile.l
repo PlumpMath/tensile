@@ -59,8 +59,30 @@ ESCAPE \\([abfnrtv\'\"\\]|u\+?[[:xdigit:]]{4}|U\+?[[:xdigit:]]{8}|[uU]\{[^}]+\})
 "!===" { return TOK_NOT_IDENTITY; }
 "->" { return TOK_ARROW; }
 ".." { return TOK_PARENT; }
-^[[:space:]]*import[[:space:]]+[[:alnum:]_]+(\.[[:alnum:]_]+)*[[:space:]]*; {
+^[[:space:]]*require[[:space:]]+[[:alnum:]_]+(\.[[:alnum:]_]+)*([[:space:]]+[+-]?([0-9](\.[0-9]+)?|\.[0-9]+))?[[:space:]]*; {
+    char *tokstate = NULL;
+    char *modulename = NULL;
+    char *modulever = NULL;
     
+    apr_strtok(yytext, " \t\n\f\r\v", &tokstate); // skip 'require'
+    modulename = apr_strtok(NULL, " \t\n\f\r\v", &tokstate);
+    modulever = apr_strtok(NULL, " \t\n\f\r\v;", &tokstate);
+    
+    if (require_module(context, (const uint8_t *)modulename,
+                       modulever ? strtod(modulever, NULL) : 0.0))
+    {
+        lexer_buffer *last;
+
+        last = &APR_ARRAY_IDX(context->conf->lexer_buffers, 
+                              context->conf->lexer_buffers->nelts - 2,
+                              lexer_buffer);
+        last->lineno = yylineno;
+        last = &APR_ARRAY_IDX(context->conf->lexer_buffers, 
+                              context->conf->lexer_buffers->nelts - 1,
+                              lexer_buffer);
+        last->buffer_state = yy_create_buffer(last->stream, YY_BUF_SIZE);
+        yy_switch_to_buffer(last->buffer_state);
+    }    
 }
 const { return TOK_CONST; }
 extern { return TOK_EXTERN; }
@@ -70,6 +92,8 @@ pragma { return TOK_PRAGMA; }
 pre { return TOK_PRE; }
 post { return  TOK_POST; }
 default { return TOK_DEFAULT; }
+typeof { return TOK_TYPEOF; }
+as { return TOK_AS; }
 null { 
     yylval->value = NULL_VALUE;
     return TOK_NULL; 
@@ -91,16 +115,6 @@ null {
     yylval->value = parse_iso_timestamp(context, yytext);
     return TOK_TIMESTAMP; 
 }
-B\'([[:xdigit:]]{2})*\' { 
-    yytext[yyleng - 1] = '\0';
-    yylval->value = decode_hex(context, yytext + 2);
-    return TOK_BINARY; 
-}
-T'[^\']+' { 
-    yytext[yyleng - 1] = '\0';
-    yylval->value = parse_net_timestamp(context, yytext + 2);
-    return TOK_TIMESTAMP; 
-}
 P([0-9]+Y)?([0-9]+M)?([0-9]+W)?([0-9]+D)?(T([0-9]+H)?([0-9]+M)?([0-9]+S)?)? { 
     yylval->value = MAKE_NUM_VALUE(parse_duration(context, yytext + 1));
     return TOK_NUMBER; }
@@ -110,6 +124,12 @@ P([0-9]+Y)?([0-9]+M)?([0-9]+W)?([0-9]+D)?(T([0-9]+H)?([0-9]+M)?([0-9]+S)?)? {
                                (uint8_t *)apr_pstrdup(context->static_pool, yytext + 1));
     return TOK_STRING; 
 } 
+"<<<"([^>]+|>[^>])*">>>" {
+    yytext[yyleng - 3] = '\0';
+    yylval->value = MAKE_VALUE(STRING, context->static_pool,
+                               (uint8_t *)apr_pstrdup(context->static_pool, yytext + 3));
+    return TOK_STRING; 
+}
 \"([^\"\\]+|{ESCAPE})*\" { 
     yytext[yyleng - 1] = '\0';
     yylval->value = unquote_string(context, yytext + 1);
@@ -125,5 +145,18 @@ P([0-9]+Y)?([0-9]+M)?([0-9]+W)?([0-9]+D)?(T([0-9]+H)?([0-9]+M)?([0-9]+S)?)? {
 }
 [[:space:]]+ {}
 "//".*\n {}
-"/*"([^\*]+|\*+[^\/\*])+"*/" {}
+"/*"([^*]+|\*+[^\/*])*"*/" {}
+<<EOF>> {
+    lexer_buffer *last;
+    
+    yy_delete_buffer(YY_CURRENT_BUFFER);
+    end_module_parsing(context);
 
+    if (apr_is_empty_array(context->conf->lexer_buffers))
+        yyterminate();
+    last = &APR_ARRAY_IDX(context->conf->lexer_buffers, 
+                          context->conf->lexer_buffers->nelts - 1,
+                          lexer_buffer);
+    yy_switch_to_buffer(last->buffer_state);
+    yylineno = last->lineno;
+}

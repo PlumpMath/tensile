@@ -30,6 +30,9 @@ extern "C"
 #endif
 
 #include <stdbool.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <assert.h>
 #include <math.h>
 #include <time.h>
 #include <setjmp.h>
@@ -39,6 +42,7 @@ extern "C"
 #include <apr_tables.h>
 
 #include "support.h"
+#include "values.h"
 
 typedef struct engine_conf {
     double verbosity;
@@ -46,7 +50,12 @@ typedef struct engine_conf {
     apr_hash_t *loaded_dso;
     apr_hash_t *imported;
     apr_hash_t *actions;
+    apr_hash_t *pragmas;
+    apr_hash_t *typecasts;
     struct var_bindings *global_vars;
+    apr_array_header_t *search_path;
+    apr_array_header_t *dso_search_path;
+    apr_array_header_t *lexer_buffers;
 } engine_conf;
 
 typedef enum stage_section {
@@ -55,6 +64,22 @@ typedef enum stage_section {
     SECTION_POST,
     SECTION_MAX
 } stage_section;
+
+typedef struct call_frame {
+    struct action_def *called;
+    unsigned n_args;
+    const expr_value *args;
+    struct call_frame *up;
+} call_frame;
+
+typedef struct lexer_buffer {
+    void *buffer_state;
+    unsigned lineno;
+    const uint8_t *modulename;
+    const uint8_t *filename;
+    double req_version;
+    FILE *stream;
+} lexer_buffer;
 
 typedef struct exec_context {
     engine_conf *conf;
@@ -68,79 +93,28 @@ typedef struct exec_context {
     struct tree_node *context_node;
     struct var_bindings *bindings;
     apr_array_header_t *stage_queue;
+    call_frame *frame;
 } exec_context;
-
-enum value_type {
-    VALUE_NULL,
-    VALUE_NUMBER,
-    VALUE_STRING,
-    VALUE_BINARY,
-    VALUE_TIMESTAMP,
-    VALUE_NODEREF,
-    VALUE_LIST,
-    VALUE_LIST_ITER,
-    VALUE_CLOSURE
-};
-
-typedef struct binary_data {
-    const struct binary_data_type *type;
-    unsigned len;
-    uint8_t *data;
-} binary_data;
-
-typedef struct closure {
-    const struct action_def *def;
-    apr_array_header_t *args;
-} closure;
-
-typedef struct expr_value {
-    enum value_type type;
-    apr_pool_t *scope;
-    union {
-        double num;
-        uint8_t *str;
-        time_t ts;
-        binary_data bin;
-        struct tree_node *ref;
-        apr_array_header_t *list;
-        closure cls;
-    } v;
-} expr_value;
-
-#define VALUE_FIELD_NUMBER num
-#define VALUE_FIELD_STRING str
-#define VALUE_FIELD_BINARY bin
-#define VALUE_FIELD_TIMESTAMP ts
-#define VALUE_FIELD_NODEREF ref
-#define VALUE_FIELD_LIST list
-#define VALUE_FIELD_LIST_ITER list
-#define VALUE_FIELD_CLOSURE cls
-
-#define MAKE_VALUE(_type, _scope, _value)                           \
-    ((expr_value){.type = VALUE_##_type,                            \
-            .scope = (_scope),                                      \
-            .v = {.VALUE_FIELD_##_type = (_value)}})
-
-#define MAKE_NUM_VALUE(_value) MAKE_VALUE(NUMBER, NULL, _value)
-
-#define NULL_VALUE ((expr_value){.type = VALUE_NULL})
 
 typedef struct binary_data_type {
     const char *name;
     uint8_t *(*to_string)(exec_context *ctx, binary_data data);
     double (*to_number)(exec_context *ctx, binary_data data);
     expr_value (*loosen)(exec_context *ctx, binary_data data);
+    expr_value (*uplus)(exec_context *ctx, binary_data data);
     expr_value (*reverse)(exec_context *ctx, binary_data data);
     size_t (*length)(exec_context *ctx, binary_data data);
     expr_value (*concat)(exec_context *ctx, binary_data data, binary_data other);
     expr_value (*strip)(exec_context *ctx, binary_data data, binary_data other);
+    expr_value (*repeat)(exec_context *ctx, binary_data data, double num);
     expr_value (*intersperse)(exec_context *ctx, binary_data data, binary_data other);
     expr_value (*split)(exec_context *ctx, binary_data data, const expr_value *optarg);
     expr_value (*tokenize)(exec_context *ctx, binary_data data, const expr_value *optarg);
     expr_value (*item)(exec_context *ctx, binary_data data, expr_value arg);
     expr_value (*range)(exec_context *ctx, binary_data data, expr_value arg1, expr_value arg2);
-    int (*compare)(exec_context *ctx, bool inexact, binary_data data1, binary_data data2);
+    int (*compare)(exec_context *ctx, bool inexact, binary_data data1, binary_data data2, bool ordering);
     bool (*match)(exec_context *ctx, bool inexact, binary_data data, expr_value pattern);
+    void (*aftercopy)(exec_context *ctx, expr_value *copy);
 } binary_data_type;
 
 
@@ -151,13 +125,31 @@ enum expr_type {
     EXPR_VARREF,
     EXPR_LIST,
     EXPR_CONTEXT,
-    EXPR_OPERATOR
+    EXPR_OPERATOR,
+    EXPR_TYPECAST,
+    EXPR_AT_CONTEXT,
+    EXPR_DEFAULT
 };
 
 typedef struct expr_node expr_node;
 
-typedef expr_value (*expr_operator_func)(exec_context *ctx, bool lvalue, unsigned nv, 
-                                         expr_node **vs);
+typedef expr_value (*expr_operator_func)(exec_context *ctx, bool lvalue, 
+                                         unsigned nv, 
+                                         expr_value *vs);
+
+typedef expr_value (*typecast_func)(exec_context *ctx, expr_value src);
+
+typedef struct arg_info {
+    bool lvalue;
+    bool iterable;
+    bool product;
+} arg_info;
+
+typedef struct operator_info {
+    unsigned n_args;
+    dispatch *func; 
+    const arg_info *info;
+} operator_info;
 
 struct expr_node {
     enum expr_type type;
@@ -166,10 +158,18 @@ struct expr_node {
         uint8_t *varname;
         apr_array_header_t *list;
         struct {
-            expr_operator_func func;
-            unsigned nargs;
-            struct expr_node *args[3];
+            const operator_info *func;
+            const struct expr_node *args[3];
         } op;
+        struct {
+            typecast_func func;
+            const struct expr_node *arg;
+        } cast;
+        struct 
+        {
+            const struct expr_node *context;
+            const struct expr_node *arg;
+        } at;
     } x;
 };
 
@@ -177,15 +177,12 @@ extern expr_node *make_expr_node(exec_context *ctx, enum expr_type t, ...)
     ATTR_MALLOC
     ATTR_NONNULL_1ST
     ATTR_WARN_UNUSED_RESULT;
-extern apr_array_header_t *make_expr_list(exec_context *ctx)
-    ATTR_MALLOC
-    ATTR_NONNULL_1ST
-    ATTR_WARN_UNUSED_RESULT;
 
-typedef struct variable {
-    bool local;
-    struct tree_node *node;
-} variable;
+static inline ATTR_MALLOC ATTR_NONNULL_1ST ATTR_WARN_UNUSED_RESULT
+apr_array_header_t *make_expr_list(exec_context *ctx)
+{
+    return apr_array_make(ctx->static_pool, 0, sizeof(expr_node *));
+}
 
 typedef struct var_bindings {
     apr_pool_t *scope;
@@ -193,33 +190,15 @@ typedef struct var_bindings {
     struct var_bindings *chain;
 } var_bindings;
 
-enum tree_notify_type {
-    TREE_NOTIFY_UPDATE_VALUE,
-    TREE_NOTIFY_CHANGE_VALUE,
-    TREE_NOTIFY_BEFORE_ADD_CHILD,
-    TREE_NOTIFY_AFTER_ADD_CHILD,
-    TREE_NOTIFY_BEFORE_DELETE_CHILD,
-    TREE_NOTIFY_AFTER_DELETE_CHILD,
-    TREE_NOTIFY_SUBTREE_CHANGE
-};
+tree_node *lookup_var(exec_context *ctx, const uint8_t *name, bool local) ATTR_NONNULL ATTR_WARN_UNUSED_RESULT;
+tree_node *define_var(exec_context *ctx, const uint8_t *name) ATTR_NONNULL;
 
-typedef bool (*tree_notify_func)(exec_context *ctx, enum tree_notify_type type, ...);
+extern expr_value evaluate_expr_node(exec_context *ctx,
+                                     const expr_node *expr,
+                                     bool lvalue) 
+    ATTR_NONNULL;
 
-typedef struct tree_node {
-    apr_pool_t *scope;
-    apr_hash_t *attrs;
-    struct tree_node *parent;
-    tree_notify_func notifier;
-    expr_value value;
-} tree_node;
-
-tree_node *lookup_var(exec_context *ctx, uint8_t *name, bool local) ATTR_NONNULL ATTR_WARN_UNUSED_RESULT;
-
-expr_value evaluate_expr_node(exec_context *ctx,
-                              const expr_node *expr,
-                              bool lvalue) 
-    ATTR_NONNULL
-    ATTR_WARN_UNUSED_RESULT;
+extern expr_value typecast_tostring(exec_context *ctx, expr_value val);
 
 typedef enum action_result {
     ACTION_PROCEED,
@@ -228,14 +207,21 @@ typedef enum action_result {
     ACTION_CONTINUE
 } action_result;
 
-typedef action_result (*action_func)(exec_context *ctx, apr_array_header_t *args);
+typedef action_result (*action_func)(exec_context *ctx, unsigned n, expr_value *args);
+typedef void (*pragma_func)(exec_context *ctx, const uint8_t *name, 
+                            const uint8_t *strval, double numval);
 
 typedef struct action_def {
     unsigned n_args;
     bool vararg;
     uint8_t **names;
-    expr_node **defaults;
-    struct action *body;
+    const expr_node **defaults;
+    const arg_info *info;
+    bool external;
+    union {
+        struct action *body;
+        dispatch *func;
+    } x;
 } action_def;
 
 
@@ -268,6 +254,10 @@ typedef struct action {
     } c;
 } action;
 
+extern void augment_arg_list(exec_context *ctx, const action_def *def,
+                             apr_array_header_t *args, bool complete)
+    ATTR_NONNULL;
+
 extern action *make_action(exec_context *ctx, enum action_type type, ...) 
     ATTR_NONNULL_1ST ATTR_MALLOC
     ATTR_WARN_UNUSED_RESULT;
@@ -277,20 +267,22 @@ extern action *seq_actions(exec_context *ctx, action *arg1, action *arg2)
 extern action *alt_actions(exec_context *ctx, action *arg1, action *arg2) 
     ATTR_NONNULL_1ST
     ATTR_WARN_UNUSED_RESULT;
-extern action *alt_def_actions(exec_context *ctx, action *arg1, action *arg2) 
-    ATTR_NONNULL_1ST
-    ATTR_WARN_UNUSED_RESULT;
-extern action *make_relation(exec_context *ctx,
-                             const action_def *rel, 
-                             const expr_node *arg1, 
-                             const expr_node *arg2) 
-    ATTR_NONNULL ATTR_MALLOC
-    ATTR_WARN_UNUSED_RESULT;
+
 extern action *make_call(exec_context *ctx, 
                          const action_def *act, 
                          ...) 
     ATTR_NONNULL_ARGS((1, 2)) ATTR_SENTINEL ATTR_MALLOC
     ATTR_WARN_UNUSED_RESULT;
+
+static inline ATTR_NONNULL ATTR_MALLOC ATTR_WARN_UNUSED_RESULT
+action *make_relation(exec_context *ctx,
+                      const action_def *rel, 
+                      const expr_node *arg1, 
+                      const expr_node *arg2) 
+{
+    return make_call(ctx, rel, arg1, arg2, NULL);
+}
+
 
 extern const action_def *lookup_action(exec_context *ctx, const uint8_t *name) 
     ATTR_NONNULL
@@ -307,14 +299,28 @@ typedef struct stage_contents {
     action *otherwise;
 } stage_contents;
 
+static inline  ATTR_WARN_UNUSED_RESULT
+stage_contents combine_stage_contents(exec_context *ctx, 
+                                      stage_contents arg1,
+                                      stage_contents arg2)
+{
+    return (stage_contents){
+        .normal = alt_actions(ctx, arg1.normal, arg2.normal),
+            .otherwise = seq_actions(ctx, arg1.otherwise, arg2.otherwise)
+    };
+}
+
+
 typedef struct stage {
     uint8_t *name;
     stage_contents contents[SECTION_MAX];
 } stage;
 
-extern stage *make_stage(exec_context *ctx) 
-    ATTR_NONNULL ATTR_MALLOC
-    ATTR_WARN_UNUSED_RESULT;
+static inline ATTR_NONNULL ATTR_MALLOC ATTR_WARN_UNUSED_RESULT
+stage *make_stage(exec_context *ctx)
+{
+    return apr_pcalloc(ctx->static_pool, sizeof(stage));
+}
 
 
 typedef struct sectioned_action {
@@ -322,26 +328,42 @@ typedef struct sectioned_action {
     stage_contents what;
 } sectioned_action;
 
-extern void add_rule(exec_context *ctx, stage *st, sectioned_action act) 
-    ATTR_NONNULL;
+static inline ATTR_NONNULL
+void add_rule(exec_context *ctx, stage *st, sectioned_action act)
+{
+    st->contents[act.section] = combine_stage_contents(ctx, st->contents[act.section], act.what);
+}
 
-extern void raise_error(exec_context *ctx, apr_status_t code)
-    ATTR_NORETURN ATTR_NONNULL;
+static inline ATTR_NORETURN ATTR_NONNULL
+void raise_error(exec_context *ctx, apr_status_t code)
+{
+    siglongjmp(*ctx->exitpoint, code);
+}
 
 #define TENSILE_ERR_SPACE (APR_OS_START_USERERR + 100500)
 
 enum tensile_error_code {
     TEN_PARSE_ERROR = TENSILE_ERR_SPACE,
     TEN_BAD_TYPE,
-    TEN_UNRECOGNIZED_CHECK
+    TEN_UNRECOGNIZED_CHECK,
+    TEN_OUT_OF_RANGE,
+    TEN_TOO_FEW_ARGS,
+    TEN_TOO_MANY_ARGS,
+    TEN_NO_REQUIRED_ARG,
+    TEN_DANGLING_REF
 };
 
+#define CHECKED_DIVIDE(_ctx, _num, _den) \
+    ((_den) == 0 ? (raise_error((_ctx), APR_EINVAL), 0u) : (_num) / (_den))
 
 extern expr_value parse_iso_timestamp(exec_context *ctx, const char *ts) 
     ATTR_NONNULL
     ATTR_WARN_UNUSED_RESULT;
 extern expr_value parse_net_timestamp(exec_context *ctx, const char *ts) 
     ATTR_NONNULL
+    ATTR_WARN_UNUSED_RESULT;
+
+extern time_t timestamp_just_date(time_t ts)
     ATTR_WARN_UNUSED_RESULT;
 
 extern expr_value decode_hex(exec_context *ctx, const char *hex) 
@@ -355,6 +377,15 @@ extern double parse_duration(exec_context *ctx, const char *dur)
 extern expr_value unquote_string(exec_context *ctx, const char *str) 
     ATTR_NONNULL
     ATTR_WARN_UNUSED_RESULT;
+
+extern uint8_t *find_binary(binary_data data, binary_data search)
+    ATTR_WARN_UNUSED_RESULT
+    ATTR_PURE;
+
+extern size_t normalize_index(exec_context *ctx, size_t len, double idx) ATTR_PURE;
+
+extern void end_module_parsing(exec_context *ctx);
+extern bool require_module(exec_context *ctx, const uint8_t *name, double version);
 
 #ifdef __cplusplus
 }

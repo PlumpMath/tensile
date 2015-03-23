@@ -9,17 +9,28 @@
 #include "engine.h"
 #include "ops.h"
 
-static action *convert_to_check(exec_context *ctx, const expr_node *expr);
+static action *convert_to_check(exec_context *ctx, const expr_node *expr)
+ATTR_NONNULL ATTR_MALLOC ATTR_WARN_UNUSED_RESULT;
 
-static inline expr_node *make_literal_string(exec_context *context, uint8_t *str)
+static inline ATTR_NONNULL ATTR_WARN_UNUSED_RESULT ATTR_MALLOC
+expr_node *make_literal_string(exec_context *context, uint8_t *str)
 {
     return make_expr_node(context, EXPR_LITERAL, MAKE_VALUE(STRING, context->static_pool, str));
 }
 
-static inline expr_node *make_closure(exec_context *context, const action_def *def, apr_array_header_t *args)
+static inline
+expr_node *make_closure_expr(exec_context *context, const action_def *def, apr_array_header_t *arglist)
 {
-    return make_expr_node(context, EXPR_LITERAL, MAKE_VALUE(CLOSURE, context->static_pool, ((closure){.def = def, .args = args})));
+    expr_node *head = make_expr_node(context, EXPR_LITERAL, make_closure(context, def, 0));
+ 
+    if (arglist == NULL)
+       return head;
+
+    augment_arg_list(context, def, arglist, false);
+    return make_expr_node(context, EXPR_OPERATOR, expr_op_bind, head,
+                          make_expr_node(context, EXPR_LIST, arglist));
 }
+
 
 %}
 
@@ -34,10 +45,12 @@ static inline expr_node *make_closure(exec_context *context, const action_def *d
     action_func actfun;
     action *act;
     enum stage_section section;
+    stage_contents sc;
     sectioned_action sact;
     stage *stage;
     void *gptr;
 }
+%token TOK_AS
 %token TOK_CONST
 %token TOK_ARROW
 %token<value> TOK_BINARY
@@ -73,6 +86,7 @@ static inline expr_node *make_closure(exec_context *context, const action_def *d
 %token<str> TOK_STRING
 %token TOK_THIS
 %token<value> TOK_TIMESTAMP
+%token TOK_TYPEOF
 %token TOK_UMINUS
 %token TOK_VARFIELD
 
@@ -89,7 +103,8 @@ static inline expr_node *make_closure(exec_context *context, const action_def *d
 %left '+' '-'
 %left '*' '/' '%'
 %right '^'
-%right '`' '!' '#' TOK_UMINUS
+%left TOK_AS
+%right '`' '!' '#' TOK_UMINUS TOK_TYPEOF
 %right TOK_EXTERN
 %left TOK_FIELD TOK_VARFIELD '[' TOK_PARENT
 
@@ -108,6 +123,7 @@ static inline expr_node *make_closure(exec_context *context, const action_def *d
 %type<actdef> orderop
 %type<expr> sortspec
 %type<expr> filterspec
+%type<value> num0
 
 %type<act> action
 %type<act> simple_action
@@ -115,11 +131,12 @@ static inline expr_node *make_closure(exec_context *context, const action_def *d
 %type<act> assignments0
 %type<act> rhs
 %type<act> innerstagebody
-%type<act> innerrules
-%type<act> innerrule
+%type<sc> innerrules
+%type<sc> innerrule
 
 %type<str> gid
 %type<str> gidnull
+%type<str> gid0
 
 %type<section> section
 
@@ -141,7 +158,7 @@ script:         body
 
 body:           /*empty */
         |       body ';'
-        |       body assignment ';' { (void)evaluate_expr_node(context, $2, false); }
+        |       body assignment ';' { evaluate_expr_node(context, $2, false); }
         |       body stage
         |       body actiondef ';'
         |       body pragma ';'
@@ -266,7 +283,8 @@ rhs:         ':'action ';' { $$ = $2; }
 
 innerstagebody:      assignments0 innerrules
                 { 
-                    $$ = seq_actions(context, $1, $2); 
+                    action *joint = alt_actions(context, $2.normal, $2.otherwise);
+                    $$ = seq_actions(context, $1, joint);
                 }
                 ;
 
@@ -274,13 +292,14 @@ innerrules:     innerrule  { $$ = $1; }
         |       innerrules ';' { $$ = $1; }
         |       innerrules innerrule %prec ';'
                 { 
-                    $$  = alt_def_actions(context, $1, $2); 
+                    $$  = combine_stage_contents(context, $1, $2); 
                 }
         ;
 
 innerrule:      topaction rhs
                 { 
-                    $$ = $1 ? make_action(context, ACTION_CONDITIONAL, $1, $2) : $2; 
+                    $$ = $1 ? (stage_contents){.normal = make_action(context, ACTION_CONDITIONAL, $1, $2)} : 
+                    (stage_contents){.otherwise = $2}; 
                 }
         ;
 
@@ -322,32 +341,38 @@ simple_action:  assignment
 
 assignment:     expression '=' expression
                 {
-                    $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_assignment, 2, $1, $3);
+                    $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_assignment, $1, $3);
                 }
         |       expression TOK_COMP_ASSIGN expression 
                 {
-                    $$ = make_expr_node(context, EXPR_OPERATOR, $2, 2, $1, $3);
+                    $$ = make_expr_node(context, EXPR_OPERATOR, $2, $1, $3);
                 }
         |       expression TOK_ARROW expression
                 {
-                    $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_link, 2, $1, $3);
+                    $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_link, $1, $3);
                 }
         |       TOK_CONST expression '=' expression
                 {
-                    $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_const, 2, $2, $4);
+                    $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_const, $2, $4);
                 }
         |       TOK_LOCAL expression '=' expression
                 {
-                    $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_local_assign, 2, $2, $4);
+                    $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_local_assign, $2, $4);
                 }
                 ;
 
 
-pragma:         TOK_PRAGMA TOK_ID gidnum
+pragma:         TOK_PRAGMA TOK_ID gid0 num0
         ;
 
-gidnum:         gid
-        |       TOK_NUMBER
+gid0:         gid
+        |    /* empty */
+                { $$ = NULL; }
+        ;
+
+num0:           TOK_NUMBER
+        |       /*empty */
+                { $$ = MAKE_NUM_VALUE(0.0); }
         ;
 
 exprlist:       expression { 
@@ -376,7 +401,7 @@ exprlist0:      /*empty */ { $$ = make_expr_list(context); }
 expression:     literal { $$ = make_expr_node(context, EXPR_LITERAL, $1); }
         |       '[' exprlist0 ']' { $$ = make_expr_node(context, EXPR_LIST, $2); }
         |       expression '<' attributes '>' {} %prec TOK_FIELD {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_makenode, 2, $1, $3);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_makenode, $1, $3);
                 }
         |       '(' expression ')' { $$ = $2; }
         |       TOK_ID { $$ = make_expr_node(context, EXPR_VARREF, $1); }
@@ -390,89 +415,89 @@ expression:     literal { $$ = make_expr_node(context, EXPR_LITERAL, $1); }
                 $$->x.op.args[0] = $1; 
                 }
         |       expression '[' ']' {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_make_iter, 1, $1);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_make_iter, $1);
                 }
         |       expression '[' aggregate ']' {
-                $$ = make_expr_node(context, EXPR_OPERATOR, $3, 1, $1);
+                $$ = make_expr_node(context, EXPR_OPERATOR, $3, $1);
                 }
         |       expression '[' rangesel ']' {
                 $$ = $3;
                 $$->x.op.args[0] = $1; 
                 }
         |       '+'expression %prec TOK_UMINUS {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_uplus, 1, $2);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_uplus, $2);
                 }
         |       '-'expression %prec TOK_UMINUS {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_uminus, 1, $2);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_uminus, $2);
                 }
         |       '*'expression %prec TOK_UMINUS {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_noop, 1, $2);
-                }
-        |       '&'expression %prec TOK_UMINUS {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_tostring, 1, $2);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_noop, $2);
                 }
         |       '/'expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_floor, 1, $2);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_floor, $2);
                 }
         |       '%'expression %prec TOK_UMINUS {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_frac, 1, $2);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_frac, $2);
                 }
-        |       '^'expression %prec TOK_UMINUS {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_typeof, 1, $2);
+        |       TOK_TYPEOF expression {
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_typeof, $2);
                 }
         |       '~'expression %prec TOK_UMINUS{
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_loosen, 1, $2);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_loosen, $2);
                 }
         |       '#'expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_length, 1, $2);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_length, $2);
                 }
         |       '$' sortspec expression %prec TOK_UMINUS {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_sort, 2, $2, $3);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_sort, $2, $3);
                 }
         |       '`'filterspec {
                 $$ = make_expr_node(context, EXPR_LITERAL, $2);
                 }
         |       expression '+' expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_plus, 2, $1, $3);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_plus, $1, $3);
                 }
         |       expression '-' expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_minus, 2, $1, $3);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_minus, $1, $3);
                 }
         |       expression '*' expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_mul, 2, $1, $3);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_mul, $1, $3);
                 }
         |       expression '/' expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_div, 2, $1, $3);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_div, $1, $3);
                 }
         |       expression '%' expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_rem, 2, $1, $3);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_rem, $1, $3);
                 }
         |       expression '&' expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_join, 2, $1, $3);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_join, $1, $3);
                 }
         |       expression '^' expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_power, 2, $1, $3);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_power, $1, $3);
                 }
         |       expression '@' expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_atcontext, 2, $1, $3);
+                $$ = make_expr_node(context, EXPR_AT_CONTEXT, $1, $3);
                 }
         |       expression '?' expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_defaulted, 2, $1, $3);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_defaulted, $1, $3);
                 }
         |       expression '$' sortspec expression %prec '$' {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_merge, 3, $1, $3, $4);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_merge, $1, $3, $4);
                 }
         |       expression TOK_MIN expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_min, 2, $1, $3);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_min, $1, $3);
                 }
         |       expression TOK_MAX expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_max, 2, $1, $3);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_max, $1, $3);
                 }
         |       expression TOK_MIN_CI expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_min_ci, 2, $1, $3);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_min_ci, $1, $3);
                 }
         |       expression TOK_MAX_CI expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_max_ci, 2, $1, $3);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_max_ci, $1, $3);
+                }
+        |       expression TOK_AS gid {
+                $$ = make_expr_node(context, EXPR_TYPECAST, $1, $3);
                 }
                 ;
 
@@ -501,38 +526,38 @@ aggregate:      '+' { $$ = expr_op_aggregate_sum; }
 
 
 fieldsel:       TOK_FIELD {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_getfield, 2, NULL, 
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_getfield, NULL, 
                                     make_literal_string(context, $1));
                 }
         |       TOK_VARFIELD ']' {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_children, 1, NULL);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_children, NULL);
                 }
         |       TOK_VARFIELD '#' ']'{
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_count, 1, NULL);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_count, NULL);
                 }
         |       TOK_VARFIELD expression ']' {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_getfield, 2, NULL, $2);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_getfield, NULL, $2);
                 }
         |       TOK_PARENT {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_parent, 1, NULL);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_parent, NULL);
                 }
                 ;
 
 rangesel:       expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_item, 2, NULL, $1);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_item, NULL, $1);
                 }
         |       expression ':' expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_range, 3, NULL, $1, $3);
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_range, NULL, $1, $3);
                 }
         |       expression ':'
                 {
-                    $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_range, 3, NULL, $1, 
+                    $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_range, NULL, $1, 
                 make_expr_node(context, EXPR_LITERAL, MAKE_NUM_VALUE(INFINITY)));
 
                 }
         |       ':'expression
                 {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_range, 3, NULL, 
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_range, NULL, 
                 make_expr_node(context, EXPR_LITERAL, MAKE_NUM_VALUE(0.0)),
                                     $2);
                 }
@@ -570,22 +595,22 @@ orderop:              '<' {$$ = &predicate_less; }
 
 sortspec:       orderop 
                 { 
-                    $$ = make_closure(context, $1, NULL);
+                    $$ = make_closure_expr(context, $1, NULL);
                 }
         |       TOK_ID 
                 {
-                    $$ = make_closure(context, lookup_action(context, $1), NULL);
+                    $$ = make_closure_expr(context, lookup_action(context, $1), NULL);
                 }
         |       '(' expression ')' { $$ = $2; }
                 ;
 
 filterspec:     relop closure 
                 {
-                    $$ = make_closure(context, $1, $2);
+                    $$ = make_closure_expr(context, $1, $2);
                 }
         |       TOK_ID closure 
                 {
-                    $$ = make_closure(context, lookup_action(context, $1), $2);
+                    $$ = make_closure_expr(context, lookup_action(context, $1), $2);
                 }
         ;
 
@@ -629,5 +654,9 @@ static action *convert_to_check(exec_context *context, const expr_node *expr)
 
 static void yyerror(YYLTYPE * yylloc_param, exec_context *context ATTR_UNUSED, const char *msg)
 {
-    fprintf(stderr, "%d: %s\n", yylloc_param->first_line, msg);
+    const char *fname = (const char *)APR_ARRAY_IDX(context->conf->lexer_buffers,
+                                                    context->conf->lexer_buffers->nelts - 1,
+                                                    lexer_buffer).filename;
+    fprintf(stderr, "%s:%d: %s\n", fname ? fname : "<stream>", 
+            yylloc_param->first_line, msg);
 }

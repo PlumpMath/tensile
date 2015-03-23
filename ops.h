@@ -35,7 +35,7 @@ extern "C"
     extern expr_value expr_op_##_name(exec_context *ctx, \
                                       bool lvalue,       \
                                       unsigned nv,       \
-                                      expr_node **vs)
+                                      const expr_node * const *vs)
 
 DECLARE_EXPR_OP(assignment);
 DECLARE_EXPR_OP(link);
@@ -49,7 +49,6 @@ DECLARE_EXPR_OP(make_iter);
 DECLARE_EXPR_OP(uplus);
 DECLARE_EXPR_OP(uminus);
 DECLARE_EXPR_OP(noop);
-DECLARE_EXPR_OP(tostring);
 DECLARE_EXPR_OP(floor);
 DECLARE_EXPR_OP(frac);
 DECLARE_EXPR_OP(typeof);
@@ -63,7 +62,6 @@ DECLARE_EXPR_OP(div);
 DECLARE_EXPR_OP(rem);
 DECLARE_EXPR_OP(join);
 DECLARE_EXPR_OP(power);
-DECLARE_EXPR_OP(atcontext);
 DECLARE_EXPR_OP(defaulted);
 DECLARE_EXPR_OP(merge);
 DECLARE_EXPR_OP(max);
@@ -87,6 +85,7 @@ DECLARE_EXPR_OP(parent);
 DECLARE_EXPR_OP(item);
 DECLARE_EXPR_OP(range);
 DECLARE_EXPR_OP(makenode);
+DECLARE_EXPR_OP(bind);
 
 #define DECLARE_PREDICATE(_name) \
     extern const action_def predicate_##_name
@@ -116,6 +115,11 @@ DECLARE_PREDICATE(has_var);
 DECLARE_PREDICATE(has_field);
 DECLARE_PREDICATE(has_children);
 DECLARE_PREDICATE(has_parent);
+
+DECLARE_PREDICATE(trf_negate);
+DECLARE_PREDICATE(trf_alt);
+DECLARE_PREDICATE(trf_and_not);
+DECLARE_PREDICATE(trf_and);
 
 #ifdef __cplusplus
 }
