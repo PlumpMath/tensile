@@ -31,11 +31,8 @@ extern "C"
 
 #include "engine.h"
 
-#define DECLARE_EXPR_OP(_name)                           \
-    extern expr_value expr_op_##_name(exec_context *ctx, \
-                                      bool lvalue,       \
-                                      unsigned nv,       \
-                                      const expr_node * const *vs)
+#define DECLARE_EXPR_OP(_name)                  \
+    extern const operator_info expr_op_##_name;
 
 DECLARE_EXPR_OP(assignment);
 DECLARE_EXPR_OP(link);

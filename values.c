@@ -424,25 +424,22 @@ int compare_values(exec_context *ctx, bool inexact, expr_value v1, expr_value v2
 void *dispatch_values(struct exec_context *ctx, const dispatch *disp, 
                       unsigned nargs, const expr_value *vals)
 {
-    unsigned i;
-    
-    for (i = 0; i < nargs; i++)
+    for (; disp->n_args != 0; disp++)
     {
-        if (disp->types[vals[i].type].leaf)
-        {
-            void *result = disp->types[vals[i].type].x.func;
+        unsigned i;
 
-            if (result == NULL)
-                raise_error(ctx, TEN_BAD_TYPE);
-            
-            return result;
-        }
-        else
+        if (disp->n_args > nargs)
+            continue;
+        
+        for (i = 0; i < disp->n_args; i++)
         {
-            disp = disp->types[vals[i].type].x.next;
-            if (disp == NULL)
-                raise_error(ctx, TEN_BAD_TYPE);
+            if (!(disp->types[i] & (1 << vals[i].type)))
+                break;
         }
+        if (i == disp->n_args)
+            break;
     }
-    raise_error(ctx, TEN_TOO_FEW_ARGS);
+    if (!disp->result)
+        raise_error(ctx, TEN_BAD_TYPE);
+    return disp->result;
 }

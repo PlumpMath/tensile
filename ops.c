@@ -28,137 +28,70 @@
 #include "engine.h"
 #include "ops.h"
 
-static expr_value re_evaluate_op(exec_context *ctx, expr_operator_func op, 
-                                 bool lvalue, unsigned nargs,
-                                 expr_value *args)
+
+static const arg_info normal_args[3] = {
+    {false, true},
+    {false, true},
+    {false, true}
+};
+
+
+#define DEFINE_OP_INFO(_name, _nargs, _defh, ...)           \
+    const operator_info expr_op_##_name = {                 \
+        .n_args = _nargs,                                   \
+        .func = (dispatch[]){__VA_ARGS__, {0, _defh, {}}},  \
+        .info = normal_args                                 \
+    }
+
+#define DECLARE_OP_INST(_name, _ctx, _vals)                           \
+    static expr_value eval_##_name(exec_context *_ctx,                \
+                                   bool __lvalue ATTR_UNUSED,         \
+                                   unsigned __nv ATTR_UNUSED,         \
+                                   expr_value *_vals)
+
+#define DISP1(_type, _handler) {1, (_handler), {1 << (VALUE_##_type),}}
+#define DISP2(_type1, _type2, _handler) {2, (_handler), \
+        {1 << (VALUE_##_type1), 1 << (VALUE_##_type2)}}
+
+
+DECLARE_OP_INST(noop, ctx ATTR_UNUSED, vals)
 {
-    expr_node literals[3];
-    const expr_node * const tmpargs[3] = {&literals[0], &literals[1], &literals[2]};
-    unsigned i;
+    return vals[0];
+}
+
+DEFINE_OP_INFO(noop, 1, eval_no_op);
+        
+
+DECLARE_OP_INST(uplus_num, ctx, vals)
+{
+    vals[0].v.num = fabs(vals[0].v.num);
+    return vals[0];
+}
+
+static inline expr_value eval_uplus_str(exec_context *ctx ATTR_UNUSED, 
+                                        bool lvalue ATTR_UNUSED,
+                                        unsigned nv ATTR_UNUSED,
+                                        expr_value *vals)
+{
+    size_t len = 0;
+    uint8_t *buffer = NULL;
+    uint8_t *dest;
     
-    assert(nargs <= 3);
-    for (i = 0; i < nargs; i++)
-    {
-        literals[i].type = EXPR_LITERAL;
-        literals[i].x.literal = args[i];
-    }
-    return op(ctx, lvalue, nargs, tmpargs);
+    buffer = u8_normalize(UNINORM_NFKC, vals[0].v.str, 
+                          u8_strlen(vals[0].v.str), 
+                          NULL, &len);
+    if (buffer == NULL)
+        raise_error(ctx, APR_FROM_OS_ERROR(errno));
+    dest = apr_palloc(ctx->local_pool, len + 1);
+    memcpy(dest, buffer, len);
+    dest[len] = '\0';
+    vals[0].v.str = dest;
+    
+    vals[0].scope = ctx->local_pool;
+    free(buffer);
+
+    return vals;
 }
-
-static expr_value normal_unary_op(exec_context *ctx, bool lvalue, bool deref,
-                                  expr_value (*func)(exec_context *, expr_value),
-                                  expr_operator_func opfunc,
-                                  const expr_node *v)
-{
-    expr_value arg;
-
-    arg = evaluate_expr_node(ctx, v, lvalue);
-    arg = resolve_reference(arg, !deref);
-
-    if (arg.type == VALUE_LIST_ITER)
-    {
-        expr_value listval =  make_expr_value_list(ctx, (size_t)arg.v.list->nelts);
-        unsigned i;
-        
-        for (i = 0; i < (unsigned)arg.v.list->nelts; i++)
-        {
-            expr_value *item = ref_expr_list_value(ctx, arg, i);
-            expr_value result = re_evaluate_op(ctx, opfunc, lvalue, 1, item);
-            set_expr_list_value(ctx, &listval, i, result);
-        }
-        return listval;
-    }
-    return func(ctx, arg);
-}
-
-static expr_value normal_binary_op(exec_context *ctx, bool lvalue, bool deref,
-                                   expr_value (*func)(exec_context *, expr_value, expr_value, bool),
-                                   expr_operator_func opfunc,
-                                   const expr_node * const v[2])
-{
-    expr_value args[2];
-
-    args[0] = evaluate_expr_node(ctx, v[0], lvalue);
-    args[0] = resolve_reference(args[0], !deref);
-    args[1] = evaluate_expr_node(ctx, v[1], false);
-    args[1] = resolve_reference(args[1], false);
-
-    if (args[0].type == VALUE_LIST_ITER || args[1].type == VALUE_LIST_ITER)
-    {
-        unsigned common = (unsigned)(-1);
-        expr_value listval;
-        unsigned i;
-        expr_value items[2];
-        expr_value result;
-
-        if (args[0].type == VALUE_LIST_ITER)
-            common = (unsigned)args[0].v.list->nelts;
-        if (args[1].type == VALUE_LIST_ITER)
-        {
-            if ((unsigned)args[1].v.list->nelts < common)
-                common = (unsigned)args[1].v.list->nelts;
-        }
-
-        listval = make_expr_value_list(ctx, common);
-        
-        items[0] = args[0];
-        items[1] = args[1];
-        for (i = 0; i < common; i++)
-        {
-            if (args[0].type == VALUE_LIST_ITER)
-                items[0] = *ref_expr_list_value(ctx, args[0], i);
-            if (args[1].type == VALUE_LIST_ITER)
-                items[1] = *ref_expr_list_value(ctx, args[1], i);
-            result = re_evaluate_op(ctx, opfunc, lvalue, 2, items);
-            set_expr_list_value(ctx, &listval, i, result);
-        }
-        return listval;
-    }
-    return func(ctx, args[0], args[1], lvalue);
-}
-
-
-#define DEFINE_NORMAL_UNOP(_name, _innername)                           \
-    expr_value expr_op_##_name(exec_context *ctx,                       \
-                               bool lvalue ATTR_UNUSED,                 \
-                               unsigned nv ATTR_UNUSED,                 \
-                               const expr_node * const *vs)             \
-    {                                                                   \
-        assert(nv == 1);                                                \
-        return normal_unary_op(ctx, false, true, _innername, expr_op_##_name, *vs); \
-    }                                                                   \
-    struct action
-
-#define DEFINE_REF_UNOP(_name, _innername)                              \
-    expr_value expr_op_##_name(exec_context *ctx,                       \
-                               bool lvalue,                             \
-                               unsigned nv ATTR_UNUSED,                 \
-                               const expr_node * const *vs)             \
-    {                                                                   \
-        assert(nv == 1);                                                \
-        return normal_unary_op(ctx, lvalue, false, _innername, expr_op_##_name, *vs); \
-    }                                                                   \
-    struct action
-
-#define DEFINE_NORMAL_BINOP(_name, _innername)                          \
-    expr_value expr_op_##_name(exec_context *ctx,                       \
-                               bool lvalue ATTR_UNUSED,                 \
-                               unsigned nv ATTR_UNUSED,                 \
-                               const expr_node * const *vs)             \
-    {                                                                   \
-        assert(nv == 2);                                                \
-        return normal_binary_op(ctx, false, true, _innername, expr_op_##_name, vs); \
-    }                                                                   \
-    struct action
-
-
-static inline expr_value eval_no_op(exec_context *ctx ATTR_UNUSED, expr_value val)
-{
-    return val;
-}
-
-DEFINE_NORMAL_UNOP(noop, eval_no_op);
-
 
 static inline expr_value eval_uplus(exec_context *ctx, expr_value val)
 {
@@ -171,24 +104,7 @@ static inline expr_value eval_uplus(exec_context *ctx, expr_value val)
             val.v.num = fabs(val.v.num);
             break;
         case VALUE_STRING:
-        {
-            size_t len = 0;
-            uint8_t *buffer = NULL;
-            uint8_t *dest;
-            
-            buffer = u8_normalize(UNINORM_NFKC, val.v.str, u8_strlen(val.v.str), 
-                                  NULL, &len);
-            if (buffer == NULL)
-                raise_error(ctx, APR_FROM_OS_ERROR(errno));
-            dest = apr_palloc(ctx->local_pool, len + 1);
-            memcpy(dest, buffer, len);
-            dest[len] = '\0';
-            val.v.str = dest;
-            
-            val.scope = ctx->local_pool;
-            free(buffer);
-            break;
-        }
+        
         case VALUE_TIMESTAMP:
             tzset();
             val.v.ts += timezone;
@@ -205,7 +121,7 @@ static inline expr_value eval_uplus(exec_context *ctx, expr_value val)
 }
 
 
-DEFINE_NORMAL_UNOP(uplus, eval_uplus);
+DEFINE_OP_INFO(uplus, 1, eval_uplus);
 
 
 static inline expr_value eval_uminus(exec_context *ctx, expr_value val)

@@ -77,14 +77,14 @@ expr_value eval_at_context(exec_context *ctx, bool lvalue, expr_value new_this,
 static ATTR_NONNULL ATTR_WARN_UNUSED_RESULT
 expr_value eval_defaulted(exec_context *ctx, bool lvalue, const expr_node *base, const expr_node *defval)
 {
-    volatile sigjmp_buf catcher;
-    volatile exec_context gctx = *ctx;
-    volatile expr_value result = NULL_VALUE;
+    sigjmp_buf catcher;
+    exec_context gctx = *ctx;
+    expr_value result = NULL_VALUE;
 
     gctx.exitpoint = &catcher;
     if (!sigsetjmp(catcher, 1))
     {
-        result = evaluate_expr_node(&gtx, base, lvalue);
+        result = evaluate_expr_node(&gctx, base, lvalue);
     }
     if (result.type == VALUE_NULL ||
         (result.type == VALUE_NUMBER && isnan(result.v.num)))
@@ -104,7 +104,6 @@ expr_value evaluate_operator(exec_context *ctx, bool lvalue,
     for (i = 0; i < op->n_args; i++)
     {
         args[i] = resolve_reference(args[i], op->info[i].lvalue);
-        assert(!op->info[i].product);
         if (op->info[i].iterable && args[i].type == VALUE_LIST_ITER)
             iterables = true;
     }
@@ -194,7 +193,7 @@ expr_value evaluate_expr_node(exec_context *ctx,
                                    evaluate_expr_node(ctx, expr->x.at.context, false), 
                                    expr->x.at.arg);
         case EXPR_DEFAULT:
-            return eval_defaulted(ctx, lvalue, expr->x.at.arg, expr->x.at.default);
+            return eval_defaulted(ctx, lvalue, expr->x.at.arg, expr->x.at.context);
         case EXPR_OPERATOR:
         {
             expr_value args[3];

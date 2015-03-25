@@ -353,7 +353,7 @@ expr_value unquote_string(exec_context *ctx, const char *str)
     return MAKE_VALUE(STRING, ctx->local_pool, expanded);
 }
 
-uint8_t *find_binary(binary_data data, binary_data search)
+const uint8_t *find_binary(binary_data data, binary_data search)
 {
     uint8_t *next;
     

@@ -98,7 +98,7 @@ typedef struct exec_context {
 
 typedef struct binary_data_type {
     const char *name;
-    uint8_t *(*to_string)(exec_context *ctx, binary_data data);
+    const uint8_t *(*to_string)(exec_context *ctx, binary_data data);
     double (*to_number)(exec_context *ctx, binary_data data);
     expr_value (*loosen)(exec_context *ctx, binary_data data);
     expr_value (*uplus)(exec_context *ctx, binary_data data);
@@ -142,7 +142,6 @@ typedef expr_value (*typecast_func)(exec_context *ctx, expr_value src);
 typedef struct arg_info {
     bool lvalue;
     bool iterable;
-    bool product;
 } arg_info;
 
 typedef struct operator_info {
@@ -218,6 +217,7 @@ typedef struct action_def {
     const expr_node **defaults;
     const arg_info *info;
     bool external;
+    bool predicate;
     union {
         struct action *body;
         dispatch *func;
@@ -378,7 +378,7 @@ extern expr_value unquote_string(exec_context *ctx, const char *str)
     ATTR_NONNULL
     ATTR_WARN_UNUSED_RESULT;
 
-extern uint8_t *find_binary(binary_data data, binary_data search)
+extern const uint8_t *find_binary(binary_data data, binary_data search)
     ATTR_WARN_UNUSED_RESULT
     ATTR_PURE;
 

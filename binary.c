@@ -23,7 +23,7 @@
 #include "engine.h"
 
 
-static uint8_t *default_binary_tostring(exec_context *ctx, binary_data data)
+static const uint8_t *default_binary_tostring(exec_context *ctx, binary_data data)
 {
     uint8_t *result;
     if (!u8_check(data.data, data.len))
@@ -31,7 +31,7 @@ static uint8_t *default_binary_tostring(exec_context *ctx, binary_data data)
     
     result = apr_palloc(ctx->local_pool, data.len + 1);
     memcpy(result, data.data, data.len);
-    data.data[data.len] = '\0';
+    result[data.len] = '\0';
     return result;
 }
 
@@ -52,14 +52,15 @@ static expr_value default_binary_reverse(exec_context *ctx, binary_data data)
 {
     binary_data result;
     unsigned i;
+    uint8_t *dest;
     
     result.type = data.type;
     result.len = data.len;
-    result.data = apr_palloc(ctx->local_pool, data.len);
+    result.data = dest = apr_palloc(ctx->local_pool, data.len);
     
     for (i = 0; i < data.len; i++)
     {
-        result.data[i] = data.data[data.len - i - 1u];
+        dest[i] = data.data[data.len - i - 1u];
     }
     return MAKE_VALUE(BINARY, ctx->local_pool, result);
 }
@@ -73,12 +74,13 @@ static expr_value default_binary_concat(exec_context *ctx,
                                         binary_data arg1, binary_data arg2)
 {
     binary_data result;
+    uint8_t *dest;
     
     result.type = arg1.type;
     result.len = arg1.len + arg2.len;
-    result.data = apr_palloc(ctx->local_pool, result.len);
-    memcpy(result.data, arg1.data, arg1.len);
-    memcpy(result.data + arg1.len, arg2.data, arg2.len);
+    result.data = dest = apr_palloc(ctx->local_pool, result.len);
+    memcpy(dest, arg1.data, arg1.len);
+    memcpy(dest + arg1.len, arg2.data, arg2.len);
     
     return MAKE_VALUE(BINARY, ctx->local_pool, result);
 }
@@ -88,21 +90,25 @@ static expr_value default_binary_repeat(exec_context *ctx,
 {
     binary_data result;
     size_t factor;
+    unsigned i;
+    uint8_t *dest;
     
     if (num < 1.0)
     {
         return MAKE_VALUE(BINARY, ctx->static_pool,
                           ((binary_data){.type = arg.type,
-                                  .data = "",
+                                  .data = (const uint8_t *)"",
                                   .len = 0}));
     }                         
 
-    result.type = arg1.type;
-    result.len = arg1.len + arg2.len;
-    result.data = apr_palloc(ctx->local_pool, result.len);
-    memcpy(result.data, arg1.data, arg1.len);
-    memcpy(result.data + arg1.len, arg2.data, arg2.len);
-    
+    factor = (size_t)num;
+    result.type = arg.type;
+    result.len = arg.len * factor;
+    result.data = dest = apr_palloc(ctx->local_pool, result.len);
+    for (i = 0; i < factor; i++)
+    {
+        memcpy(dest + i * arg.len, arg.data, arg.len);
+    }
     return MAKE_VALUE(BINARY, ctx->local_pool, result);
 }
 
@@ -160,7 +166,7 @@ static expr_value default_binary_split(exec_context *ctx, binary_data data, cons
     }
     else if (optarg->type == VALUE_BINARY)
     {
-        uint8_t *next;
+        const uint8_t *next;
         result = make_expr_value_list(ctx, 0);
 
         while ((next = find_binary(data, optarg->v.bin)) != NULL)
@@ -231,7 +237,7 @@ static expr_value default_binary_tokenize(exec_context *ctx, binary_data data, c
     }
     else if (optarg->type == VALUE_BINARY)
     {
-        uint8_t *next;
+        const uint8_t *next;
         result = make_expr_value_list(ctx, 0);
 
         while (data.len > 0 && 
@@ -316,7 +322,7 @@ const binary_data_type default_binary_data = {
     .reverse = default_binary_reverse,
     .length = default_binary_length,
     .concat = default_binary_concat,
-    .repeat = default¯binary_repeat,
+    .repeat = default_binary_repeat,
     .strip = default_binary_strip,
     .split = default_binary_split,
     .tokenize = default_binary_tokenize,

@@ -41,7 +41,7 @@ expr_node *make_closure_expr(exec_context *context, const action_def *def, apr_a
     const action_def *actdef;
     apr_array_header_t *list;
     int ival;
-    expr_operator_func oper;
+    const operator_info *oper;
     action_func actfun;
     action *act;
     enum stage_section section;
@@ -514,14 +514,14 @@ attributes:     TOK_FIELD ':' expression {
                 }
         ;
 
-aggregate:      '+' { $$ = expr_op_aggregate_sum; }
-        |       '*' { $$ = expr_op_aggregate_prod; }
-        |       '&' { $$ = expr_op_aggregate_join; }
-        |       '/' { $$ = expr_op_aggregate_avg; }
-        |       TOK_MIN { $$ = expr_op_aggregate_min; }
-        |       TOK_MAX { $$ = expr_op_aggregate_max; }
-        |       TOK_MIN_CI { $$ = expr_op_aggregate_min_ci; }
-        |       TOK_MAX_CI { $$ = expr_op_aggregate_max_ci; }
+aggregate:      '+' { $$ = &expr_op_aggregate_sum; }
+        |       '*' { $$ = &expr_op_aggregate_prod; }
+        |       '&' { $$ = &expr_op_aggregate_join; }
+        |       '/' { $$ = &expr_op_aggregate_avg; }
+        |       TOK_MIN { $$ = &expr_op_aggregate_min; }
+        |       TOK_MAX { $$ = &expr_op_aggregate_max; }
+        |       TOK_MIN_CI { $$ = &expr_op_aggregate_min_ci; }
+        |       TOK_MAX_CI { $$ = &expr_op_aggregate_max_ci; }
                 ;
 
 
@@ -630,17 +630,17 @@ static action *convert_to_check(exec_context *context, const expr_node *expr)
                              make_literal_string(context, expr->x.varname),
                              NULL);
         case EXPR_OPERATOR:
-            if (expr->x.op.func == expr_op_getfield)
+            if (expr->x.op.func == &expr_op_getfield)
             {
                 return make_relation(context, &predicate_has_field, 
                                      expr->x.op.args[0], expr->x.op.args[1]);
             }
-            if (expr->x.op.func == expr_op_children)
+            if (expr->x.op.func == &expr_op_children)
             {
                 return make_call(context, &predicate_has_children,
                                  expr->x.op.args[0], NULL);
             }
-            if (expr->x.op.func == expr_op_parent)
+            if (expr->x.op.func == &expr_op_parent)
             {
                 return make_call(context, &predicate_has_parent,
                                  expr->x.op.args[0], NULL);

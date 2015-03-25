@@ -51,7 +51,7 @@ enum value_type {
 typedef struct binary_data {
     const struct binary_data_type *type;
     size_t len;
-    uint8_t *data;
+    const uint8_t *data;
 } binary_data;
 
 struct action_def;
@@ -199,14 +199,11 @@ extern expr_value resolve_reference(expr_value val, bool lvalue)
 extern int compare_values(struct exec_context *ctx, bool inexact, expr_value v1, expr_value v2, bool ordering)
     ATTR_NONNULL_1ST;
 
+#define MAX_DISPATCH_ARGS 8
 typedef struct dispatch {
-    struct {
-        bool leaf;
-        union {
-            void *func;
-            const struct dispatch *next;
-        } x;
-    } types[VALUE_MAX_TYPE + 1];
+    unsigned n_args;
+    void *result;
+    uint8_t types[MAX_DISPATCH_ARGS];
 } dispatch;
 
 extern void *dispatch_values(struct exec_context *ctx, const dispatch *disp, 

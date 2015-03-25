@@ -44,15 +44,15 @@ ESCAPE \\([abfnrtv\'\"\\]|u\+?[[:xdigit:]]{4}|U\+?[[:xdigit:]]{8}|[uU]\{[^}]+\})
 ":>~" { return TOK_MAX_CI; }
 ".[" { return TOK_VARFIELD; }
 "+=" { 
-    yylval->oper = expr_op_plus_assign; 
+    yylval->oper = &expr_op_plus_assign; 
     return TOK_COMP_ASSIGN; 
 }
 "&=" { 
-    yylval->oper = expr_op_join_assign;
+    yylval->oper = &expr_op_join_assign;
     return TOK_COMP_ASSIGN; 
 }
 "?=" { 
-    yylval->oper = expr_op_default_assign;
+    yylval->oper = &expr_op_default_assign;
     return TOK_COMP_ASSIGN; 
 }
 "===" { return TOK_IDENTITY; }
