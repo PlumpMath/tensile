@@ -433,7 +433,7 @@ void *dispatch_values(struct exec_context *ctx, const dispatch *disp,
         
         for (i = 0; i < disp->n_args; i++)
         {
-            if (!(disp->types[i] & (1 << vals[i].type)))
+            if (disp->types[i] != vals[i].type)
                 break;
         }
         if (i == disp->n_args)

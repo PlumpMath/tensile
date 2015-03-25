@@ -203,7 +203,7 @@ extern int compare_values(struct exec_context *ctx, bool inexact, expr_value v1,
 typedef struct dispatch {
     unsigned n_args;
     void *result;
-    uint8_t types[MAX_DISPATCH_ARGS];
+    enum value_type types[MAX_DISPATCH_ARGS];
 } dispatch;
 
 extern void *dispatch_values(struct exec_context *ctx, const dispatch *disp, 
