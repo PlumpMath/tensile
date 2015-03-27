@@ -46,6 +46,7 @@ DECLARE_EXPR_OP(make_iter);
 DECLARE_EXPR_OP(uplus);
 DECLARE_EXPR_OP(uminus);
 DECLARE_EXPR_OP(noop);
+DECLARE_EXPR_OP(lvalue);
 DECLARE_EXPR_OP(floor);
 DECLARE_EXPR_OP(frac);
 DECLARE_EXPR_OP(typeof);
@@ -117,6 +118,7 @@ DECLARE_PREDICATE(trf_negate);
 DECLARE_PREDICATE(trf_alt);
 DECLARE_PREDICATE(trf_and_not);
 DECLARE_PREDICATE(trf_and);
+DECLARE_PREDICATE(trf_loosen);
 
 #ifdef __cplusplus
 }

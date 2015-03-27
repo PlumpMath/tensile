@@ -94,7 +94,6 @@ expr_value eval_defaulted(exec_context *ctx, bool lvalue, const expr_node *base,
     return result;
 }
 
-static ATTR_NONNULL ATTR_WARN_UNUSED_RESULT
 expr_value evaluate_operator(exec_context *ctx, bool lvalue, 
                              const operator_info *op, expr_value *args)
 {
@@ -103,7 +102,7 @@ expr_value evaluate_operator(exec_context *ctx, bool lvalue,
     
     for (i = 0; i < op->n_args; i++)
     {
-        args[i] = resolve_reference(args[i], op->info[i].lvalue);
+        args[i] = resolve_reference(args[i], op->info[i].ref);
         if (op->info[i].iterable && args[i].type == VALUE_LIST_ITER)
             iterables = true;
     }

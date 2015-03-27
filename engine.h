@@ -141,6 +141,7 @@ typedef expr_value (*typecast_func)(exec_context *ctx, expr_value src);
 
 typedef struct arg_info {
     bool lvalue;
+    bool ref;
     bool iterable;
 } arg_info;
 
@@ -192,6 +193,9 @@ typedef struct var_bindings {
 tree_node *lookup_var(exec_context *ctx, const uint8_t *name, bool local) ATTR_NONNULL ATTR_WARN_UNUSED_RESULT;
 tree_node *define_var(exec_context *ctx, const uint8_t *name) ATTR_NONNULL;
 
+extern expr_value evaluate_operator(exec_context *ctx, bool lvalue, 
+                                    const operator_info *op, expr_value *args)
+    ATTR_NONNULL ATTR_WARN_UNUSED_RESULT;
 extern expr_value evaluate_expr_node(exec_context *ctx,
                                      const expr_node *expr,
                                      bool lvalue) 
@@ -288,6 +292,16 @@ extern const action_def *lookup_action(exec_context *ctx, const uint8_t *name)
     ATTR_NONNULL
     ATTR_WARN_UNUSED_RESULT;
 
+extern action_result call_closure(exec_context *ctx, const closure *cls, 
+                                  unsigned nargs, expr_value *args)
+    ATTR_NONNULL
+    ATTR_WARN_UNUSED_RESULT;
+
+extern bool call_predicate(exec_context *ctx, const closure *cls, 
+                           unsigned nargs, expr_value *args)
+    ATTR_NONNULL
+    ATTR_WARN_UNUSED_RESULT;
+
 extern const action_def *resolve_dso_sym(exec_context *ctx,
                                          const uint8_t *library, 
                                          const uint8_t *name) 
@@ -353,9 +367,6 @@ enum tensile_error_code {
     TEN_DANGLING_REF
 };
 
-#define CHECKED_DIVIDE(_ctx, _num, _den) \
-    ((_den) == 0 ? (raise_error((_ctx), APR_EINVAL), 0u) : (_num) / (_den))
-
 extern expr_value parse_iso_timestamp(exec_context *ctx, const char *ts) 
     ATTR_NONNULL
     ATTR_WARN_UNUSED_RESULT;
@@ -382,10 +393,36 @@ extern const uint8_t *find_binary(binary_data data, binary_data search)
     ATTR_WARN_UNUSED_RESULT
     ATTR_PURE;
 
-extern size_t normalize_index(exec_context *ctx, size_t len, double idx) ATTR_PURE;
+extern size_t normalize_index(exec_context *ctx, size_t len, double idx) 
+    ATTR_NONNULL_1ST ATTR_PURE;
 
-extern void end_module_parsing(exec_context *ctx);
-extern bool require_module(exec_context *ctx, const uint8_t *name, double version);
+extern expr_value extract_substr(exec_context *ctx, const uint8_t *str, 
+                                 size_t start, size_t len,
+                                 const uint8_t **end)
+    ATTR_NONNULL_ARGS((1, 2));
+
+extern expr_value generic_split(exec_context *ctx, void *data,
+                                bool (*isend)(exec_context *, const void *),
+                                expr_value (*getprefix)(exec_context *ctx, void *, size_t),
+                                size_t chunksize)
+    ATTR_NONNULL ATTR_WARN_UNUSED_RESULT;
+
+extern expr_value generic_tokenize(exec_context *ctx, void *data, const void *sep,
+                                   size_t (*find)(exec_context *, const void *, const void *),
+                                   void (*skip)(exec_context *, void *, const void *),
+                                   expr_value (*getprefix)(exec_context *ctx, void *, size_t))
+    ATTR_NONNULL_ARGS((1, 2, 3, 4, 6)) ATTR_WARN_UNUSED_RESULT;
+
+extern expr_value generic_range(exec_context *ctx, const void *data, 
+                                double start, double end,
+                                size_t (*getlen)(exec_context *, const void *),
+                                expr_value (*extract)(exec_context *, const void *, size_t, size_t))
+    ATTR_NONNULL ATTR_WARN_UNUSED_RESULT;
+
+extern void end_module_parsing(exec_context *ctx)
+    ATTR_NONNULL;
+extern bool require_module(exec_context *ctx, const uint8_t *name, double version)
+    ATTR_NONNULL;
 
 #ifdef __cplusplus
 }

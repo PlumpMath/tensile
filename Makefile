@@ -25,7 +25,7 @@ APU_LDLAGS := $(shell $(APU_PKGCONFIG) --libs-only-L)
 APR_LIBS := $(shell $(APR_PKGCONFIG) --libs-only-l)
 APU_LIBS := $(shell $(APU_PKGCONFIG) --libs-only-l)
 
-C_SOURCES = utils.c values.c ops.c eval.c binary.c tensile.tab.c lex.yy.c
+C_SOURCES = library.c utils.c values.c ops.c eval.c binary.c tensile.tab.c lex.yy.c
 
 APPLICATION = tensile
 

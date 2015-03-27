@@ -125,6 +125,59 @@ static expr_value default_binary_strip(exec_context *ctx,
     return MAKE_VALUE(BINARY, ctx->local_pool, arg1);
 }
 
+static bool binary_isend(exec_context *ctx ATTR_UNUSED, const void *data)
+{
+    return ((const binary_data *)data)->len == 0;
+}
+
+static expr_value binary_getprefix(exec_context *ctx, void *data, size_t len)
+{
+    expr_value result;
+    binary_data *bin = data;
+
+    if (len > bin->len)
+        len = bin->len;
+
+    result = MAKE_VALUE(BINARY, ctx->local_pool, 
+                        ((binary_data){.type = bin->type,
+                                .data = bin->data,
+                                .len = len
+                                }));
+    
+    bin->len -= len;
+    bin->data += len;
+    return result;
+}
+
+static size_t binary_find(exec_context *ctx ATTR_UNUSED, const void *data, const void *sep)
+{
+    const binary_data *bin = data;
+    const binary_data *binsep = sep;
+    const uint8_t *next;
+
+    if (bin->len == 0)
+        return (size_t)(-1);
+    
+    next = find_binary(*bin, *binsep);
+    if (next == NULL)
+        return bin->len;
+    
+    return (size_t)(next - bin->data);
+}
+
+static void binary_skip(exec_context *ctx ATTR_UNUSED, void *data, const void *sep)
+{
+    binary_data *bin = data;
+    const binary_data *binsep = sep;
+
+    if (binsep->len > bin->len)
+        return;
+    if (memcmp(bin->data, binsep->data, binsep->len) != 0)
+        return;
+    bin->data += binsep->len;
+    bin->len -= binsep->len;
+}
+
 static expr_value default_binary_split(exec_context *ctx, binary_data data, const expr_value *optarg)
 {
     expr_value result;
@@ -140,62 +193,24 @@ static expr_value default_binary_split(exec_context *ctx, binary_data data, cons
             
             for (j = 0; j < CHAR_BIT; j++)
             {
-                expr_value *val = &APR_ARRAY_IDX(result.v.list, i, expr_value);
-                set_expr_value_num(val, 
+                set_expr_value_num(ref_expr_list_value(ctx, result, i),
                                    (data.data[i] & (1 << j)) == 0 ? 0.0 : 1.0);
             }
         }
     }
     else if (optarg->type == VALUE_NUMBER)
     {
-        size_t n = (size_t)optarg->v.num;
-        size_t chunksize = CHECKED_DIVIDE(ctx, data.len, n);
+        if (optarg->v.num < 1.0)
+            raise_error(ctx, APR_EINVAL);
 
-        result = make_expr_value_list(ctx, n);
-        for (i = 0; i < n; i++, data.data += chunksize)
-        {
-            expr_value *val = &APR_ARRAY_IDX(result.v.list, i, expr_value);
-            val->type = VALUE_BINARY;
-            val->v.bin.type = &default_binary_data;
-            val->v.bin.data = data.data;
-            val->v.bin.len = data.len < chunksize ? data.len : chunksize;
-            data.len -= val->v.bin.len;
-            data.data += val->v.bin.len;
-        }
-        
+        result = generic_split(ctx, &data, binary_isend, binary_getprefix, 
+                               data.len / (size_t)optarg->v.num);
     }
     else if (optarg->type == VALUE_BINARY)
     {
-        const uint8_t *next;
-        result = make_expr_value_list(ctx, 0);
 
-        while ((next = find_binary(data, optarg->v.bin)) != NULL)
-        {
-            expr_value *val = &APR_ARRAY_PUSH(result.v.list, expr_value);
-            val->type = VALUE_BINARY;
-            val->scope = ctx->local_pool;
-            val->v.bin.type = &default_binary_data;
-            val->v.bin.data = data.data;
-            if (next == data.data && data.len > 0)
-            {
-                val->v.bin.len = 1;
-                data.len--;
-                data.data++;
-            }
-            else
-            {
-                val->v.bin.len = (size_t)(next - data.data);
-                data.len -= val->v.bin.len + optarg->v.bin.len;
-                data.data = next + optarg->v.bin.len;
-            }
-        }
-        if (data.len > 0)
-        {
-            expr_value *val = &APR_ARRAY_PUSH(result.v.list, expr_value);
-            val->type = VALUE_BINARY;
-            val->scope = ctx->local_pool;
-            val->v.bin = data;
-        }
+        result = generic_tokenize(ctx, &data, &optarg->v.bin,
+                                  binary_find, binary_skip, binary_getprefix);
     }
     else
         raise_error(ctx, TEN_BAD_TYPE);
@@ -213,52 +228,23 @@ static expr_value default_binary_tokenize(exec_context *ctx, binary_data data, c
         
         for (i = 0; i < data.len; i++)
         {
-            expr_value *val = &APR_ARRAY_IDX(result.v.list, i, expr_value);
+            expr_value *val = ref_expr_list_value(ctx, result, i);
             set_expr_value_num(val, (double)data.data[i]);
         }
     }
     else if (optarg->type == VALUE_NUMBER)
     {
-        size_t chunksize = (size_t)optarg->v.num;
-        size_t n = CHECKED_DIVIDE(ctx, data.len + chunksize - 1, chunksize);
-
-        result = make_expr_value_list(ctx, n);
-        for (i = 0; i < n; i++, data.data += chunksize)
-        {
-            expr_value *val = &APR_ARRAY_IDX(result.v.list, i, expr_value);
-            val->type = VALUE_BINARY;
-            val->v.bin.type = &default_binary_data;
-            val->v.bin.data = data.data;
-            val->v.bin.len = data.len < chunksize ? data.len : chunksize;
-            data.len -= val->v.bin.len;
-            data.data += val->v.bin.len;
-        }
         
+        if (optarg->v.num < (double)CHAR_BIT)
+            raise_error(ctx, APR_EINVAL);
+
+        result = generic_split(ctx, &data, binary_isend, binary_getprefix,
+                               (size_t)optarg->v.num / CHAR_BIT);
     }
     else if (optarg->type == VALUE_BINARY)
     {
-        const uint8_t *next;
-        result = make_expr_value_list(ctx, 0);
-
-        while (data.len > 0 && 
-               (next = find_binary((binary_data){.data = data.data + 1, 
-                           .len = data.len - 1}, optarg->v.bin)) != NULL)
-        {
-            expr_value *val = &APR_ARRAY_PUSH(result.v.list, expr_value);
-            val->type = VALUE_BINARY;
-            val->scope = ctx->local_pool;
-            val->v.bin.data = data.data;
-            val->v.bin.len = (size_t)(next - data.data);
-            data.len -= val->v.bin.len + optarg->v.bin.len;
-            data.data = next;
-        }
-        if (data.len > 0)
-        {
-            expr_value *val = &APR_ARRAY_PUSH(result.v.list, expr_value);
-            val->type = VALUE_BINARY;
-            val->scope = ctx->local_pool;
-            val->v.bin = data;
-        }
+        result = generic_tokenize(ctx, &data, &optarg->v.bin,
+                                  binary_find, NULL, binary_getprefix);
     }
     else
         raise_error(ctx, TEN_BAD_TYPE);
@@ -278,28 +264,53 @@ expr_value default_binary_item(exec_context *ctx, binary_data data, expr_value a
     return MAKE_NUM_VALUE((data.data[idx / CHAR_BIT] & (1 << (idx % CHAR_BIT))) == 0 ? 0.0 : 1.0);
 }
 
+static size_t binary_getlen(exec_context *ctx ATTR_UNUSED, const void *data)
+{
+    return ((binary_data *)data)->len * CHAR_BIT;
+}
+
+static expr_value ATTR_PURE
+binary_extract(exec_context *ctx, const void *data, size_t start, size_t len)
+{
+    const binary_data *bindata = data;
+
+    if ((start % CHAR_BIT) != 0 || (len % CHAR_BIT) != 0)
+        raise_error(ctx, APR_EINVAL);
+
+    start /= CHAR_BIT;
+    len /= CHAR_BIT;
+    
+    if (start > bindata->len)
+    {
+        start = 0;
+        len = 0;
+    }
+    else if (start + len > bindata->len)
+    {
+        len = bindata->len - start;
+    }
+
+    if (len == 0)
+    {
+        return MAKE_VALUE(BINARY, ctx->static_pool,
+                          ((binary_data){.type = bindata->type,
+                                  .data = (const uint8_t *)"",
+                                  .len = 0}));
+    }
+    return MAKE_VALUE(BINARY, ctx->local_pool,
+                      ((binary_data){.type = bindata->type,
+                              .data = bindata->data + start,
+                              .len = len}));
+}
+
 
 static ATTR_PURE
 expr_value default_binary_range(exec_context *ctx, binary_data data, expr_value arg1, expr_value arg2)
 {
-    size_t idx1;
-    size_t idx2;
-
     if (arg1.type != VALUE_NUMBER || arg2.type != VALUE_NUMBER)
         raise_error(ctx, TEN_BAD_TYPE);
-    
-    idx1 = normalize_index(ctx, data.len * CHAR_BIT, arg1.v.num);
-    idx2 = normalize_index(ctx, data.len * CHAR_BIT, arg2.v.num);
 
-    if ((idx1 % CHAR_BIT) != 0 || (idx2 % CHAR_BIT) != 0)
-        raise_error(ctx, APR_EINVAL);
-    
-    idx1 /= CHAR_BIT;
-    idx2 /= CHAR_BIT;
-    
-    data.data += idx1;
-    data.len = idx1 > idx2 ? 0u : idx2 - idx1 + 1u;
-    return MAKE_VALUE(BINARY, ctx->local_pool, data);
+    return generic_range(ctx, &data, arg1.v.num, arg2.v.num, binary_getlen, binary_extract);
 }
 
 static int default_binary_compare(exec_context *ctx ATTR_UNUSED, bool inexact ATTR_UNUSED, 

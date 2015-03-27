@@ -44,21 +44,20 @@ ESCAPE \\([abfnrtv\'\"\\]|u\+?[[:xdigit:]]{4}|U\+?[[:xdigit:]]{8}|[uU]\{[^}]+\})
 ":>~" { return TOK_MAX_CI; }
 ".[" { return TOK_VARFIELD; }
 "+=" { 
-    yylval->oper = &expr_op_plus_assign; 
-    return TOK_COMP_ASSIGN; 
+    return TOK_ADD_ASSIGN;
 }
 "&=" { 
-    yylval->oper = &expr_op_join_assign;
-    return TOK_COMP_ASSIGN; 
+    return TOK_JOIN_ASSIGN;
 }
 "?=" { 
-    yylval->oper = &expr_op_default_assign;
-    return TOK_COMP_ASSIGN; 
+    return TOK_DFL_ASSIGN;
 }
 "===" { return TOK_IDENTITY; }
 "!===" { return TOK_NOT_IDENTITY; }
 "->" { return TOK_ARROW; }
 ".." { return TOK_PARENT; }
+".*" { return TOK_CHILDREN; }
+".#" { return TOK_COUNT; }
 ^[[:space:]]*require[[:space:]]+[[:alnum:]_]+(\.[[:alnum:]_]+)*([[:space:]]+[+-]?([0-9](\.[0-9]+)?|\.[0-9]+))?[[:space:]]*; {
     char *tokstate = NULL;
     char *modulename = NULL;

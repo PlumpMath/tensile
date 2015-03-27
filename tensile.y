@@ -93,7 +93,7 @@ expr_node *make_closure_expr(exec_context *context, const action_def *def, apr_a
 %left ';'
 %left '|'
 %left ','
-%nonassoc '=' TOK_COMP_ASSIGN TOK_ARROW
+%nonassoc '=' TOK_DFL_ASSIGN TOK_ADD_ASSIGN TOK_JOIN_ASSIGN TOK_ARROW
 %nonassoc '<' '>' '~' TOK_EQ TOK_NE TOK_EQ_CI TOK_NE_CI TOK_LESS_CI TOK_GREATER_CI TOK_LE_CI TOK_GE_CI TOK_NOT_MATCH TOK_MATCH_CI TOK_NOT_MATCH_CI
 %nonassoc ':'
 %left '?'
@@ -106,7 +106,7 @@ expr_node *make_closure_expr(exec_context *context, const action_def *def, apr_a
 %left TOK_AS
 %right '`' '!' '#' TOK_UMINUS TOK_TYPEOF
 %right TOK_EXTERN
-%left TOK_FIELD TOK_VARFIELD '[' TOK_PARENT
+%left TOK_FIELD TOK_VARFIELD '[' TOK_PARENT TOK_CHILDREN TOK_COUNT
 
 %type<list> exprlist
 %type<list> exprlist0
@@ -341,11 +341,26 @@ simple_action:  assignment
 
 assignment:     expression '=' expression
                 {
-                    $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_assignment, $1, $3);
+                    $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_assignment, $3, $1);
                 }
-        |       expression TOK_COMP_ASSIGN expression 
+        |       expression TOK_ADD_ASSIGN expression 
                 {
-                    $$ = make_expr_node(context, EXPR_OPERATOR, $2, $1, $3);
+                    $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_assignment,
+                                        make_expr_node(context, EXPR_OPERATOR, 
+                                                       expr_op_plus, $1, $3), $1);
+                }
+        |       expression TOK_JOIN_ASSIGN expression 
+                {
+                    $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_assignment,
+                                        make_expr_node(context, EXPR_OPERATOR, 
+                                                       expr_op_join, $1, $3), $1);
+                }
+        |       expression TOK_DFL_ASSIGN expression 
+                {
+                    $$ = make_expr_node(context, EXPR_DEFAULT, 
+                make_expr_node(context, EXPR_OPERATOR, expr_op_noop, $1),
+                make_expr_node(context, EXPR_OPERATOR, 
+                                                       expr_op_assignment, $3, $1));
                 }
         |       expression TOK_ARROW expression
                 {
@@ -432,6 +447,9 @@ expression:     literal { $$ = make_expr_node(context, EXPR_LITERAL, $1); }
                 }
         |       '*'expression %prec TOK_UMINUS {
                 $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_noop, $2);
+                }
+        |       '&'expression %prec TOK_UMINUS {
+                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_lvalue, $2);
                 }
         |       '/'expression {
                 $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_floor, $2);
@@ -529,10 +547,10 @@ fieldsel:       TOK_FIELD {
                 $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_getfield, NULL, 
                                     make_literal_string(context, $1));
                 }
-        |       TOK_VARFIELD ']' {
+        |       TOK_CHILDREN {
                 $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_children, NULL);
                 }
-        |       TOK_VARFIELD '#' ']'{
+        |       TOK_COUNT {
                 $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_count, NULL);
                 }
         |       TOK_VARFIELD expression ']' {
