@@ -121,7 +121,7 @@ extern expr_value make_expr_value_list(struct exec_context *ctx, size_t n)
     ATTR_NONNULL_1ST ATTR_WARN_UNUSED_RESULT;
 
 static inline ATTR_NONNULL_1ST ATTR_WARN_UNUSED_RESULT ATTR_PURE
-expr_value *ref_expr_list_value(struct exec_context *ctx ATTR_UNUSED, expr_value src, unsigned idx)
+expr_value *ref_expr_list_value(struct exec_context *ctx ATTR_UNUSED, expr_value src, size_t idx)
 {
     assert(src.type == VALUE_LIST || src.type == VALUE_LIST_ITER);
     assert(idx < (unsigned)src.v.list->nelts);

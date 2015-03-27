@@ -332,6 +332,92 @@ expr_value extract_substr(exec_context *ctx, const uint8_t *str,
     return result;
 }
 
+
+bool is_list_suffix(exec_context *ctx, expr_value list,
+                    expr_value suffix)
+{
+    unsigned i;
+
+    if (suffix.v.list->nelts > list.v.list->nelts)
+        return false;
+
+    for (i = 0; i < (unsigned)suffix.v.list->nelts; i++)
+    {
+        if (compare_values(ctx, false,
+                           *ref_expr_list_value(ctx, suffix, i),
+                           *ref_expr_list_value(ctx, list,
+                                                i + 
+                                                (unsigned)(list.v.list->nelts - 
+                                                 suffix.v.list->nelts)),
+                           false) != 0)
+            return false;
+    }
+    return true;
+}
+
+bool is_list_prefix(exec_context *ctx, expr_value list,
+                    expr_value prefix, size_t offset)
+{
+    unsigned i;
+
+    if (offset + (unsigned)prefix.v.list->nelts > (unsigned)list.v.list->nelts)
+        return false;
+
+    for (i = 0; i < (unsigned)prefix.v.list->nelts; i++)
+    {
+        if (compare_values(ctx, false,
+                           *ref_expr_list_value(ctx, prefix, i),
+                           *ref_expr_list_value(ctx, list, offset + i),
+                           false) != 0)
+            return false;
+    }
+    return true;
+}
+
+size_t find_in_list(exec_context *ctx, expr_value list, expr_value sublist, size_t start)
+{
+    size_t i;
+    
+    if (start + (unsigned)sublist.v.list->nelts > (unsigned)list.v.list->nelts)
+        return (size_t)(-1);
+    
+    for (i = start; i < (unsigned)list.v.list->nelts - (unsigned)sublist.v.list->nelts; i++)
+    {
+        unsigned j;
+        for (j = 0;  j < (unsigned)sublist.v.list->nelts; j++)
+        {
+            if (compare_values(ctx, false,
+                               *ref_expr_list_value(ctx, list, i + j),
+                               *ref_expr_list_value(ctx, sublist, j),
+                               false) != 0)
+                break;
+        }
+        if (j == (unsigned)sublist.v.list->nelts)
+            return i - start;
+    }
+    return (size_t)(-1);
+}
+
+expr_value extract_sublist(exec_context *ctx, expr_value list, size_t start, size_t len)
+{
+    expr_value result;
+    unsigned i;
+    
+    if (start >= (unsigned)list.v.list->nelts)
+        return make_expr_value_list(ctx, 0);
+    
+    if (start + len > (unsigned)list.v.list->nelts)
+        len = (unsigned)list.v.list->nelts - start;
+    
+    result = make_expr_value_list(ctx, len);
+    for (i = 0; i < len; i++)
+    {
+        set_expr_list_value(ctx, &result, i,
+                            *ref_expr_list_value(ctx, list, i + start));
+    }
+    return result;
+} 
+
 expr_value generic_split(exec_context *ctx, void *data,
                          bool (*isend)(exec_context *, const void *),
                          expr_value (*getprefix)(exec_context *ctx, void *, size_t),
@@ -359,7 +445,7 @@ expr_value generic_tokenize(exec_context *ctx, void *data, const void *sep,
     {
         if (skip)
             skip(ctx, data, sep);
-        len = find(ctx, data, sep);
+        len = find(ctx, data, sep); 
         if (len == (size_t)(-1))
             break;
         add_expr_list_value(ctx, &result,

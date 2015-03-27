@@ -497,7 +497,7 @@ expression:     literal { $$ = make_expr_node(context, EXPR_LITERAL, $1); }
                 $$ = make_expr_node(context, EXPR_AT_CONTEXT, $1, $3);
                 }
         |       expression '?' expression {
-                $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_defaulted, $1, $3);
+                $$ = make_expr_node(context, EXPR_DEFAULT, $1, $3);
                 }
         |       expression '$' sortspec expression %prec '$' {
                 $$ = make_expr_node(context, EXPR_OPERATOR, expr_op_merge, $1, $3, $4);

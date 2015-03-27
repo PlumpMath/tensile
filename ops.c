@@ -424,7 +424,7 @@ DECLARE_OP_INST1(tokenize, STRING, ctx, vals)
     return list;
 }
 
-DECLARE_OP_INST1(tokenize, BINARY, ctx, vals)
+DECLARE_OP_INST1(tokenize1, BINARY, ctx, vals)
 {
     if (vals[0].v.bin.type->split == NULL)
         raise_error(ctx, APR_ENOTIMPL);
@@ -435,7 +435,7 @@ DEFINE_OP_INFO(frac, normal, 1, NULL,
                DISP1(NONE, noop),
                DISP1(NUMBER, frac),
                DISP1(STRING, tokenize),
-               DISP1(BINARY, tokenize));
+               DISP1(BINARY, tokenize1));
 
 DECLARE_OP_INST1(floor, NUMBER, ctx ATTR_UNUSED, vals)
 {
@@ -472,7 +472,7 @@ DECLARE_OP_INST1(wordsplit, STRING, ctx, vals)
     return list;
 }
 
-DECLARE_OP_INST1(split, BINARY, ctx, vals)
+DECLARE_OP_INST1(split1, BINARY, ctx, vals)
 {
     if (vals[0].v.bin.type->tokenize == NULL)
         raise_error(ctx, APR_ENOTIMPL);
@@ -484,7 +484,7 @@ DEFINE_OP_INFO(floor, normal, 1, NULL,
                DISP1(NONE, noop),
                DISP1(NUMBER, floor),
                DISP1(STRING, wordsplit),
-               DISP1(BINARY, split));
+               DISP1(BINARY, split1));
 
 
 DECLARE_OP_INST1(parent, NODEREF, ctx ATTR_UNUSED, vals)
@@ -650,28 +650,6 @@ DECLARE_OP_INST2(strip, BINARY, BINARY, ctx, vals)
     return vals[0].v.bin.type->strip(ctx, vals[0].v.bin, vals[1].v.bin);
 }
 
-static ATTR_NONNULL ATTR_WARN_UNUSED_RESULT
-bool is_list_suffix(exec_context *ctx, expr_value list,
-                    expr_value suffix)
-{
-    unsigned i;
-
-    if (suffix.v.list->nelts > list.v.list->nelts)
-        return false;
-
-    for (i = 0; i < (unsigned)suffix.v.list->nelts; i++)
-    {
-        if (compare_values(ctx, false,
-                           *ref_expr_list_value(ctx, suffix, i),
-                           *ref_expr_list_value(ctx, list,
-                                                i + 
-                                                (unsigned)(list.v.list->nelts - 
-                                                 suffix.v.list->nelts)),
-                           false) != 0)
-            return false;
-    }
-    return true;
-}
 
 DECLARE_OP_INST2(strip, LIST, LIST, ctx, vals)
 {
@@ -833,6 +811,36 @@ DECLARE_OP_INST2(intersperse, LIST, LIST, ctx, vals)
     return result;
 }
 
+DECLARE_OP_INST2(concat, LIST, STRING, ctx, vals)
+{
+    unsigned i;
+    size_t inlen = u8_strlen(vals[1].v.str);
+    size_t outlen = 0u;
+    uint8_t *result;
+    uint8_t *dest;
+    
+    for (i = 0; i < (unsigned)vals[0].v.list->nelts; i++)
+    {
+        const expr_value *v = ref_expr_list_value(ctx, vals[0], i);
+        if (v->type != VALUE_STRING)
+            raise_error(ctx, TEN_BAD_TYPE);
+        outlen += u8_strlen(v->v.str) + (i ? inlen : 0);
+    }
+    dest = result = apr_palloc(ctx->local_pool, outlen + 1);
+    for (i = 0; i < (unsigned)vals[0].v.list->nelts; i++)
+    {
+        const expr_value *v = ref_expr_list_value(ctx, vals[0], i);
+        
+        if (i != 0)
+        {
+            memcpy(dest, vals[1].v.str, inlen);
+            dest += inlen;
+        }
+        dest = u8_stpcpy(dest, v->v.str);
+    }
+    return MAKE_VALUE(STRING, ctx->local_pool, result);
+}
+
 
 DECLARE_OP_INST2(and, CLOSURE, CLOSURE, ctx, vals)
 {
@@ -851,8 +859,11 @@ DEFINE_OP_INFO(mul, normal, 2, NULL,
                DISP2(BINARY, BINARY, intersperse),
                DISP2(LIST, NUMBER, repeat),
                DISP2(LIST, LIST, intersperse),
+               DISP2(LIST, STRING, concat),
                DISP2(CLOSURE, CLOSURE, and));
 
+
+ATTR_PURE
 DECLARE_OP_INST2(div, NUMBER, NUMBER, ctx, vals)
 {
     if (vals[1].v.num == 0.0)
@@ -899,7 +910,7 @@ static void string_skip(exec_context *ctx ATTR_UNUSED, void *data, const void *s
     (*pstr) += u8_strlen(sepstr);
 }
 
-DECLARE_OP_INST2(split, STRING, NUMBER, ctx ATTR_UNUSED, vals)
+DECLARE_OP_INST2(split, STRING, NUMBER, ctx, vals)
 {
     const uint8_t *str = vals[0].v.str;
     size_t nchar = u8_mbsnlen(str, u8_strlen(str));
@@ -913,7 +924,7 @@ DECLARE_OP_INST2(split, STRING, NUMBER, ctx ATTR_UNUSED, vals)
                          nchar / (size_t)vals[1].v.num);
 }
 
-DECLARE_OP_INST2(split, STRING, STRING, ctx ATTR_UNUSED, vals)
+DECLARE_OP_INST2(split, STRING, STRING, ctx, vals)
 {
     const uint8_t *str = vals[0].v.str;
     return generic_tokenize(ctx, &str, vals[1].v.str,
@@ -956,11 +967,362 @@ static void string_skip_prop(exec_context *ctx, void *data, const void *sep)
 }
 
 
-DECLARE_OP_INST2(split, STRING, CLOSURE, ctx ATTR_UNUSED, vals)
+DECLARE_OP_INST2(split, STRING, CLOSURE, ctx, vals)
 {
     const uint8_t *str = vals[0].v.str;
-    return generic_tokenize(ctx, &str, vals[1].v.str,
+    return generic_tokenize(ctx, &str, &vals[1].v.cls,
                             string_find_prop,
                             string_skip_prop,
                             string_getprefix);
 }
+
+DECLARE_OP_INST1(split, BINARY, ctx, vals)
+{
+    if (!vals[0].v.bin.type->split)
+        raise_error(ctx, APR_ENOTIMPL);
+    return vals[0].v.bin.type->split(ctx, vals[0].v.bin, &vals[1]);
+}
+
+typedef struct list_position {
+    expr_value *list;
+    size_t pos;
+} list_position;
+
+static bool list_isend(exec_context *ctx ATTR_UNUSED, const void *data)
+{
+    const list_position *pos = data;
+    return pos->pos >= (unsigned)pos->list->v.list->nelts;
+}
+
+static expr_value list_getprefix(exec_context *ctx, void *data, size_t len)
+{
+    list_position *pos = data;
+    expr_value result;
+
+    result = extract_sublist(ctx, *pos->list, pos->pos, len);
+    pos->pos += len;
+    return result;
+}
+
+static size_t list_find(exec_context *ctx, const void *data, const void *sep)
+{
+    list_position pos = *(const list_position *)data;
+    const expr_value *lsep = sep;
+    size_t result;
+
+    if (pos.pos >= (unsigned)pos.list->v.list->nelts)
+        return (size_t)(-1);
+
+    result = find_in_list(ctx, *pos.list, *lsep, pos.pos);
+    return result == (size_t)(-1) ? 
+        (unsigned)pos.list->v.list->nelts - pos.pos : 
+        result - pos.pos;
+}
+
+static void list_skip(exec_context *ctx, void *data, const void *sep)
+{
+    list_position pos = *(const list_position *)data;
+    const expr_value *lsep = sep;
+
+    if (!is_list_prefix(ctx, *pos.list, *lsep, pos.pos))
+        return;
+    
+    pos.pos += (unsigned)lsep->v.list->nelts;
+}
+
+DECLARE_OP_INST2(split, LIST, NUMBER, ctx ATTR_UNUSED, vals)
+{
+    list_position pos = {&vals[0], 0};
+
+    if (vals[1].v.num < 1.0)
+        raise_error(ctx, APR_EINVAL);
+
+    return generic_split(ctx, &pos, 
+                         list_isend,
+                         list_getprefix,
+                         (size_t)vals[0].v.list->nelts / (size_t)vals[1].v.num);
+}
+
+DECLARE_OP_INST2(split, LIST, LIST, ctx ATTR_UNUSED, vals)
+{
+    list_position pos = {&vals[0], 0};
+    return generic_tokenize(ctx, &pos, &vals[1],
+                            list_find,
+                            list_skip,
+                            list_getprefix);
+}
+
+static size_t list_find_prop(exec_context *ctx, const void *data, const void *sep)
+{
+    list_position pos = *(const list_position *)data;
+    const closure *cls = sep;
+    size_t count;
+
+    if (pos.pos >= (unsigned)pos.list->v.list->nelts)
+        return (size_t)(-1);
+
+    for (count = 0; pos.pos + count < (unsigned)pos.list->v.list->nelts;  count++)
+    {
+        if (call_predicate(ctx, cls, 1, 
+                           ref_expr_list_value(ctx, *pos.list, 
+                                               pos.pos + count)))
+            break;
+    }
+    return count;
+}
+
+static void list_skip_prop(exec_context *ctx, void *data, const void *sep)
+{
+    list_position *pos = data;
+    const closure *cls = sep;
+
+    if (pos->pos >= (unsigned)pos->list->v.list->nelts)
+        return;
+
+    if (call_predicate(ctx, cls, 1, 
+                       ref_expr_list_value(ctx, *pos->list, pos->pos)))
+    {
+        pos->pos++;
+    }
+}
+
+
+DECLARE_OP_INST2(split, LIST, CLOSURE, ctx, vals)
+{
+    list_position pos = {&vals[0], 0};
+    return generic_tokenize(ctx, &pos, &vals[1].v.cls,
+                            list_find_prop,
+                            list_skip_prop,
+                            list_getprefix);
+}
+
+DECLARE_OP_INST2(impl, CLOSURE, CLOSURE, ctx, vals)
+{
+    expr_value clos = make_closure(ctx, &predicate_trf_impl, 2);
+    
+    set_closure_arg(ctx, &clos, 0, vals[0]);
+    set_closure_arg(ctx, &clos, 1, vals[1]);
+    return clos;
+}
+
+DEFINE_OP_INFO(div, normal, 2, NULL,
+               DISP2(NUMBER, NUMBER, div),
+               DISP2(STRING, NUMBER, split),
+               DISP2(STRING, STRING, split),
+               DISP2(STRING, CLOSURE, split),
+               DISP1(BINARY, split),
+               DISP2(LIST, NUMBER, split),
+               DISP2(LIST, LIST, split),
+               DISP2(LIST, CLOSURE, split),
+               DISP2(CLOSURE, CLOSURE, impl));
+
+ATTR_PURE
+DECLARE_OP_INST2(rem, NUMBER, NUMBER, ctx, vals)
+{
+    if (vals[1].v.num == 0.0)
+        raise_error(ctx, APR_EINVAL);
+    
+    return MAKE_NUM_VALUE(fmod(vals[0].v.num, vals[1].v.num));
+}
+
+DECLARE_OP_INST2(tokenize, STRING, NUMBER, ctx, vals)
+{
+    const uint8_t *str = vals[0].v.str;
+    if (vals[1].v.num < 1.0)
+        raise_error(ctx, APR_EINVAL);
+
+    return generic_split(ctx, &str, 
+                         string_isend,
+                         string_getprefix,
+                         (size_t)vals[1].v.num);
+}
+
+DECLARE_OP_INST2(tokenize, STRING, STRING, ctx, vals)
+{
+    const uint8_t *str = vals[0].v.str;
+    return generic_tokenize(ctx, &str, vals[1].v.str,
+                            string_find,
+                            NULL,
+                            string_getprefix);
+}
+
+static size_t string_find_trans(exec_context *ctx, const void *data, const void *sep)
+{
+    const uint8_t *str = *(const uint8_t * const *)data;
+    const closure *cls = sep;
+    expr_value curchars[2];
+    size_t count;
+
+    if (*str == '\0')
+        return (size_t)(-1);
+
+    for (count = 0; *str != '\0';  count++)
+    {
+        curchars[0] = extract_substr(ctx, str, 0, 1, &str);
+        if (*str == '\0')
+            break;
+        curchars[1] = extract_substr(ctx, str, 0, 1, NULL);
+        if (call_predicate(ctx, cls, 2, curchars))
+            break;
+    }
+    return count;
+}
+
+
+DECLARE_OP_INST2(tokenize, STRING, CLOSURE, ctx, vals)
+{
+    const uint8_t *str = vals[0].v.str;
+    return generic_tokenize(ctx, &str, &vals[1].v.cls,
+                            string_find_trans,
+                            NULL,
+                            string_getprefix);
+}
+
+DECLARE_OP_INST1(tokenize, BINARY, ctx, vals)
+{
+    if (!vals[0].v.bin.type->tokenize)
+        raise_error(ctx, APR_ENOTIMPL);
+    return vals[0].v.bin.type->tokenize(ctx, vals[0].v.bin, &vals[1]);
+}
+
+DECLARE_OP_INST2(group, LIST, NUMBER, ctx ATTR_UNUSED, vals)
+{
+    list_position pos = {&vals[0], 0};
+
+    if (vals[1].v.num < 1.0)
+        raise_error(ctx, APR_EINVAL);
+
+    return generic_split(ctx, &pos, 
+                         list_isend,
+                         list_getprefix,
+                         (size_t)vals[1].v.num);
+}
+
+DECLARE_OP_INST2(group, LIST, LIST, ctx ATTR_UNUSED, vals)
+{
+    list_position pos = {&vals[0], 0};
+    return generic_tokenize(ctx, &pos, &vals[1],
+                            list_find,
+                            NULL,
+                            list_getprefix);
+}
+
+static size_t list_find_trans(exec_context *ctx, const void *data, const void *sep)
+{
+    list_position pos = *(const list_position *)data;
+    const closure *cls = sep;
+    size_t count;
+
+    if (pos.pos >= (unsigned)pos.list->v.list->nelts)
+        return (size_t)(-1);
+
+    for (count = 0; pos.pos + count < (unsigned)pos.list->v.list->nelts - 1;  count++)
+    {
+        expr_value vals[2];
+        
+        vals[0] = *ref_expr_list_value(ctx, *pos.list, pos.pos + count);
+        vals[1] = *ref_expr_list_value(ctx, *pos.list, pos.pos + count + 1);
+        if (call_predicate(ctx, cls, 2, vals))
+            break;
+    }
+    return count;
+}
+
+DECLARE_OP_INST2(group, LIST, CLOSURE, ctx, vals)
+{
+    list_position pos = {&vals[0], 0};
+    return generic_tokenize(ctx, &pos, &vals[1].v.cls,
+                            list_find_trans,
+                            NULL,
+                            list_getprefix);
+}
+
+DECLARE_OP_INST2(eqv, CLOSURE, CLOSURE, ctx, vals)
+{
+    expr_value clos = make_closure(ctx, &predicate_trf_eqv, 2);
+    
+    set_closure_arg(ctx, &clos, 0, vals[0]);
+    set_closure_arg(ctx, &clos, 1, vals[1]);
+    return clos;
+}
+
+DEFINE_OP_INFO(rem, normal, 2, NULL,
+               DISP2(NUMBER, NUMBER, rem),
+               DISP2(STRING, NUMBER, tokenize),
+               DISP2(STRING, STRING, tokenize),
+               DISP2(STRING, CLOSURE, tokenize),
+               DISP1(BINARY, tokenize),
+               DISP2(LIST, NUMBER, group),
+               DISP2(LIST, LIST, group),
+               DISP2(LIST, CLOSURE, group),
+               DISP2(CLOSURE, CLOSURE, eqv));
+
+ATTR_PURE
+DECLARE_OP_INST2(power, NUMBER, NUMBER, ctx, vals)
+{
+    if (vals[1].v.num == 0.0)
+        raise_error(ctx, APR_EINVAL);
+    
+    return MAKE_NUM_VALUE(pow(vals[0].v.num, vals[1].v.num));
+}
+
+DECLARE_OP_INST2(power, BINARY, BINARY, ctx, vals)
+{
+    if (!vals[0].v.bin.type->power)
+        raise_error(ctx, APR_ENOTIMPL);
+    return vals[0].v.bin.type->power(ctx, vals[0].v.bin, vals[1].v.bin);
+}
+
+DECLARE_OP_INST2(product, LIST, LIST, ctx, vals)
+{
+    unsigned i, j;
+    expr_value result = make_expr_value_list(ctx, 
+                                             (size_t)vals[0].v.list->nelts * 
+                                             (size_t)vals[1].v.list->nelts);
+    
+    for (i = 0; i < (unsigned)vals[0].v.list->nelts; i++)
+    {
+        for (j = 0; j < (unsigned)vals[1].v.list->nelts; j++)
+        {
+            expr_value pair = make_expr_value_list(ctx, 2);
+            set_expr_list_value(ctx, &pair, 0, 
+                                *ref_expr_list_value(ctx, vals[0], i));
+            set_expr_list_value(ctx, &pair, 1, 
+                                *ref_expr_list_value(ctx, vals[1], j));
+            set_expr_list_value(ctx, &result,
+                                i * (unsigned)vals[1].v.list->nelts + j,
+                                pair);
+        }
+    }
+    return result;
+}
+
+DECLARE_OP_INST2(iter, CLOSURE, NUMBER, ctx, vals)
+{
+    expr_value clos = make_closure(ctx, &predicate_trf_iter, 2);
+    
+    set_closure_arg(ctx, &clos, 0, vals[0]);
+    set_closure_arg(ctx, &clos, 1, vals[1]);
+    return clos;
+}
+
+DECLARE_OP_INST2(while, CLOSURE, CLOSURE, ctx, vals)
+{
+    expr_value clos = make_closure(ctx, &predicate_trf_while, 2);
+    
+    set_closure_arg(ctx, &clos, 0, vals[0]);
+    set_closure_arg(ctx, &clos, 1, vals[1]);
+    return clos;
+}
+
+
+DEFINE_OP_INFO(power, normal, 2, NULL,
+               DISP2(NUMBER, NUMBER, power),
+               DISP2(BINARY, BINARY, power),
+               DISP2(LIST, LIST, product),
+               DISP2(CLOSURE, NUMBER, iter),
+               DISP2(CLOSURE, CLOSURE, while));
+
+DEFINE_OP_INFO(join, normal, 2, eval_mkpair,
+               DISP2(LIST, LIST, append),
+               DISP1(LIST, append1));

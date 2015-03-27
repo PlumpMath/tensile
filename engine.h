@@ -106,6 +106,7 @@ typedef struct binary_data_type {
     size_t (*length)(exec_context *ctx, binary_data data);
     expr_value (*concat)(exec_context *ctx, binary_data data, binary_data other);
     expr_value (*strip)(exec_context *ctx, binary_data data, binary_data other);
+    expr_value (*power)(exec_context *ctx, binary_data data, binary_data other);
     expr_value (*repeat)(exec_context *ctx, binary_data data, double num);
     expr_value (*intersperse)(exec_context *ctx, binary_data data, binary_data other);
     expr_value (*split)(exec_context *ctx, binary_data data, const expr_value *optarg);
@@ -400,6 +401,21 @@ extern expr_value extract_substr(exec_context *ctx, const uint8_t *str,
                                  size_t start, size_t len,
                                  const uint8_t **end)
     ATTR_NONNULL_ARGS((1, 2));
+
+extern bool is_list_suffix(exec_context *ctx, expr_value list,
+                           expr_value suffix)
+    ATTR_NONNULL_1ST ATTR_WARN_UNUSED_RESULT;
+
+extern bool is_list_prefix(exec_context *ctx, expr_value list,
+                           expr_value prefix,
+                           size_t offset)
+    ATTR_NONNULL_1ST ATTR_WARN_UNUSED_RESULT;;
+
+extern size_t find_in_list(exec_context *ctx, expr_value list, expr_value sublist, size_t start)
+    ATTR_NONNULL_1ST ATTR_WARN_UNUSED_RESULT;
+
+extern expr_value extract_sublist(exec_context *ctx, expr_value list, size_t start, size_t len)
+    ATTR_NONNULL_1ST ATTR_WARN_UNUSED_RESULT; 
 
 extern expr_value generic_split(exec_context *ctx, void *data,
                                 bool (*isend)(exec_context *, const void *),

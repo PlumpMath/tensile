@@ -60,7 +60,6 @@ DECLARE_EXPR_OP(div);
 DECLARE_EXPR_OP(rem);
 DECLARE_EXPR_OP(join);
 DECLARE_EXPR_OP(power);
-DECLARE_EXPR_OP(defaulted);
 DECLARE_EXPR_OP(merge);
 DECLARE_EXPR_OP(max);
 DECLARE_EXPR_OP(min);
@@ -118,7 +117,11 @@ DECLARE_PREDICATE(trf_negate);
 DECLARE_PREDICATE(trf_alt);
 DECLARE_PREDICATE(trf_and_not);
 DECLARE_PREDICATE(trf_and);
+DECLARE_PREDICATE(trf_impl);
+DECLARE_PREDICATE(trf_eqv);
 DECLARE_PREDICATE(trf_loosen);
+DECLARE_PREDICATE(trf_iter);
+DECLARE_PREDICATE(trf_while);
 
 #ifdef __cplusplus
 }

@@ -443,3 +443,4 @@ void *dispatch_values(struct exec_context *ctx, const dispatch *disp,
         raise_error(ctx, TEN_BAD_TYPE);
     return disp->result;
 }
+
