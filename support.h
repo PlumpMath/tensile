@@ -55,6 +55,12 @@ extern "C"
 #define ATTR_ALLOC_SIZE2(x,y)
 #endif
 
+#if     (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9)
+#define ATTR_RETURNS_NONNULL __attribute__((returns_nonnull))
+#else
+#define ATTR_RETURNS_NONNULL 
+#endif
+
 #if     __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
 #define ATTR_WEAK __attribute__((weak)
 #else
@@ -106,6 +112,29 @@ extern "C"
 #define ATTR_WARN_UNUSED_RESULT
 #endif /* __GNUC__ */
 
+
+#if __GNUC__ >= 4
+static inline unsigned count_leading_zeroes(unsigned i)
+{
+  if (i == 0)
+    return 0;
+  return __builtin_clz(i);
+}
+#else
+static inline int count_leading_zeroes(unsigned i)
+{
+  unsigned j;
+  
+  if (i == 0)
+    return 0;
+  for (j = sizeof(i) * CHAR_BIT - 1; j > 0; j--)
+  {
+    if (i & (1u << j))
+      return sizeof(i) * CHAR_BIT - 1 - j;
+  }
+  return sizeof(i) * CHAR_BIT - 1;
+}
+#endif
 
 #ifdef __cplusplus
 }
