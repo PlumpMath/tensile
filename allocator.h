@@ -31,97 +31,111 @@ extern "C"
 
 #include "support.h"
 
-#define DECLARE_TYPE_ALLOCATOR(_type, _args)        \
-  extern _type *new_##_type _args                   \
-  ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL;     \
-  extern void free_##_type(_type *_obj);            \
-  extern _type *copy_##_type(const _type *_oldobj)
+#define DECLARE_TYPE_ALLOCATOR(_type, _args)            \
+    extern _type *new_##_type _args                     \
+    ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL;       \
+    extern void free_##_type(_type *_obj);              \
+    extern _type *copy_##_type(const _type *_oldobj)
 
-#define DECLARE_REFCNT_ALLOCATOR(_type, _args)  \
-  DECLARE_TYPE_ALLOCATOR(_type, _args);         \
-  static inline _type *use_##_type(_type *val)  \
-  {                                             \
-    val->refcnt++;                              \
-    return val;                                 \
-  }                                             \
-  struct fake
-
-#define DECLARE_ARRAY_ALLOCATOR(_type)          \
-  DECLARE_TYPE_ALLOCATOR(_type, unsigned n);    \
-  extern _type *resize_##_type(_type *arr, unsigned newn)
-
-#define DECLARE_REFCNT_ARRAY_ALLOCATOR(_type)   \
-  DECLARE_REFCNT_ALLOCATOR(_type, unsigned n);  \
-  extern _type *resize_##_type(_type *arr, unsigned newn)
-
+#define DECLARE_REFCNT_ALLOCATOR(_type, _args)      \
+    DECLARE_TYPE_ALLOCATOR(_type, _args);           \
+    static inline _type *use_##_type(_type *val)    \
+    {                                               \
+        val->refcnt++;                              \
+        return val;                                 \
+    }                                               \
+    struct fake
+        
+#define DECLARE_ARRAY_OPS(_type, _eltype)                               \
+    extern _type *resize_##_type(_type *arr, unsigned newn);            \
+    typedef void (*_type##_mapper)(const _eltype *src, _eltype *dst);   \
+    typedef void (*_type##_zipper)(const _eltype *src1,                 \
+                                   const _eltype *src2,                 \
+                                   _eltype *dst);                       \
+    typedef void (*_type##_folder)(void *accum, const _eltype *item);   \
+    extern _type *map_##_type(_type##_mapper fn, const _type *arg);     \
+    extern _type *zip_##_type(_type##_mapper fn,                        \
+                              const _type *arg1,                        \
+                              const _type *arg2);                       \
+    extern void fold_##_type(_type##_folder fn, void *accum,            \
+                             const _type *arg)
+    
+#define DECLARE_ARRAY_ALLOCATOR(_type, _eltype) \
+    DECLARE_TYPE_ALLOCATOR(_type, unsigned n);  \
+    DECLARE_ARRAY_OPS(_type, _eltype)       
+            
+#define DECLARE_REFCNT_ARRAY_ALLOCATOR(_type, _eltype)  \
+    DECLARE_REFCNT_ALLOCATOR(_type, unsigned n);        \
+    DECLARE_ARRAY_OPS(_type, _eltype)
+        
 typedef struct freelist_t {
-  struct freelist_t * chain;
+    struct freelist_t * chain;
 } freelist_t;
 
-#define DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var, _init, _clone,  \
-                                 _destructor, _fini)                 \
-  static freelist_t *freelist_##_type;                               \
-  static _type *alloc_##_type(void) ATTR_MALLOC ATTR_RETURNS_NONNULL \
-  {                                                                  \
-    _type *_var;                                                     \
-                                                                     \
-    if (freelist_##_type == NULL)                                    \
-      _var = malloc(sizeof (*_var));                                 \
-    else                                                             \
-    {                                                                \
-      _var = (_type *)freelist_##_type;                              \
-      freelist_##_type = freelist_##_type->chain;                    \
-    }                                                                \
-    return _var;                                                     \
-  }                                                                  \
-                                                                     \
-  _type *new_##_type _args                                           \
-  {                                                                  \
-    _type *_var = alloc_##_type();                                   \
-    _init;                                                           \
-    return _var;                                                     \
-  }                                                                  \
-                                                                     \
-  _type *copy_##_type(const _type *_orig)                            \
-  {                                                                  \
-    _type *_var = alloc_##_type();                                   \
-    memcpy(_var, _orig, sizeof(*_var));                              \
-    _clone;                                                          \
-    return _var;                                                     \
-  }                                                                  \
-                                                                     \
-  _destructor(_type *_var)                                           \
-  {                                                                  \
-    _fini;                                                           \
-    ((freelist_t *)_var)->chain = freelist_##_type;                  \
-    freelist_##_type = (freelist_t *)_var);                          \
-  }                                                                  \
-  struct fake
+#define DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var, _init, _clone,     \
+                                 _destructor, _fini)                    \
+    static freelist_t *freelist_##_type;                                \
+    static _type *alloc_##_type(void) ATTR_MALLOC ATTR_RETURNS_NONNULL  \
+    {                                                                   \
+        _type *_var;                                                    \
+                                                                        \
+        if (freelist_##_type == NULL)                                   \
+            _var = malloc(sizeof (*_var));                              \
+        else                                                            \
+        {                                                               \
+            _var = (_type *)freelist_##_type;                           \
+            freelist_##_type = freelist_##_type->chain;                 \
+        }                                                               \
+        return _var;                                                    \
+    }                                                                   \
+                                                                        \
+    _type *new_##_type _args                                            \
+    {                                                                   \
+        _type *_var = alloc_##_type();                                  \
+        _init;                                                          \
+        return _var;                                                    \
+    }                                                                   \
+                                                                        \
+    _type *copy_##_type(const _type *_orig)                             \
+    {                                                                   \
+        _type *_var = alloc_##_type();                                  \
+        memcpy(_var, _orig, sizeof(*_var));                             \
+        _clone;                                                         \
+        return _var;                                                    \
+    }                                                                   \
+                                                                        \
+    _destructor(_type *_var)                                            \
+    {                                                                   \
+        _fini;                                                          \
+        ((freelist_t *)_var)->chain = freelist_##_type;                 \
+        freelist_##_type = (freelist_t *)_var);                         \
+    }                                                                   \
+struct fake
 
 #define DEFINE_TYPE_ALLOCATOR(_type, _args, _var, _init, _clone, _fini) \
-  DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var, _init, _clone,           \
-                           void free_##_type, _fini)
+    DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var, _init, _clone,         \
+                             void free_##_type, _fini)
 
 
 #define DEFINE_REFCNT_ALLOCATOR(_type, _args, _var, _init, _clone, _fini) \
-  DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var,                          \
-                           { _var->refcnt = 1; _init; },                \
-                           { _var->refcnt = 1; _clone; },               \
-                           static inline void destroy_##_type, _fini);  \
+    DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var,                        \
+                             { _var->refcnt = 1; _init; },              \
+                             { _var->refcnt = 1; _clone; },             \
+                             static inline void destroy_##_type, _fini); \
                                                                         \
-  void free_##_type(_type *_var)                                        \
-  {                                                                     \
-    assert(_var->refcnt != 0);                                          \
-    if (--_var->refcnt == 0)                                            \
-      destroy_##_type(_var);                                            \
-  }
+    void free_##_type(_type *_var)                                      \
+    {                                                                   \
+        assert(_var->refcnt != 0);                                      \
+        if (--_var->refcnt == 0)                                        \
+            destroy_##_type(_var);                                      \
+    }
 
 #define DEFINE_ARRAY_ALLOC_COMMON(_type, _getsize, _maxsize, _var, _idxvar, \
                                   _initc, _inite,                       \
                                   _clonec, _clone,                      \
                                   _adjustc, _adjuste                    \
                                   _destructor, _finie, _finic)          \
-  static freelist_t *freelists_##_type[_maxsize];                       \
+    static freelist_t *freelists_##_type[_maxsize];                     \
                                                                         \
   static _type *alloc_##_type(unsigned n) ATTR_MALLOC ATTR_RETURNS_NONNULL \
   {                                                                     \
@@ -150,7 +164,8 @@ typedef struct freelist_t {
       _inite;                                                           \
     }                                                                   \
     return _var;                                                        \
-}                                                                       \
+  }                                                                     \
+                                                                        \
                                                                         \
   _type *copy_##_type(const _type *_orig)                               \
   {                                                                     \
@@ -164,6 +179,11 @@ typedef struct freelist_t {
       _clonee;                                                          \
     }                                                                   \
     return _var;                                                        \
+  }                                                                     \
+                                                                        \
+  static void dispose_##_type(_type *_var)                              \
+  {                                                                     \
+                                                                        \
   }                                                                     \
                                                                         \
   _type *resize_##_type(_type *_var, unsigned _newn)                    \
