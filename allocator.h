@@ -48,35 +48,48 @@ extern "C"
     }                                                                   \
     struct fake
 
-#define DECLARE_ARRAY_OPS(_type, _eltype)                               \
+#define DECLARE_ARRAY_ALLOC_COMMON(_type)                               \
     extern _type *resize_##_type(_type *arr, unsigned newn)             \
         ATTR_NONNULL_1ST ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT;  \
-    typedef void (*_type##_mapper)(const _eltype *src, _eltype *dst);   \
-    typedef void (*_type##_zipper)(const _eltype *src1,                 \
-                                   const _eltype *src2,                 \
-                                   _eltype *dst);                       \
-    typedef void (*_type##_folder)(void *accum, const _eltype *item);   \
-    extern _type *map_##_type(_type##_mapper fn, const _type *arg)      \
-        ATTR_NONNULL_1ST ATTR_WARN_UNUSED_RESULT;                       \
-    extern _type *zip_##_type(_type##_mapper fn,                        \
-                              const _type *arg1,                        \
-                              const _type *arg2)                        \
-        ATTR_NONNULL_1ST ATTR_WARN_UNUSED_RESULT;                       \
-    extern void fold_##_type(_type##_folder fn, void *accum,            \
-                             const _type *arg)                          \
-        ATTR_NONNULL_1ST
-        
-#define DECLARE_ARRAY_ALLOCATOR(_type, _eltype) \
+                                                                        \
+    static inline _type *ensure_##_type##_size(_type *arr,              \
+                                               unsigned req,            \
+                                               unsigned delta)          \
+        ATTR_NONNULL_1ST ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT   \
+    {                                                                   \
+        if (_arr->nelts <= req)                                         \
+            return _arr;                                                \
+        return resize_##_type(_arr, _arr->nelts + delta);               \
+    }                                                                   \
+    struct fake
+
+#define DECLARE_ARRAY_ALLOCATOR(_type)          \
     DECLARE_TYPE_ALLOCATOR(_type, unsigned n);  \
-    DECLARE_ARRAY_OPS(_type, _eltype)       
-            
-#define DECLARE_REFCNT_ARRAY_ALLOCATOR(_type, _eltype)  \
+    DECLARE_ARRAY_ALLOC_COMMON(_type)       
+
+#define DECLARE_REFCNT_ARRAY_ALLOCATOR(_type)           \
     DECLARE_REFCNT_ALLOCATOR(_type, unsigned n);        \
-    DECLARE_ARRAY_OPS(_type, _eltype)
-        
+    DECLARE_ARRAY_ALLOC_COMMON(_type)
+
+
+#define DECLARE_ARRAY_TYPE(_name, _contents, _eltype)   \
+    typedef struct _name                                \
+    {                                                   \
+        unsigned nelts;                                 \
+        _contents                                       \
+        _eltype elts[];                                 \
+    } _name
+    
+
+#if defined(IMPLEMENT_ALLOCATOR)
+
 typedef struct freelist_t {
     struct freelist_t * chain;
 } freelist_t;
+
+
+#define OLD(_var) old_##_var
+#define NEW(_var) new_##_var
 
 #define DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var, _init, _clone,     \
                                  _destructor, _fini)                    \
@@ -103,14 +116,14 @@ typedef struct freelist_t {
         return _var;                                                    \
     }                                                                   \
                                                                         \
-    _type *copy_##_type(const _type *_orig)                             \
+    _type *copy_##_type(const _type *OLD(_var))                         \
     {                                                                   \
-        _type *_var = alloc_##_type();                                  \
+        _type *NEW(_var) = alloc_##_type();                             \
                                                                         \
-        assert(_orig != NULL);                                          \
-        memcpy(_var, _orig, sizeof(*_var));                             \
+        assert(OLD(_var) != NULL);                                      \
+        memcpy(NEW(_var), OLD(_var), sizeof(*OLD(_var)));               \
         _clone;                                                         \
-        return _var;                                                    \
+        return NEW(_var);                                               \
     }                                                                   \
                                                                         \
     _destructor(_type *_var)                                            \
@@ -130,7 +143,7 @@ typedef struct freelist_t {
     DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var,                        \
                              { _var->refcnt = 1; _init; },              \
                              { _var->refcnt = 1; _clone; },             \
-                             static inline void destroy_##_type, _fini);\
+                             static inline void destroy_##_type, _fini); \
                                                                         \
     void free_##_type(_type *_var)                                      \
     {                                                                   \
@@ -144,7 +157,7 @@ typedef struct freelist_t {
                                   _initc, _inite,                       \
                                   _clonec, _clone,                      \
                                   _adjustc, _adjuste                    \
-                                  _destructor, _finie, _finic)          \
+                                  _destructor, _finic, _finie)          \
   static freelist_t *freelists_##_type[_maxsize];                       \
                                                                         \
   static _type *alloc_##_type(unsigned n)                               \
@@ -167,29 +180,30 @@ typedef struct freelist_t {
   _type *new_##_type(unsigned _n)                                       \
   {                                                                     \
       _type *_var = alloc_##_type(_n);                                  \
-    unsigned _idxvar;                                                   \
+      unsigned _idxvar;                                                 \
                                                                         \
-    _initc;                                                             \
-    for (_idxvar = 0; _idxvar < _n; _idxvar++)                          \
-    {                                                                   \
-      _inite;                                                           \
-    }                                                                   \
-    return _var;                                                        \
+      for (_idxvar = 0; _idxvar < _n; _idxvar++)                        \
+      {                                                                 \
+          _inite;                                                       \
+      }                                                                 \
+      _initc;                                                           \
+      return _var;                                                      \
   }                                                                     \
                                                                         \
-                                                                        \
-  _type *copy_##_type(const _type *_orig)                               \
+  _type *copy_##_type(const _type *OLD(_var))                           \
   {                                                                     \
-    _type *_var = alloc_##_type(_orig->nelts);                          \
-    unsigned _idxvar;                                                   \
+      _type *NEW(_var) = alloc_##_type(OLD(_var)->nelts);               \
+      unsigned _idxvar;                                                 \
                                                                         \
-    memcpy(_var, _orig, _orig->nelts * sizeof(_orig->elts[0]));         \
-    _clonec;                                                            \
-    for (_idxvar = 0; _idxvar < _orig->nelts; _idxvar++)                \
-    {                                                                   \
-      _clonee;                                                          \
-    }                                                                   \
-    return _var;                                                        \
+      memcpy(NEW(_var), OLD(_var),                                      \
+             sizeof(_type) +                                            \
+             OLD(_var)->nelts * sizeof(OLD(_var)->elts[0]));            \
+      for (_idxvar = 0; _idxvar < OLD(_var)->nelts; _idxvar++)          \
+      {                                                                 \
+          _clonee;                                                      \
+      }                                                                 \
+      _clonec;                                                          \
+      return NEW(_var);                                                 \
   }                                                                     \
                                                                         \
   static void dispose_##_type(_type *_var) ATTR_NONNULL                 \
@@ -208,16 +222,24 @@ typedef struct freelist_t {
   _type *resize_##_type(_type *_var, unsigned _newn)                    \
   {                                                                     \
     unsigned _idxvar;                                                   \
+    ATTR_UNUSED const _type *OLD(_var) = _var;                          \
+    _type *NEW(_var) = NULL;                                            \
                                                                         \
     for (_idxvar = _newn; _idxvar < _var->nelts; _idxvar++)             \
     {                                                                   \
       _finie;                                                           \
     }                                                                   \
-    if (_getsize(_newn) > _getsize(_var->nelts))                        \
+    if (_getsize(_newn) <= _getsize(_var->nelts))                       \
+        NEW(_var) = _var;                                               \
+    else                                                                \
     {                                                                   \
-      _type *_fresh = alloc_##_type(_newn);                             \
-      memcpy(_fresh, _var, _var->nelts * sizeof(_var->elts[0]));        \
-      //for (_idxvar = 0; _idxvar < _fresh->                            \
+        NEW(_var) = alloc_##_type(_newn);                               \
+        memcpy(NEW(_var), OLD(_var),                                    \
+               sizeof(_type) +                                          \
+               OLD(_var)->nelts * sizeof(OLD(_var)->elts[0]));          \
+        for (_idxvar = 0; _idxvar < NEW(_var)->nelts; _idxvar++)        \
+        {                                                               \
+        }                                                               \
     }                                                                   \
   }                                                                     \
                                                                         \
@@ -234,6 +256,8 @@ typedef struct freelist_t {
   }                                                                     \
   struct fake
 
+#endif // defined(ALLOCATOR_IMP)
+  
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
