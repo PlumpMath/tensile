@@ -139,19 +139,23 @@ typedef struct freelist_t {
     DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var, _init, _clone,         \
                              void free_##_type, _fini)
 
-#define DEFINE_REFCNT_ALLOCATOR(_type, _args, _var, _init, _clone, _fini) \
-    DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var,                        \
-                             { _var->refcnt = 1; _init; },              \
-                             { _var->refcnt = 1; _clone; },             \
-                             static inline void destroy_##_type, _fini); \
-                                                                        \
+#define DEFINE_REFCNT_FREE(_type, _var)                                 \
     void free_##_type(_type *_var)                                      \
     {                                                                   \
         if (!_var) return;                                              \
         assert(_var->refcnt != 0);                                      \
         if (--_var->refcnt == 0)                                        \
             destroy_##_type(_var);                                      \
-    }
+    }                                                                   \
+    struct fake
+
+
+#define DEFINE_REFCNT_ALLOCATOR(_type, _args, _var, _init, _clone, _fini) \
+    DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var,                        \
+                             { _var->refcnt = 1; _init; },              \
+                             { _var->refcnt = 1; _clone; },             \
+                             static inline void destroy_##_type, _fini) \
+    DEFINE_REFCNT_FREE(_type, _var)
 
 #define DEFINE_ARRAY_ALLOC_COMMON(_type, _getsize, _maxsize, _var, _idxvar, \
                                   _initc, _inite,                       \
@@ -222,37 +226,45 @@ typedef struct freelist_t {
   _type *resize_##_type(_type *_var, unsigned _newn)                    \
   {                                                                     \
     unsigned _idxvar;                                                   \
-    ATTR_UNUSED const _type *OLD(_var) = _var;                          \
-    _type *NEW(_var) = NULL;                                            \
                                                                         \
     for (_idxvar = _newn; _idxvar < _var->nelts; _idxvar++)             \
     {                                                                   \
-      _finie;                                                           \
+        _finie;                                                         \
     }                                                                   \
-    if (_getsize(_newn) <= _getsize(_var->nelts))                       \
-        NEW(_var) = _var;                                               \
-    else                                                                \
+                                                                        \
+    if (_getsize(_newn) > _getsize(_var->nelts))                        \
     {                                                                   \
-        NEW(_var) = alloc_##_type(_newn);                               \
+        const _type *OLD(_var) = _var;                                  \
+        _type *NEW(_var) = alloc_##_type(_newn);                        \
+                                                                        \
         memcpy(NEW(_var), OLD(_var),                                    \
                sizeof(_type) +                                          \
                OLD(_var)->nelts * sizeof(OLD(_var)->elts[0]));          \
         for (_idxvar = 0; _idxvar < NEW(_var)->nelts; _idxvar++)        \
         {                                                               \
+            _adjuste;                                                   \
         }                                                               \
+        _adjustc;                                                       \
+        dispose_##_type(OLD(_var));                                     \
+        _var = NEW(_var);                                               \
     }                                                                   \
+                                                                        \
+    for (_idxvar = _var->nelts; _idxvar < _newn; _idxvar++)             \
+    {                                                                   \
+        _inite;                                                         \
+    }                                                                   \
+    return _var;                                                        \
   }                                                                     \
                                                                         \
   _destructor(_type *_var)                                              \
   {                                                                     \
-    unsigned _idxvar;
+      unsigned _idxvar;                                                 \
                                                                         \
-    for (_idxvar = 0; _idxvar < _var->nelts; _idxvar++)                 \
-    {                                                                   \
-      _finie;                                                           \
-    }                                                                   \
-    _finic;                                                             \
-                                                                     \
+      for (_idxvar = 0; _idxvar < _var->nelts; _idxvar++)               \
+      {                                                                 \
+          _finie;                                                       \
+      }                                                                 \
+      _finic;                                                           \
   }                                                                     \
   struct fake
 

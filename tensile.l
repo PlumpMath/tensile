@@ -1,6 +1,7 @@
 %option yylineno
 %option bison-bridge
 %option bison-locations
+%option reentrant
 %{
 
 #include <stdlib.h>
@@ -24,117 +25,83 @@ YY_DECL;
 
 ESCAPE \\([abfnrtv\'\"\\]|u\+?[[:xdigit:]]{4}|U\+?[[:xdigit:]]{8}|[uU]\{[^}]+\})
 %%
-[][{},;:{}~+*/%<>=^@#|&?`!()$-] { return *yytext; }
-"~~" { return TOK_MATCH_CI; }
-"==" { return TOK_EQ; }
-"~=" { return TOK_EQ_CI; }
-"<~" { return TOK_LESS_CI; }
-">~" { return TOK_GREATER_CI; }
-"<=" { return TOK_LE; }
-"<~=" { return TOK_LE_CI; }
-">=" { return TOK_GE; }
-">~=" { return TOK_GE_CI; }
-"!=" { return TOK_NE; }
-"!~=" { return TOK_NE_CI; }
+[-+*/^!~(){}.@?,;<>:&|#] { return *yytext; }
+[][] { return *yytext; }
 "!~" { return TOK_NOT_MATCH; }
-"!~~" { return TOK_NOT_MATCH_CI; }
+"~~" { return TOK_MATCH_BINDING; }
+"==" { return TOK_EQ; }
+"<=" { return TOK_LE; }
+">=" { return TOK_GE; }
+"!=" { return TOK_NE; }
 "<:" { return TOK_MIN; }
-"<:~" { return TOK_MIN_CI; }
 ":>" { return TOK_MAX; }
-":>~" { return TOK_MAX_CI; }
-".[" { return TOK_VARFIELD; }
-"+=" { 
-    return TOK_ADD_ASSIGN;
-}
-"&=" { 
-    return TOK_JOIN_ASSIGN;
-}
-"?=" { 
-    return TOK_DFL_ASSIGN;
-}
-"===" { return TOK_IDENTITY; }
-"!===" { return TOK_NOT_IDENTITY; }
-"->" { return TOK_ARROW; }
-".." { return TOK_PARENT; }
-".*" { return TOK_CHILDREN; }
-".#" { return TOK_COUNT; }
-^[[:space:]]*require[[:space:]]+[[:alnum:]_]+(\.[[:alnum:]_]+)*([[:space:]]+[+-]?([0-9](\.[0-9]+)?|\.[0-9]+))?[[:space:]]*; {
-    char *tokstate = NULL;
-    char *modulename = NULL;
-    char *modulever = NULL;
-    
-    apr_strtok(yytext, " \t\n\f\r\v", &tokstate); // skip 'require'
-    modulename = apr_strtok(NULL, " \t\n\f\r\v", &tokstate);
-    modulever = apr_strtok(NULL, " \t\n\f\r\v;", &tokstate);
-    
-    if (require_module(context, (const uint8_t *)modulename,
-                       modulever ? strtod(modulever, NULL) : 0.0))
-    {
-        lexer_buffer *last;
-
-        last = &APR_ARRAY_IDX(context->conf->lexer_buffers, 
-                              context->conf->lexer_buffers->nelts - 2,
-                              lexer_buffer);
-        last->lineno = yylineno;
-        last = &APR_ARRAY_IDX(context->conf->lexer_buffers, 
-                              context->conf->lexer_buffers->nelts - 1,
-                              lexer_buffer);
-        last->buffer_state = yy_create_buffer(last->stream, YY_BUF_SIZE);
-        yy_switch_to_buffer(last->buffer_state);
-    }    
-}
-const { return TOK_CONST; }
+"=>" { return TOK_RULE; }
+"<-" { return TOK_IN; }
+"->" { return TOK_PUT; }
+"->>" { return TOK_PUT_ALL; }
+"^->" { return TOK_PUT_NEXT; }
+">>" { return TOK_SEQ; }
+"*?" { return TOK_PEEK; }
+"::" { return TOK_TYPECAST; }
+"?::" { return TOK_ISTYPE; }
+":=" { return TOK_ASSIGN; }
+"++" { return TOK_APPEND; }
+"--" { return TOK_CHOP; }
+"**" { return TOK_INTERSPERSE; }
+"//" { return TOK_SPLIT; }
+"<>" { return TOK_QUEUE; }
+"/"([^/\\]|\\.)+"/" { return TOK_REGEXP; }
+div { return TOK_DIV; }
+else { return TOK_ELSE; }
+error { return TOK_ERROR; }
 extern { return TOK_EXTERN; }
+false { return TOK_FALSE; }
+for { return TOK_FOR; }
+foreach { return TOK_FOREACH; }
+foreign { return TOK_FOREIGN; }
+freeze { return TOK_FREEZE; }
+if { return TOK_TYPE; }
+import { return TOK_IMPORT; }
+kill { return TOK_KILL; }
 local { return TOK_LOCAL; }
-this { return TOK_THIS; }
+me { return TOK_ME; }
+mod { return TOK_MOD; }
+module { return TOK_MODULE; }
+null { yylval->value = NULL_VALUE;  return TOK_NULL; }
 pragma { return TOK_PRAGMA; }
-pre { return TOK_PRE; }
-post { return  TOK_POST; }
-default { return TOK_DEFAULT; }
-typeof { return TOK_TYPEOF; }
-as { return TOK_AS; }
-null { 
-    yylval->value = NULL_VALUE;
-    return TOK_NULL; 
+prototype { return TOK_PROTOTYPE; }
+pure { return TOK_PURE; }
+resume { return TOK_RESUME; }
+select { return TOK_SELECT; }
+suspend { return TOK_SUSPEND; }
+switch { return TOK_SWITCH; }
+true { return TOK_TRUE; }
+while { return TOK_WHILE; }
+with { return TOK_WITH; }
+yield { return TOK_YIELD; }
+[+-]?[0-9]+ {
+    return TOK_INTEGER;
 }
-
-\.[[:alnum:]_]+ { 
-    yylval->str = (uint8_t *)apr_pstrdup(context->static_pool, yytext + 1);
-    return TOK_FIELD; 
+0[xX][[:xdigit:]]+ {
+    return TOK_INTEGER;
 }
-[+-]?infinity { 
-    yylval->value = MAKE_NUM_VALUE(*yytext == '-' ? -INFINITY : INFINITY);
-    return TOK_NUMBER; 
+0[bB][01]+ {
+    return TOK_INTEGER;
 }
-[+-]?([0-9](\.[0-9]+)?|\.[0-9]+)([eE][+-]?[0-9]+)? { 
-    yylval->value = MAKE_NUM_VALUE(strtod(yytext, NULL));
-    return TOK_NUMBER; 
+[+-]?(([0-9]+\.[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?|[0-9]+[eE][+-]?[0-9]+) { 
+    return TOK_FLOAT; 
 }
 [0-9]{4}-[0-9]{2}-[0-9]{2}T([0-9]{2}:[0-9]{2}(:[0-9]{2})?)? { 
     yylval->value = parse_iso_timestamp(context, yytext);
     return TOK_TIMESTAMP; 
 }
-P([0-9]+Y)?([0-9]+M)?([0-9]+W)?([0-9]+D)?(T([0-9]+H)?([0-9]+M)?([0-9]+S)?)? { 
-    yylval->value = MAKE_NUM_VALUE(parse_duration(context, yytext + 1));
-    return TOK_NUMBER; }
-'[^\']+' { 
-    yytext[yyleng - 1] = '\0';
-    yylval->value = MAKE_VALUE(STRING, context->static_pool,
-                               (uint8_t *)apr_pstrdup(context->static_pool, yytext + 1));
-    return TOK_STRING; 
+'([^\']|{ESCAPE})' {
+    return TOK_CHARACTER; 
 } 
-"<<<"([^>]+|>[^>])*">>>" {
-    yytext[yyleng - 3] = '\0';
-    yylval->value = MAKE_VALUE(STRING, context->static_pool,
-                               (uint8_t *)apr_pstrdup(context->static_pool, yytext + 3));
-    return TOK_STRING; 
-}
-\"([^\"\\]+|{ESCAPE})*\" { 
-    yytext[yyleng - 1] = '\0';
-    yylval->value = unquote_string(context, yytext + 1);
+
+\"([^\"\\]+|{ESCAPE})*\" {
     return TOK_STRING; }
 [[:alpha:]_][[:alnum:]_]* { 
-    yylval->str = (uint8_t *)apr_pstrdup(context->static_pool, yytext);
     return TOK_ID; 
 }
 
@@ -143,19 +110,5 @@ P([0-9]+Y)?([0-9]+M)?([0-9]+W)?([0-9]+D)?(T([0-9]+H)?([0-9]+M)?([0-9]+S)?)? {
     yylineno = strtoul(yytext + 1, NULL, 10);
 }
 [[:space:]]+ {}
-"//".*\n {}
+"%".*\n {}
 "/*"([^*]+|\*+[^\/*])*"*/" {}
-<<EOF>> {
-    lexer_buffer *last;
-    
-    yy_delete_buffer(YY_CURRENT_BUFFER);
-    end_module_parsing(context);
-
-    if (apr_is_empty_array(context->conf->lexer_buffers))
-        yyterminate();
-    last = &APR_ARRAY_IDX(context->conf->lexer_buffers, 
-                          context->conf->lexer_buffers->nelts - 1,
-                          lexer_buffer);
-    yy_switch_to_buffer(last->buffer_state);
-    yylineno = last->lineno;
-}

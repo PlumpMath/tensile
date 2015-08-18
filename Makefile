@@ -8,9 +8,9 @@ PKGCONFIG = pkg-config
 CFLAGS = -O2 -fstack-protector -W -Wall -Werror -Wmissing-declarations -Wformat=2 -Winit-self -Wuninitialized \
 	-Wsuggest-attribute=pure -Wsuggest-attribute=const -Wconversion -Wstack-protector -Wpointer-arith -Wwrite-strings \
 	-Wmissing-format-attribute
-CPPFLAGS = $(APR_CPPFLAGS) $(APU_CPPFLAGS)
-LDFLAGS = $(APR_LDFLAGS) $(APU_LDFLAGS) -Wl,-export-dynamic
-LIBS = $(APU_LIBS) $(APR_LIBS) -lm -lfl -lunistring 
+CPPFLAGS = 
+LDFLAGS = -Wl,-export-dynamic
+LIBS = -lm -lfl -lunistring -ltre
 MFLAGS = -MM
 
 APR_PKGCONFIG = $(PKGCONFIG) apr-1
