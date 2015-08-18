@@ -25,6 +25,7 @@ YY_DECL;
 
 ESCAPE \\([abfnrtv\'\"\\]|u\+?[[:xdigit:]]{4}|U\+?[[:xdigit:]]{8}|[uU]\{[^}]+\})
 %%
+_ { return TOK_WILDCARD; }
 [-+*/^!~(){}.@?,;<>:&|#] { return *yytext; }
 [][] { return *yytext; }
 "!~" { return TOK_NOT_MATCH; }
@@ -60,7 +61,9 @@ for { return TOK_FOR; }
 foreach { return TOK_FOREACH; }
 foreign { return TOK_FOREIGN; }
 freeze { return TOK_FREEZE; }
-if { return TOK_TYPE; }
+generic { return TOK_GENERIC; }
+goto { return TOK_GOTO; }
+if { return TOK_IF; }
 import { return TOK_IMPORT; }
 kill { return TOK_KILL; }
 local { return TOK_LOCAL; }
@@ -70,7 +73,6 @@ module { return TOK_MODULE; }
 null { yylval->value = NULL_VALUE;  return TOK_NULL; }
 pragma { return TOK_PRAGMA; }
 prototype { return TOK_PROTOTYPE; }
-pure { return TOK_PURE; }
 resume { return TOK_RESUME; }
 select { return TOK_SELECT; }
 suspend { return TOK_SUSPEND; }
