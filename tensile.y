@@ -414,8 +414,8 @@ pattern:        TOK_ID
         |       literal
         |       TOK_REGEXP
         |       '(' expression ')'
-        |       TOK_ID TOK_ASSIGN pattern
-        |       TOK_ID '(' patternlist0 ')' 
+        |       TOK_ID TOK_ASSIGN pattern %prec TOK_ASSIGN
+        |       TOK_ID '(' patternlist0 ')' %prec '('
         |       '[' patternlist ']'
         ;
 
