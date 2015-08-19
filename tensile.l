@@ -52,6 +52,7 @@ _ { return TOK_WILDCARD; }
 "//" { return TOK_SPLIT; }
 "<>" { return TOK_QUEUE; }
 "/"([^/\\]|\\.)+"/" { return TOK_REGEXP; }
+cold { return TOK_COLD; }
 div { return TOK_DIV; }
 else { return TOK_ELSE; }
 error { return TOK_ERROR; }
@@ -63,6 +64,8 @@ foreign { return TOK_FOREIGN; }
 freeze { return TOK_FREEZE; }
 generic { return TOK_GENERIC; }
 goto { return TOK_GOTO; }
+hot { return TOK_HOT; }
+idle { return TOK_IDLE; }
 if { return TOK_IF; }
 import { return TOK_IMPORT; }
 kill { return TOK_KILL; }
@@ -77,6 +80,7 @@ resume { return TOK_RESUME; }
 select { return TOK_SELECT; }
 suspend { return TOK_SUSPEND; }
 switch { return TOK_SWITCH; }
+trace { return TOK_TRACE; }
 true { return TOK_TRUE; }
 while { return TOK_WHILE; }
 with { return TOK_WITH; }

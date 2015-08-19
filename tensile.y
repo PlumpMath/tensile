@@ -31,27 +31,29 @@
 %token TOK_FOREIGN
 %token TOK_PRAGMA                        
 
-                                                                                                
+
+%nonassoc ':'
 %left ';'                      
 %left ','
 %nonassoc TOK_RULE                        
 %nonassoc TOK_ASSIGN
+%nonassoc TOK_HOT TOK_COLD TOK_IDLE
+%nonassoc TOK_ELSE                        
+%right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_GENERIC TOK_SELECT TOK_WITH TOK_FREEZE
 %nonassoc TOK_SEQ
-%nonassoc TOK_ELSE                                                
-%nonassoc TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_GENERIC TOK_SELECT TOK_WITH TOK_FREEZE TOK_GOTO
-%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_YIELD TOK_ERROR
+%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_YIELD TOK_ERROR TOK_GOTO
 %right TOK_PUT TOK_PUT_ALL TOK_PUT_NEXT 
 %left '='                        
 %nonassoc TOK_MATCH_BINDING
 %nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH TOK_IN TOK_ISTYPE
-%left '?'
 %left '|' '^'
 %left '&'
 %left TOK_MAX TOK_MIN 
 %left '+' '-' TOK_APPEND TOK_CHOP '#'
 %left '*' '/' TOK_DIV TOK_MOD TOK_INTERSPERSE TOK_SPLIT
-%nonassoc TOK_TYPECAST                        
-%right '!' TOK_PEEK TOK_UMINUS
+%nonassoc TOK_TYPECAST
+/*                       %left TOK_FUNCALL                        */
+%right '!' '?' TOK_PEEK TOK_UMINUS
 %left '.'                        
 
 %{
@@ -207,22 +209,22 @@ instanceargs:   instancearg
 instancearg:    TOK_ID TOK_ASSIGN expression
                 ;
 
-nodeblock:   '{' bindings sequence '}'
-        |    '{' stateful '}'
-        |    '{'sequence '}'
+nodeblock:   '{' bindings sequence  '}'
+        |    '{' sequence '}'
+        |    '{' states '}'
                 ;
 
-stateful:       state
-        |       stateful state
+states:         state
+        |       states state
         ;
 
-state:          TOK_ID ':' stateblock
-        |       TOK_ERROR ':' stateblock
-        |       TOK_KILL ':' stateblock
+state:          statelabel ':' bindings sequence
+        |       statelabel ':' sequence
         ;
 
-stateblock:     bindings sequence
-        |       sequence
+statelabel:     TOK_ID
+        |       TOK_ERROR
+        |       TOK_KILL
         ;
 
 noderef:        TOK_ID
@@ -232,85 +234,89 @@ noderef:        TOK_ID
 varref:         TOK_ID
         |       TOK_ID '.' TOK_ID
         |       TOK_ID '.' TOK_ID '.' TOK_ID
-        ;
+                ;
 
-simple_expression:     literal 
-        |       '[' exprlist0 ']' 
-        |       '[' assoclist ']'
-        |       '(' expression ')' 
+expression: literal 
+        |       '['exprlist0 ']' 
+
+        |       '('expression ')' 
         |       varref
         |       block
         |       anonymous_node
-        |       TOK_ID '(' exprlist0 ')' 
+        |       TOK_ID '(' exprlist0 ')'
         |       TOK_ME
         |       TOK_QUEUE
         |       TOK_REGEXP
-        |       simple_expression '[' ']' 
-        |       simple_expression '[' expression ']' 
-        |       '+' simple_expression %prec TOK_UMINUS 
-        |       '-' simple_expression %prec TOK_UMINUS 
-        |       '*' simple_expression %prec TOK_UMINUS 
-        |       '^' simple_expression %prec TOK_UMINUS
-        |       '#' simple_expression %prec TOK_UMINUS
-        |       '?' simple_expression %prec TOK_UMINUS
-        |       '!' simple_expression
-        |       TOK_PEEK simple_expression
-        |       simple_expression '+' simple_expression 
-        |       simple_expression '-' simple_expression 
-        |       simple_expression '*' simple_expression 
-        |       simple_expression '/' simple_expression 
-        |       simple_expression TOK_DIV simple_expression
-        |       simple_expression TOK_MOD simple_expression
-        |       simple_expression '&' simple_expression 
-        |       simple_expression '^' simple_expression 
-        |       simple_expression '|' simple_expression 
-        |       simple_expression '?' simple_expression
-        |       simple_expression '#' simple_expression
-        |       simple_expression TOK_MIN simple_expression 
-        |       simple_expression TOK_MAX simple_expression
-        |       simple_expression TOK_APPEND simple_expression
-        |       simple_expression TOK_INTERSPERSE simple_expression
-        |       simple_expression TOK_CHOP simple_expression
-        |       simple_expression TOK_SPLIT simple_expression
-        |       simple_expression TOK_TYPECAST TOK_ID
-        |       simple_expression TOK_SEQ simple_expression
-        |       simple_expression TOK_EQ simple_expression
-        |       simple_expression TOK_NE simple_expression
-        |       simple_expression '<' simple_expression
-        |       simple_expression '>' simple_expression
-        |       simple_expression TOK_LE simple_expression
-        |       simple_expression TOK_GE simple_expression
-        |       simple_expression '~' pattern
-        |       simple_expression TOK_MATCH_BINDING pattern
-        |       simple_expression TOK_NOT_MATCH pattern
-        |       simple_expression TOK_IN simple_expression
-        |       simple_expression TOK_ISTYPE typechoice
-        |       simple_expression '=' simple_expression
-        |       simple_expression TOK_PUT simple_expression
-        |       simple_expression TOK_PUT_ALL simple_expression
-        |       simple_expression TOK_PUT_NEXT simple_expression
-        |       TOK_KILL simple_expression
-        |       TOK_SUSPEND simple_expression
-        |       TOK_RESUME simple_expression
-        |       TOK_YIELD simple_expression
-        |       TOK_ERROR simple_expression
+        |       expression '[' ']' 
+        |       expression '[' expression ']' 
+        |       '+' expression %prec TOK_UMINUS 
+        |       '-' expression %prec TOK_UMINUS 
+        |       '*' expression %prec TOK_UMINUS 
+        |       '^' expression %prec TOK_UMINUS
+        |       '#' expression %prec TOK_UMINUS
+        |       '?' expression %prec TOK_UMINUS
+        |       '!' expression
+        |       TOK_PEEK expression
+        |       expression '+' expression 
+        |       expression '-' expression 
+        |       expression '*' expression 
+        |       expression '/' expression 
+        |       expression TOK_DIV expression
+        |       expression TOK_MOD expression
+        |       expression '&' expression 
+        |       expression '^' expression 
+        |       expression '|' expression 
+        |       expression TOK_ELSE expression
+        |       expression '#' expression
+        |       expression TOK_MIN expression 
+        |       expression TOK_MAX expression
+        |       expression TOK_APPEND expression
+        |       expression TOK_INTERSPERSE expression
+        |       expression TOK_CHOP expression
+        |       expression TOK_SPLIT expression
+        |       expression TOK_TYPECAST TOK_ID
+        |       expression TOK_SEQ expression
+        |       expression TOK_EQ expression
+        |       expression TOK_NE expression
+        |       expression '<' expression
+        |       expression '>' expression
+        |       expression TOK_LE expression
+        |       expression TOK_GE expression
+        |       expression '~' pattern
+        |       expression TOK_MATCH_BINDING pattern
+        |       expression TOK_NOT_MATCH pattern
+        |       expression TOK_IN expression
+        |       expression TOK_ISTYPE typechoice
+        |       expression '=' expression
+        |       expression TOK_PUT expression
+        |       expression TOK_PUT_ALL expression
+        |       expression TOK_PUT_NEXT expression
+        |       TOK_KILL expression
+        |       TOK_SUSPEND expression
+        |       TOK_RESUME expression
+        |       TOK_YIELD expression
+        |       TOK_ERROR expression
         |       TOK_GOTO TOK_ID
-                ;
-                
-expression:     simple_expression
-        |       TOK_IF '(' expression ')' simple_expression 
-        |       TOK_IF '(' expression ')' simple_expression TOK_ELSE simple_expression                
-        |       TOK_WHILE '(' expression ')' simple_expression
-        |       TOK_FOR '(' bindings ';' expression ';' bindings ')' simple_expression
-        |       TOK_FOREACH '(' foreach_spec ')' simple_expression
-        |       TOK_WITH '(' TOK_ID ')' simple_expression
-        |       TOK_FREEZE '(' expression ')' simple_expression
+        |       TOK_IF '(' expression ')' expression %prec TOK_IF
+        |       TOK_WHILE '(' expression ')' expression %prec TOK_WHILE
+        |       TOK_FOR '(' bindings ';' expression ';' bindings ')' expression %prec TOK_FOR
+        |       TOK_FOREACH '(' foreach_spec ')' expression %prec TOK_FOREACH
+        |       TOK_WITH '(' TOK_ID ')' expression %prec TOK_WITH
+        |       TOK_FREEZE '(' expression ')' expression %prec TOK_FREEZE
         |       TOK_SWITCH '(' expression ')' '{' alternatives '}'
         |       TOK_SELECT '{' select_alternatives '}'
         |       TOK_GENERIC '(' expression ')' '{' generic_alternatives '}'
+        |       TOK_HOT expression
+        |       TOK_COLD expression
+        |       TOK_IDLE expression
                 ;
 
-anonymous_node: '@' noderef '(' bindings0 ')'
+anonymous_node: '@' noderef '(' bindings0 ')' 
+        |       '@' TOK_FOR  '(' bindings ';' expression0 ';' bindings ')' expression %prec TOK_FOR
+                ;
+
+expression0:    /*empty*/
+        |       expression
         ;
 
 bindings:       binding 
@@ -319,7 +325,7 @@ bindings:       binding
 
 bindings0:     /*empty*/
         |      bindings
-        ;
+                ;
 
 binding: TOK_ID TOK_ASSIGN expression
                 ;
@@ -329,7 +335,7 @@ block:   '{'    sequence '}'
                 ;
 
 sequence:       expression ';'
-        |       sequence expression
+        |       sequence expression ';'
                 ;
 
 exprlist0:      /*empty*/
