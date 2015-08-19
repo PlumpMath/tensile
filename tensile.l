@@ -74,6 +74,7 @@ me { return TOK_ME; }
 mod { return TOK_MOD; }
 module { return TOK_MODULE; }
 null { yylval->value = NULL_VALUE;  return TOK_NULL; }
+partition { return TOK_PARTITION; }
 pragma { return TOK_PRAGMA; }
 prototype { return TOK_PROTOTYPE; }
 resume { return TOK_RESUME; }

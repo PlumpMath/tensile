@@ -28,6 +28,7 @@
 %token TOK_LOCAL
 %token TOK_IMPORT
 %token TOK_PROTOTYPE
+%token TOK_PARTITION
 %token TOK_FOREIGN
 %token TOK_PRAGMA                        
 
@@ -52,10 +53,10 @@
 %left '+' '-' TOK_APPEND TOK_CHOP '#'
 %left '*' '/' TOK_DIV TOK_MOD TOK_INTERSPERSE TOK_SPLIT
 %nonassoc TOK_TYPECAST
-/*                       %left TOK_FUNCALL                        */
 %right '!' '?' TOK_PEEK TOK_UMINUS
-%left '.'                        
-
+%left '[' '('
+%left '.'
+%nonassoc TOK_ID                        
 %{
 extern int yylex(YYSTYPE* yylval_param, YYLTYPE * yylloc_param, exec_context *context);
 static void yyerror(YYLTYPE * yylloc_param, exec_context *context, const char *msg);
@@ -173,11 +174,12 @@ foreignsym:     /*empty*/
         |        '.' TOK_ID
                 ;
 
-nodedecl:       prototype0 TOK_ID '(' nodeargs ')' nodedef
+nodedecl:       nodekind TOK_ID '(' nodeargs ')' nodedef
                 ;
 
-prototype0:     /*empty*/
+nodekind:     /*empty*/
         |       TOK_PROTOTYPE
+        |       TOK_PARTITION
         ;
 
 nodedef:        instantiate ';'
@@ -236,25 +238,24 @@ varref:         TOK_ID
         |       TOK_ID '.' TOK_ID '.' TOK_ID
                 ;
 
-expression: literal 
-        |       '['exprlist0 ']' 
-
-        |       '('expression ')' 
-        |       varref
+expression: literal
+        |       '[' exprlist0 ']'
+        |       '[' assoclist ']' 
+        |       '(' expression ')' 
+        |       TOK_ID
         |       block
         |       anonymous_node
-        |       TOK_ID '(' exprlist0 ')'
+        |       TOK_ID '(' exprlist0 ')' 
         |       TOK_ME
         |       TOK_QUEUE
         |       TOK_REGEXP
-        |       expression '[' ']' 
-        |       expression '[' expression ']' 
+        |       expression '[' expression0 ']' 
         |       '+' expression %prec TOK_UMINUS 
         |       '-' expression %prec TOK_UMINUS 
         |       '*' expression %prec TOK_UMINUS 
         |       '^' expression %prec TOK_UMINUS
         |       '#' expression %prec TOK_UMINUS
-        |       '?' expression %prec TOK_UMINUS
+        |       '?' expression 
         |       '!' expression
         |       TOK_PEEK expression
         |       expression '+' expression 
@@ -408,14 +409,16 @@ typechoice:     TOK_ID
         |       typechoice '|' TOK_ID
         ;
 
-pattern:        TOK_ID
-        |       TOK_WILDCARD
+pattern:        TOK_WILDCARD
         |       literal
         |       TOK_REGEXP
         |       '(' expression ')'
-        |       TOK_ID TOK_ASSIGN pattern
-        |       TOK_ID '(' patternlist0 ')' 
+        |       TOK_ID suffix
         |       '[' patternlist ']'
+        ;
+
+suffix:         /*empty*/
+        |       '(' patternlist0 ')'
         ;
 
 patternlist0: /*empty*/
