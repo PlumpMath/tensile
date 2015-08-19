@@ -409,16 +409,14 @@ typechoice:     TOK_ID
         |       typechoice '|' TOK_ID
         ;
 
-pattern:        TOK_WILDCARD
+pattern:        TOK_ID
+        |       TOK_WILDCARD
         |       literal
         |       TOK_REGEXP
         |       '(' expression ')'
-        |       TOK_ID suffix
+        |       TOK_ID TOK_ASSIGN pattern
+        |       TOK_ID '(' patternlist0 ')' 
         |       '[' patternlist ']'
-        ;
-
-suffix:         /*empty*/
-        |       '(' patternlist0 ')'
         ;
 
 patternlist0: /*empty*/
