@@ -47,16 +47,17 @@
 %left '='                        
 %nonassoc TOK_MATCH_BINDING
 %nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH TOK_IN TOK_ISTYPE
-%left '|' '^'
+%left '|' 
 %left '&'
 %left TOK_MAX TOK_MIN 
 %left '+' '-' TOK_APPEND TOK_CHOP '#'
 %left '*' '/' TOK_DIV TOK_MOD TOK_INTERSPERSE TOK_SPLIT
+%right '^'
 %nonassoc TOK_TYPECAST
+%left '[' 
 %right '!' '?' TOK_PEEK TOK_UMINUS
-%left '[' '('
 %left '.'
-%nonassoc TOK_ID                        
+%nonassoc TOK_ID
 %{
 extern int yylex(YYSTYPE* yylval_param, YYLTYPE * yylloc_param, exec_context *context);
 static void yyerror(YYLTYPE * yylloc_param, exec_context *context, const char *msg);
@@ -105,7 +106,6 @@ tlmcondition:   '(' tlmcondition ')'
         |       '!' tlmcondition
         |       tlmcondition '&' tlmcondition
         |       tlmcondition '|' tlmcondition
-        |       tlmcondition '^' tlmcondition
                 ;
 
 versionconstraint: /*empty*/
@@ -211,8 +211,7 @@ instanceargs:   instancearg
 instancearg:    TOK_ID TOK_ASSIGN expression
                 ;
 
-nodeblock:   '{' bindings sequence  '}'
-        |    '{' sequence '}'
+nodeblock:   '{' sequence  '}'
         |    '{' states '}'
                 ;
 
@@ -220,8 +219,7 @@ states:         state
         |       states state
         ;
 
-state:          statelabel ':' bindings sequence
-        |       statelabel ':' sequence
+state:          statelabel ':' sequence
         ;
 
 statelabel:     TOK_ID
@@ -230,19 +228,19 @@ statelabel:     TOK_ID
         ;
 
 noderef:        TOK_ID
-        |       TOK_ID '.' TOK_ID
+        |       TOK_ID '.' TOK_ID %prec '.'
                 ;
 
 varref:         TOK_ID
-        |       TOK_ID '.' TOK_ID
-        |       TOK_ID '.' TOK_ID '.' TOK_ID
+        |       TOK_ID '.' TOK_ID  %prec '.'
+        |       TOK_ID '.' TOK_ID '.' TOK_ID %prec '.' 
                 ;
 
 expression: literal
         |       '[' exprlist0 ']'
         |       '[' assoclist ']' 
         |       '(' expression ')' 
-        |       TOK_ID
+        |       varref
         |       block
         |       anonymous_node
         |       TOK_ID '(' exprlist0 ')' 
@@ -264,8 +262,8 @@ expression: literal
         |       expression '/' expression 
         |       expression TOK_DIV expression
         |       expression TOK_MOD expression
-        |       expression '&' expression 
         |       expression '^' expression 
+        |       expression '&' expression
         |       expression '|' expression 
         |       expression TOK_ELSE expression
         |       expression '#' expression
@@ -312,7 +310,7 @@ expression: literal
         |       TOK_IDLE expression
                 ;
 
-anonymous_node: '@' noderef '(' bindings0 ')' 
+anonymous_node: '@' noderef '(' bindings ')'
         |       '@' TOK_FOR  '(' bindings ';' expression0 ';' bindings ')' expression %prec TOK_FOR
                 ;
 
@@ -324,18 +322,14 @@ bindings:       binding
         |       bindings ';' binding
                 ;
 
-bindings0:     /*empty*/
-        |      bindings
-                ;
-
 binding: TOK_ID TOK_ASSIGN expression
                 ;
 
 block:   '{'    sequence '}'
-        |       '{' bindings sequence '}'
                 ;
 
 sequence:       expression ';'
+        |       bindings ';'
         |       sequence expression ';'
                 ;
 
@@ -393,7 +387,6 @@ selector:       varref
         |       '(' selector ')'
         |       selector '&' selector
         |       selector '|' selector
-        |       selector '^' selector
         ;
 
 generic_alternatives:
@@ -414,7 +407,7 @@ pattern:        TOK_ID
         |       literal
         |       TOK_REGEXP
         |       '(' expression ')'
-        |       TOK_ID TOK_ASSIGN pattern %prec TOK_ASSIGN
+        |       TOK_ID TOK_ASSIGN pattern 
         |       TOK_ID '(' patternlist0 ')' %prec '('
         |       '[' patternlist ']'
         ;
