@@ -310,7 +310,7 @@ expression: literal
         |       TOK_IDLE expression
                 ;
 
-anonymous_node: '@' noderef '(' bindings ')'
+anonymous_node: '@' noderef block
         |       '@' TOK_FOR  '(' bindings ';' expression0 ';' bindings ')' expression %prec TOK_FOR
                 ;
 
@@ -323,6 +323,7 @@ bindings:       binding
                 ;
 
 binding: TOK_ID TOK_ASSIGN expression
+        | pragma
                 ;
 
 block:   '{'    sequence '}'
