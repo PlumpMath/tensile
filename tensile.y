@@ -31,18 +31,21 @@
 %token TOK_PARTITION
 %token TOK_FOREIGN
 %token TOK_PRAGMA                        
-
+%token TOK_INCLUDE
+%token TOK_HOOK
+%token TOK_AUGMENT                                                
 
 %nonassoc ':'
 %left ';'                      
 %left ','
 %nonassoc TOK_RULE                        
 %nonassoc TOK_ASSIGN
+%right TOK_THEN                        
 %nonassoc TOK_HOT TOK_COLD TOK_IDLE
-%nonassoc TOK_ELSE                        
-%right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_GENERIC TOK_SELECT TOK_WITH TOK_FREEZE
+%nonassoc TOK_ELSE
+%right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_GENERIC TOK_SELECT TOK_WITH TOK_FREEZE TOK_WATCH
 %nonassoc TOK_SEQ
-%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_YIELD TOK_ERROR TOK_GOTO
+%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_YIELD TOK_ERROR TOK_GOTO TOK_ASSERT
 %right TOK_PUT TOK_PUT_ALL TOK_PUT_NEXT 
 %left '='                        
 %nonassoc TOK_MATCH_BINDING
@@ -50,12 +53,12 @@
 %left '|' 
 %left '&'
 %left TOK_MAX TOK_MIN 
-%left '+' '-' TOK_APPEND TOK_CHOP '#'
+%left '+' '-' TOK_APPEND TOK_CHOP 
 %left '*' '/' TOK_DIV TOK_MOD TOK_INTERSPERSE TOK_SPLIT
 %right '^'
 %nonassoc TOK_TYPECAST
 %left '[' 
-%right '!' '?' TOK_PEEK TOK_UMINUS
+%right '!' '?' TOK_SIZEOF TOK_TRACING TOK_PEEK TOK_UMINUS
 %left '.'
 %nonassoc TOK_ID
 %{
@@ -70,6 +73,7 @@ script:         body
 
 body:           /*empty*/
         |       body ';'
+        |       body include ';'
         |       body module
         |       body pragma ';'
         |       body toplevelconditional 
@@ -81,6 +85,9 @@ pragma:         TOK_PRAGMA TOK_ID literal
 
 module:         TOK_MODULE TOK_ID version0 '{' modulecontents '}'
                 ;
+
+include:        TOK_INCLUDE TOK_STRING 
+        ;
 
 version0:       /*empty*/
         |       version
@@ -124,9 +131,11 @@ envconstraint:  /*empty*/
 
 modulecontents:  /*empty*/
         |       modulecontents ';'
+        |       modulecontents include ';'
         |       modulecontents pragma ';'
         |       modulecontents moduleconditional
-        |       modulecontents scope declaration 
+        |       modulecontents scope declaration
+        |       modulecontents augment
                 ;
 
 moduleconditional: 
@@ -227,12 +236,19 @@ statelabel:     TOK_ID
         |       TOK_KILL
         ;
 
+augment:        TOK_AUGMENT hookref block
+        ;
+
 noderef:        TOK_ID
         |       TOK_ID '.' TOK_ID %prec '.'
                 ;
 
 varref:         TOK_ID
         |       TOK_ID '.' TOK_ID  %prec '.'
+        |       TOK_ID '.' TOK_ID '.' TOK_ID %prec '.' 
+                ;
+
+hookref:        TOK_ID '.' TOK_ID  %prec '.'
         |       TOK_ID '.' TOK_ID '.' TOK_ID %prec '.' 
                 ;
 
@@ -252,7 +268,8 @@ expression: literal
         |       '-' expression %prec TOK_UMINUS 
         |       '*' expression %prec TOK_UMINUS 
         |       '^' expression %prec TOK_UMINUS
-        |       '#' expression %prec TOK_UMINUS
+        |       TOK_SIZEOF expression
+        |       TOK_TRACING expression
         |       '?' expression 
         |       '!' expression
         |       TOK_PEEK expression
@@ -266,7 +283,6 @@ expression: literal
         |       expression '&' expression
         |       expression '|' expression 
         |       expression TOK_ELSE expression
-        |       expression '#' expression
         |       expression TOK_MIN expression 
         |       expression TOK_MAX expression
         |       expression TOK_APPEND expression
@@ -275,6 +291,7 @@ expression: literal
         |       expression TOK_SPLIT expression
         |       expression TOK_TYPECAST TOK_ID
         |       expression TOK_SEQ expression
+        |       expression TOK_THEN expression                
         |       expression TOK_EQ expression
         |       expression TOK_NE expression
         |       expression '<' expression
@@ -295,6 +312,7 @@ expression: literal
         |       TOK_RESUME expression
         |       TOK_YIELD expression
         |       TOK_ERROR expression
+        |       TOK_ASSERT expression
         |       TOK_GOTO TOK_ID
         |       TOK_IF '(' expression ')' expression %prec TOK_IF
         |       TOK_WHILE '(' expression ')' expression %prec TOK_WHILE
@@ -305,6 +323,7 @@ expression: literal
         |       TOK_SWITCH '(' expression ')' '{' alternatives '}'
         |       TOK_SELECT '{' select_alternatives '}'
         |       TOK_GENERIC '(' expression ')' '{' generic_alternatives '}'
+        |       TOK_WATCH '(' expression TOK_RULE TOK_ID ')' expression %prec TOK_WATCH
         |       TOK_HOT expression
         |       TOK_COLD expression
         |       TOK_IDLE expression
@@ -324,6 +343,7 @@ bindings:       binding
 
 binding: TOK_ID TOK_ASSIGN expression
         | pragma
+        | TOK_HOOK TOK_ID
                 ;
 
 block:   '{'    sequence '}'

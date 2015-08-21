@@ -52,6 +52,8 @@ _ { return TOK_WILDCARD; }
 "//" { return TOK_SPLIT; }
 "<>" { return TOK_QUEUE; }
 "/"([^/\\]|\\.)+"/" { return TOK_REGEXP; }
+assert { return TOK_ASSERT; }
+augment { return TOK_AUGMENT; }
 cold { return TOK_COLD; }
 div { return TOK_DIV; }
 else { return TOK_ELSE; }
@@ -64,10 +66,12 @@ foreign { return TOK_FOREIGN; }
 freeze { return TOK_FREEZE; }
 generic { return TOK_GENERIC; }
 goto { return TOK_GOTO; }
+hook { return TOK_HOOK; }
 hot { return TOK_HOT; }
 idle { return TOK_IDLE; }
 if { return TOK_IF; }
 import { return TOK_IMPORT; }
+include { return TOK_INCLUDE; }
 kill { return TOK_KILL; }
 local { return TOK_LOCAL; }
 me { return TOK_ME; }
@@ -79,10 +83,13 @@ pragma { return TOK_PRAGMA; }
 prototype { return TOK_PROTOTYPE; }
 resume { return TOK_RESUME; }
 select { return TOK_SELECT; }
+sizeof { return TOK_SIZEOF; }
 suspend { return TOK_SUSPEND; }
 switch { return TOK_SWITCH; }
-trace { return TOK_TRACE; }
+then { return TOK_THEN; }
+tracing { return TOK_TRACING; }
 true { return TOK_TRUE; }
+watch { return TOK_WATCH; }
 while { return TOK_WHILE; }
 with { return TOK_WITH; }
 yield { return TOK_YIELD; }
@@ -112,10 +119,9 @@ yield { return TOK_YIELD; }
     return TOK_ID; 
 }
 
-^#!.*\n {}
 ^#[[:space:]]+[0-9]+[[:space:]]+.*\n {
     yylineno = strtoul(yytext + 1, NULL, 10);
 }
+^#.*\n {}
 [[:space:]]+ {}
-"%".*\n {}
 "/*"([^*]+|\*+[^\/*])*"*/" {}

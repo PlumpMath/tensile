@@ -48,6 +48,9 @@ extern "C"
     }                                                                   \
     struct fake
 
+#define DECLARE_TYPE_PREALLOC(_type)                    \
+    extern void preallocate_##_type##s(unsigned size)
+
 #define DECLARE_ARRAY_ALLOC_COMMON(_type)                               \
     extern _type *resize_##_type(_type *arr, unsigned newn)             \
         ATTR_NONNULL_1ST ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT;  \
@@ -156,6 +159,23 @@ typedef struct freelist_t {
                              { _var->refcnt = 1; _clone; },             \
                              static inline void destroy_##_type, _fini) \
     DEFINE_REFCNT_FREE(_type, _var)
+
+#define DEFINE_TYPE_PREALLOC(_type)                                     \
+    void preallocate_##_type##s(unsigned size)                          \
+    {                                                                   \
+    unsigned i;                                                         \
+    _type *objs = malloc(size * sizeof(*objs));                         \
+                                                                        \
+    assert(freelist_##_type == NULL);                                   \
+    for (i = 0; i < size - 1; i++)                                      \
+    {                                                                   \
+        ((freelist_t *)&objs[i])->chain = (freelist_t *)&objs[i + 1];   \
+    }                                                                   \
+    ((freelist_t *)&objs[size - 1])->chain = NULL;                      \
+    freelist_##_type = (freelist_t *)objs;                              \
+    }                                                                   \
+    
+    
 
 #define DEFINE_ARRAY_ALLOC_COMMON(_type, _getsize, _maxsize, _var, _idxvar, \
                                   _initc, _inite,                       \
