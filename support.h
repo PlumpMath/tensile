@@ -116,9 +116,9 @@ extern "C"
 #if __GNUC__ >= 4
 static inline unsigned count_leading_zeroes(unsigned i)
 {
-  if (i == 0)
-    return 0;
-  return __builtin_clz(i);
+  if (i == 0u)
+    return 0u;
+  return (unsigned)__builtin_clz(i);
 }
 #else
 static inline int count_leading_zeroes(unsigned i)

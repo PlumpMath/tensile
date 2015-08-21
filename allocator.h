@@ -29,6 +29,7 @@ extern "C"
 {
 #endif
 
+#include <assert.h>
 #include "support.h"
 
 #define DECLARE_TYPE_ALLOCATOR(_type, _args)                            \
@@ -97,8 +98,9 @@ typedef struct freelist_t {
 #define DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var, _init, _clone,     \
                                  _destructor, _fini)                    \
     static freelist_t *freelist_##_type;                                \
+                                                                        \
+    ATTR_MALLOC ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL            \
     static _type *alloc_##_type(void)                                   \
-        ATTR_MALLOC ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL        \
     {                                                                   \
         _type *_var;                                                    \
                                                                         \
@@ -163,16 +165,16 @@ typedef struct freelist_t {
 #define DEFINE_TYPE_PREALLOC(_type)                                     \
     void preallocate_##_type##s(unsigned size)                          \
     {                                                                   \
-    unsigned i;                                                         \
-    _type *objs = malloc(size * sizeof(*objs));                         \
+        unsigned i;                                                     \
+        _type *objs = malloc(size * sizeof(*objs));                     \
                                                                         \
-    assert(freelist_##_type == NULL);                                   \
-    for (i = 0; i < size - 1; i++)                                      \
-    {                                                                   \
-        ((freelist_t *)&objs[i])->chain = (freelist_t *)&objs[i + 1];   \
-    }                                                                   \
-    ((freelist_t *)&objs[size - 1])->chain = NULL;                      \
-    freelist_##_type = (freelist_t *)objs;                              \
+        assert(freelist_##_type == NULL);                               \
+        for (i = 0; i < size - 1; i++)                                  \
+        {                                                               \
+            ((freelist_t *)&objs[i])->chain = (freelist_t *)&objs[i + 1]; \
+        }                                                               \
+        ((freelist_t *)&objs[size - 1])->chain = NULL;                  \
+        freelist_##_type = (freelist_t *)objs;                          \
     }                                                                   \
     
     
@@ -180,7 +182,7 @@ typedef struct freelist_t {
 #define DEFINE_ARRAY_ALLOC_COMMON(_type, _getsize, _maxsize, _var, _idxvar, \
                                   _initc, _inite,                       \
                                   _clonec, _clone,                      \
-                                  _adjustc, _adjuste                    \
+                                  _adjustc, _adjuste,                   \
                                   _destructor, _finic, _finie)          \
   static freelist_t *freelists_##_type[_maxsize];                       \
                                                                         \

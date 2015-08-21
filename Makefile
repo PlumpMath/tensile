@@ -8,29 +8,28 @@ PKGCONFIG = pkg-config
 CFLAGS = -O2 -fstack-protector -W -Wall -Werror -Wmissing-declarations -Wformat=2 -Winit-self -Wuninitialized \
 	-Wsuggest-attribute=pure -Wsuggest-attribute=const -Wconversion -Wstack-protector -Wpointer-arith -Wwrite-strings \
 	-Wmissing-format-attribute
-CPPFLAGS = 
+CPPFLAGS = -I.
 LDFLAGS = -Wl,-export-dynamic
 LIBS = -lm -lfl -lunistring -ltre
+CUNIT_CPPFLAGS = 
+CUNIT_LIBS = -lcunit
 MFLAGS = -MM
 
-APR_PKGCONFIG = $(PKGCONFIG) apr-1
-APU_PKGCONFIG = $(PKGCONFIG) apr-util-1
+C_SOURCES = tensile.tab.c lex.yy.c
 
-APR_CPPFLAGS := $(shell $(APR_PKGCONFIG) --cflags)
-APU_CPPFLAGS := $(shell $(APU_PKGCONFIG) --cflags)
+TESTS = allocator
 
-APR_LDFLAGS := $(shell $(APR_PKGCONFIG) --libs-only-L)
-APU_LDLAGS := $(shell $(APU_PKGCONFIG) --libs-only-L)
-
-APR_LIBS := $(shell $(APR_PKGCONFIG) --libs-only-l)
-APU_LIBS := $(shell $(APU_PKGCONFIG) --libs-only-l)
-
-C_SOURCES = library.c utils.c values.c ops.c eval.c binary.c tensile.tab.c lex.yy.c
+C_TEST_SOURCES = tests/engine.c
+C_TEST_SOURCES += $(patsubst %,tests/%.c,$(TESTS))
 
 APPLICATION = tensile
+TESTENGINE = tests/testengine
 
 $(APPLICATION) : $(C_SOURCES:.c=.o)
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LIBS)
+
+$(TESTENGINE) : $(C_TEST_SOURCES:.c=.o)
+	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LIBS) $(CUNIT_LIBS)
 
 
 tensile.tab.h : tensile.tab.c
@@ -41,18 +40,22 @@ tensile.tab.c : tensile.y
 
 tensile.tab.o lex.yy.o : CFLAGS += -Wno-conversion -Wno-unused-function -Wno-suggest-attribute=pure
 
+tests/%.o : CPPFLAGS += $(CUNIT_CPPFLAGS)
+
 lex.yy.c : tensile.l
 	$(FLEX) $<
 
 lex.yy.o lex.yy.d : lex.yy.c tensile.tab.h
 
 include $(C_SOURCES:.c=.d)
+include $(C_TEST_SOURCES:.c=.d)
 
 .PHONY : clean
 clean :
-	rm -f *.o
-	rm -f *.d
+	rm -f *.o tests/*.o
+	rm -f *.d tests/*.d
 	rm -f $(APPLICATION)
+	rm -f $(TESTENGINE)
 	rm -f lex.yy.c
 	rm -f tensile.tab.*
 
