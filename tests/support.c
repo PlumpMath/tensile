@@ -17,39 +17,27 @@
  *
  */
 /**
- * @brief common test definitions
- *
  * @author Artem V. Andreev <artem@AA5779.spb.edu>
  */
-#ifndef TESTS_H
-#define TESTS_H 1
-
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
 #include <CUnit/CUnit.h>
+#include "tests.h"
+#include "support.h"
 
-typedef struct test_descr {
-    const char *name;
-    CU_TestFunc test;
-} test_descr;
-
-#define TEST_DESCR(_test) { #_test, test_##_test }    
-
-typedef struct test_suite_descr {
-    const char *name;
-    CU_InitializeFunc init;
-    CU_CleanupFunc cleanup;
-    const test_descr *tests;
-} test_suite_descr;
-
-extern test_suite_descr support_tests;
-extern test_suite_descr allocator_tests;
-
-
-#ifdef __cplusplus
+static void test_clz(void) 
+{
+    CU_ASSERT_EQUAL(count_leading_zeroes(0u), sizeof(unsigned) * CHAR_BIT);
+    CU_ASSERT_EQUAL(count_leading_zeroes(1u), sizeof(unsigned) * CHAR_BIT - 1);
+    CU_ASSERT_EQUAL(count_leading_zeroes(0x12340u), sizeof(unsigned) * CHAR_BIT - 17);
+    CU_ASSERT_EQUAL(count_leading_zeroes(UINT_MAX), 0);
+    CU_ASSERT_EQUAL(count_leading_zeroes(UINT_MAX >> 1), 1);
+    CU_ASSERT_EQUAL(count_leading_zeroes(UINT_MAX >> 2), 2);
 }
-#endif /* __cplusplus */
-#endif /* TESTS_H */
+
+test_suite_descr support_tests = {
+    "support", NULL, NULL,
+    (const test_descr[]){
+        TEST_DESCR(clz),
+        {NULL, NULL}
+    }
+};

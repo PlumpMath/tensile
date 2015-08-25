@@ -137,10 +137,133 @@ static void test_prealloc(void)
     st2 = new_simple_type2();
     CU_ASSERT_PTR_EQUAL(st1, st + 1);
     CU_ASSERT_PTR_NOT_EQUAL(st2, st);
-    CU_ASSERT_PTR_NOT_EQUAL(st1, st);
+    CU_ASSERT_PTR_NOT_EQUAL(st2, st1);
     free_simple_type2(st);
     free_simple_type2(st1);
     free_simple_type2(st2);
+}
+
+typedef short small_type;
+
+DECLARE_TYPE_ALLOCATOR(small_type, ());
+DEFINE_TYPE_ALLOCATOR(small_type, (), obj, 
+                      {*obj = 0x1234;},
+                      {}, {});
+
+static void test_alloc_small(void)
+{
+    small_type *sm;
+    small_type *sm1;    
+    
+    sm = new_small_type();
+    CU_ASSERT_EQUAL(*sm, 0x1234);
+    free_small_type(sm);
+    sm1 = new_small_type();
+    CU_ASSERT_PTR_EQUAL(sm, sm1);
+    CU_ASSERT_EQUAL(*sm1, 0x1234);
+    free_small_type(sm1);
+}                     
+                      
+
+typedef struct refcnt_type {
+    unsigned refcnt;
+    void *ptr;
+    unsigned tag;
+} refcnt_type;
+
+DECLARE_REFCNT_ALLOCATOR(refcnt_type, (unsigned tag));
+DEFINE_REFCNT_ALLOCATOR(refcnt_type, (unsigned tag), obj,
+                        {obj->tag = tag;},
+                        {NEW(obj)->tag = OLD(obj)->tag + 1;},
+                        {obj->tag = 0xdeadbeef;});
+
+static void test_refcnt_alloc_init(void) 
+{
+    refcnt_type *rt = new_refcnt_type(0x12345);
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(rt);
+    CU_ASSERT_EQUAL(rt->tag, 0x12345);
+    CU_ASSERT_EQUAL(rt->refcnt, 1);
+    free_refcnt_type(rt);
+}
+
+static void test_refcnt_destroy(void) 
+{
+    refcnt_type *rt = new_refcnt_type(0x12345);
+
+    free_refcnt_type(rt);
+    CU_ASSERT_EQUAL(rt->tag, 0xdeadbeef);
+}
+
+static void test_refcnt_use_destroy(void) 
+{
+    refcnt_type *rt = new_refcnt_type(0x12345);
+    refcnt_type *use = use_refcnt_type(rt);
+
+    CU_ASSERT_PTR_EQUAL(use, rt);
+    CU_ASSERT_EQUAL(use->refcnt, 2);
+    free_refcnt_type(rt);
+    CU_ASSERT_EQUAL(use->refcnt, 1);
+    CU_ASSERT_EQUAL(use->tag, 0x12345);
+    free_refcnt_type(use);
+    CU_ASSERT_EQUAL(use->tag, 0xdeadbeef);    
+}
+
+static void test_refcnt_destroy_alloc(void) 
+{
+    refcnt_type *rt = new_refcnt_type(0x12345);
+    refcnt_type *rt1;
+
+    free_refcnt_type(rt);
+    rt1 = new_refcnt_type(0x54321);
+    CU_ASSERT_PTR_EQUAL(rt, rt1);
+    CU_ASSERT_EQUAL(rt1->refcnt, 1);
+    CU_ASSERT_EQUAL(rt1->tag, 0x54321);
+    free_refcnt_type(rt1);
+    CU_ASSERT_EQUAL(rt1->tag, 0xdeadbeef);    
+}
+
+DECLARE_ARRAY_TYPE(simple_array, void *ptr; unsigned tag;, unsigned);
+DECLARE_ARRAY_ALLOCATOR(simple_array);
+
+
+DEFINE_ARRAY_ALLOCATOR(simple_array, linear, 4, arr, i,
+                       {arr->tag = 0x12345;},
+                       {arr->elts[i] = i; },
+                       {NEW(arr)->tag = OLD(arr)->tag + 1; },
+                       {NEW(arr)->elts[i] = OLD(arr)->elts[i] + 1; },
+                       {NEW(arr)->tag = OLD(arr)->tag << 4; },
+                       {NEW(arr)->elts[i] = OLD(arr)->elts[i] << 4; },
+                       {arr->tag |= 0x80000000u; },
+                       {arr->tag = 0xdeadbeef; },
+                       {arr->elts[i] = 0xdeadbeef; });
+
+static void test_alloc_sizes(void)
+{
+    unsigned i;
+    simple_array *prev = NULL;
+
+    for (i = 0; i <= 5; i++) 
+    {
+        unsigned j;
+        simple_array *arr = new_simple_array(i);
+
+        CU_ASSERT_PTR_NOT_NULL_FATAL(arr);
+        CU_ASSERT_PTR_NOT_EQUAL(arr, prev);
+        CU_ASSERT_EQUAL(arr->tag, 0x12345);
+        CU_ASSERT_EQUAL(arr->nelts, i);
+        for (j = 0; j < i; j++)
+            CU_ASSERT_EQUAL(arr->elts[j], j);
+
+        free_simple_array(arr);
+        if (i != 5) 
+        {
+            CU_ASSERT_EQUAL(arr->tag, 0xdeadbeef);
+            for (j = 0; j < i; j++)
+                CU_ASSERT_EQUAL(arr->elts[j], 0xdeadbeef);
+        }
+        prev = arr;
+    }
 }
 
 test_suite_descr allocator_tests = {
@@ -153,6 +276,12 @@ test_suite_descr allocator_tests = {
         TEST_DESCR(copy),
         TEST_DESCR(dealloc_copy),
         TEST_DESCR(prealloc),
+        TEST_DESCR(alloc_small),
+        TEST_DESCR(refcnt_alloc_init),
+        TEST_DESCR(refcnt_destroy),
+        TEST_DESCR(refcnt_use_destroy),
+        TEST_DESCR(refcnt_destroy_alloc),
+        TEST_DESCR(alloc_sizes),
         {NULL, NULL}
     }
 };

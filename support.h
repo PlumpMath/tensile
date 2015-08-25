@@ -29,6 +29,8 @@ extern "C"
 {
 #endif
 
+#include <limits.h>
+
 /* Info on which gcc versions support which attributes is mostly borrowed from
  * glib/gmacro.h header
  */
@@ -116,23 +118,23 @@ extern "C"
 #if __GNUC__ >= 4
 static inline unsigned count_leading_zeroes(unsigned i)
 {
-  if (i == 0u)
-    return 0u;
-  return (unsigned)__builtin_clz(i);
+    if (i == 0u)
+        return (unsigned)sizeof(i) * CHAR_BIT;
+    return (unsigned)__builtin_clz(i);
 }
 #else
 static inline unsigned count_leading_zeroes(unsigned i)
 {
-  unsigned j;
+    unsigned j;
   
-  if (i == 0)
-    return 0;
-  for (j = sizeof(i) * CHAR_BIT - 1; j > 0; j--)
-  {
-    if (i & (1u << j))
-      return sizeof(i) * CHAR_BIT - 1 - j;
-  }
-  return sizeof(i) * CHAR_BIT - 1;
+    if (i == 0)
+        return (unsigned)sizeof(i) * CHAR_BIT;
+    for (j = sizeof(i) * CHAR_BIT - 1; j > 0; j--)
+    {
+        if (i & (1u << j))
+            return (unsigned)sizeof(i) * CHAR_BIT - 1 - j;
+    }
+    return (unsigned)sizeof(i) * CHAR_BIT - 1;
 }
 #endif
 

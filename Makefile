@@ -13,11 +13,11 @@ LDFLAGS = -Wl,-export-dynamic
 LIBS = -lm -lfl -lunistring -ltre
 CUNIT_CPPFLAGS = 
 CUNIT_LIBS = -lcunit
-MFLAGS = -MM
+MFLAGS = -MM -MT $(<:.c=.o)
 
 C_SOURCES = tensile.tab.c lex.yy.c
 
-TESTS = allocator
+TESTS = allocator support
 
 C_TEST_SOURCES = tests/engine.c
 C_TEST_SOURCES += $(patsubst %,tests/%.c,$(TESTS))

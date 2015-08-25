@@ -57,10 +57,10 @@ extern "C"
     extern _type *resize_##_type(_type *arr, unsigned newn)             \
         ATTR_NONNULL_1ST ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT;  \
                                                                         \
-    static inline _type *ensure_##_type##_size(_type *arr,              \
+    ATTR_NONNULL_1ST ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT       \
+    static inline _type *ensure_##_type##_size(_type *_arr,             \
                                                unsigned req,            \
                                                unsigned delta)          \
-        ATTR_NONNULL_1ST ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT   \
     {                                                                   \
         if (_arr->nelts <= req)                                         \
             return _arr;                                                \
@@ -68,12 +68,12 @@ extern "C"
     }                                                                   \
     struct fake
 
-#define DECLARE_ARRAY_ALLOCATOR(_type)          \
-    DECLARE_TYPE_ALLOCATOR(_type, unsigned n);  \
+#define DECLARE_ARRAY_ALLOCATOR(_type)              \
+    DECLARE_TYPE_ALLOCATOR(_type, (unsigned n));    \
     DECLARE_ARRAY_ALLOC_COMMON(_type)       
 
 #define DECLARE_REFCNT_ARRAY_ALLOCATOR(_type)           \
-    DECLARE_REFCNT_ALLOCATOR(_type, unsigned n);        \
+    DECLARE_REFCNT_ALLOCATOR(_type, (unsigned n));      \
     DECLARE_ARRAY_ALLOC_COMMON(_type)
 
 
@@ -159,8 +159,8 @@ typedef struct freelist_t {
 #define DEFINE_REFCNT_ALLOCATOR(_type, _args, _var, _init, _clone, _fini) \
     DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var,                        \
                              { _var->refcnt = 1; _init; },              \
-                             { _var->refcnt = 1; _clone; },             \
-                             static inline void destroy_##_type, _fini) \
+                             { NEW(_var)->refcnt = 1; _clone; },        \
+                             static inline void destroy_##_type, _fini); \
     DEFINE_REFCNT_FREE(_type, _var)
 
 #define DEFINE_TYPE_PREALLOC(_type)                                     \
@@ -177,19 +177,17 @@ typedef struct freelist_t {
         }                                                               \
         ((freelist_t *)&objs[size - 1])->chain = NULL;                  \
         freelist_##_type = (freelist_t *)objs;                          \
-    }                                                                   \
-    
-    
+    }    
 
 #define DEFINE_ARRAY_ALLOC_COMMON(_type, _scale, _maxsize, _var, _idxvar, \
                                   _initc, _inite,                       \
-                                  _clonec, _clone,                      \
+                                  _clonec, _clonee,                      \
                                   _adjustc, _adjuste, _resizec,         \
                                   _destructor, _finic, _finie)          \
   static freelist_t *freelists_##_type[_maxsize];                       \
                                                                         \
+  ATTR_MALLOC ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL              \
   static _type *alloc_##_type(unsigned n)                               \
-      ATTR_MALLOC ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL          \
   {                                                                     \
       _type *_var;                                                      \
       unsigned _sz = _scale##_order(n);                                 \
@@ -235,7 +233,8 @@ typedef struct freelist_t {
       return NEW(_var);                                                 \
   }                                                                     \
                                                                         \
-  static void dispose_##_type(_type *_var) ATTR_NONNULL                 \
+  ATTR_NONNULL                                                          \
+  static void dispose_##_type(_type *_var)                              \
   {                                                                     \
       unsigned _sz = _scale##_order(_var->nelts);                       \
                                                                         \
@@ -257,7 +256,7 @@ typedef struct freelist_t {
         _finie;                                                         \
     }                                                                   \
                                                                         \
-    if (_getsize(_newn) > _getsize(_var->nelts))                        \
+    if (_scale##_order(_newn) > _scale##_order(_var->nelts))            \
     {                                                                   \
         const _type *OLD(_var) = _var;                                  \
         _type *NEW(_var) = alloc_##_type(_newn);                        \
@@ -270,7 +269,7 @@ typedef struct freelist_t {
             _adjuste;                                                   \
         }                                                               \
         _adjustc;                                                       \
-        dispose_##_type(OLD(_var));                                     \
+        dispose_##_type(_var);                                          \
         _var = NEW(_var);                                               \
     }                                                                   \
                                                                         \
@@ -304,9 +303,37 @@ static inline void *frlmalloc(size_t sz)
 #define linear_size(_x) (_x)
 static inline unsigned log2_order(unsigned x)
 {
-    return sizeof(unsigned) * CHAR_BIT - count_leading_zeroes(x - 1);
+    return ((unsigned)sizeof(unsigned) * CHAR_BIT -
+            count_leading_zeroes(x - 1));
 }
 #define log2_size(_x) (1u << (_x))
+
+
+#define DEFINE_ARRAY_ALLOCATOR(_type, _scale, _maxsize, _var, _idxvar,  \
+                               _initc, _inite,                          \
+                               _clonec, _clonee,                        \
+                               _adjustc, _adjuste, _resizec,            \
+                               _finic, _finie)                          \
+    DEFINE_ARRAY_ALLOC_COMMON(_type, _scale, _maxsize, _var, _idxvar,   \
+                              _initc, _inite,                           \
+                              _clonec, _clonee,                         \
+                              _adjustc, _adjuste, _resizec,             \
+                              void free_##_type, _finic, _finie)
+
+#define DEFINE_REFCNT_ARRAY_ALLOCATOR(_type, _scale, _maxsize, _var,    \
+                                      _idxvar,                          \
+                                      _initc, _inite,                   \
+                                      _clonec, _clone,                  \
+                                      _adjustc, _adjuste, _resizec,     \
+                                      _finic, _finie)                   \
+    DEFINE_ARRAY_ALLOC_COMMON(_type, _scale, _maxsize, _var, _idxvar,   \
+                              { _var->refcnt = 1; _initc}, _inite,      \
+                              { NEW(_var)->refcnt = 1; _clonec}, _clone, \
+                              _adjustc, _adjuste,                       \
+                              {assert(_var->refcnt == 1; _resizec},     \
+                                  static inline void destroy_##_type,   \
+                              _finic, _finie)
+
 
 #endif // defined(ALLOCATOR_IMP)
   
