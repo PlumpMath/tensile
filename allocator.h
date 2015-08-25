@@ -30,6 +30,7 @@ extern "C"
 #endif
 
 #include <assert.h>
+#include <limits.h>
 #include "support.h"
 
 #define DECLARE_TYPE_ALLOCATOR(_type, _args)                            \
@@ -293,7 +294,8 @@ typedef struct freelist_t {
   }                                                                     \
   struct fake
 
-static inline void *frlmalloc(size_t sz) ATTR_MALLOC
+ATTR_MALLOC
+static inline void *frlmalloc(size_t sz) 
 {
     return malloc(sz > sizeof(freelist_t) ? sz : sizeof(freelist_t));
 }
