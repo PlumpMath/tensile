@@ -96,6 +96,53 @@ static void test_copy(void)
     free_simple_type(st1);
 }
 
+
+static void test_dealloc_copy(void) 
+{
+    simple_type *st = new_simple_type(0x12345);
+    simple_type *st1 = new_simple_type(0);
+    simple_type *st2;
+
+    free_simple_type(st);
+    st2 = copy_simple_type(st1);
+    CU_ASSERT_PTR_EQUAL(st2, st);
+    free_simple_type(st1);
+    free_simple_type(st2);
+}
+
+
+typedef struct simple_type2 {
+    void *ptr;
+} simple_type2;
+
+DECLARE_TYPE_ALLOCATOR(simple_type2, ());
+DECLARE_TYPE_PREALLOC(simple_type2);
+
+DEFINE_TYPE_ALLOCATOR(simple_type2, (), obj,
+                      {},
+                      {},
+                      {});
+DEFINE_TYPE_PREALLOC(simple_type2);
+
+
+static void test_prealloc(void) 
+{
+    simple_type2 *st;
+    simple_type2 *st1;
+    simple_type2 *st2;    
+    
+    preallocate_simple_type2s(2);
+    st = new_simple_type2();
+    st1 = new_simple_type2();
+    st2 = new_simple_type2();
+    CU_ASSERT_PTR_EQUAL(st1, st + 1);
+    CU_ASSERT_PTR_NOT_EQUAL(st2, st);
+    CU_ASSERT_PTR_NOT_EQUAL(st1, st);
+    free_simple_type2(st);
+    free_simple_type2(st1);
+    free_simple_type2(st2);
+}
+
 test_suite_descr allocator_tests = {
     "allocator", NULL, NULL,
     (const test_descr[]){
@@ -104,6 +151,8 @@ test_suite_descr allocator_tests = {
         TEST_DESCR(destroy_alloc),
         TEST_DESCR(destroy_alloc_alloc),        
         TEST_DESCR(copy),
+        TEST_DESCR(dealloc_copy),
+        TEST_DESCR(prealloc),
         {NULL, NULL}
     }
 };

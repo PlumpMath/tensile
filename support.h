@@ -121,7 +121,7 @@ static inline unsigned count_leading_zeroes(unsigned i)
   return (unsigned)__builtin_clz(i);
 }
 #else
-static inline int count_leading_zeroes(unsigned i)
+static inline unsigned count_leading_zeroes(unsigned i)
 {
   unsigned j;
   

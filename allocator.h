@@ -105,7 +105,7 @@ typedef struct freelist_t {
         _type *_var;                                                    \
                                                                         \
         if (freelist_##_type == NULL)                                   \
-            _var = malloc(sizeof (*_var));                              \
+            _var = frlmalloc(sizeof(*_var));                               \
         else                                                            \
         {                                                               \
             _var = (_type *)freelist_##_type;                           \
@@ -169,6 +169,7 @@ typedef struct freelist_t {
         _type *objs = malloc(size * sizeof(*objs));                     \
                                                                         \
         assert(freelist_##_type == NULL);                               \
+        assert(sizeof(*objs) >= sizeof(freelist_t));                    \
         for (i = 0; i < size - 1; i++)                                  \
         {                                                               \
             ((freelist_t *)&objs[i])->chain = (freelist_t *)&objs[i + 1]; \
@@ -179,10 +180,10 @@ typedef struct freelist_t {
     
     
 
-#define DEFINE_ARRAY_ALLOC_COMMON(_type, _getsize, _maxsize, _var, _idxvar, \
+#define DEFINE_ARRAY_ALLOC_COMMON(_type, _scale, _maxsize, _var, _idxvar, \
                                   _initc, _inite,                       \
                                   _clonec, _clone,                      \
-                                  _adjustc, _adjuste,                   \
+                                  _adjustc, _adjuste, _resizec,         \
                                   _destructor, _finic, _finie)          \
   static freelist_t *freelists_##_type[_maxsize];                       \
                                                                         \
@@ -190,10 +191,11 @@ typedef struct freelist_t {
       ATTR_MALLOC ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL          \
   {                                                                     \
       _type *_var;                                                      \
-      unsigned _sz = _getsize(n);                                       \
+      unsigned _sz = _scale##_order(n);                                 \
                                                                         \
       if (_sz >= _maxsize || freelists_##_type[_sz] == NULL)            \
-          _var = malloc(sizeof (*_var) + n * sizeof(_var->elts[0]));    \
+          _var = frlmalloc(sizeof (*_var) + _scale##_size(_sz) *        \
+                           sizeof(_var->elts[0]));                      \
       else                                                              \
       {                                                                 \
           _var = (_type *)freelists_##_type[_sz];                       \
@@ -234,7 +236,7 @@ typedef struct freelist_t {
                                                                         \
   static void dispose_##_type(_type *_var) ATTR_NONNULL                 \
   {                                                                     \
-      unsigned _sz = _getsize(_var->nelts);                             \
+      unsigned _sz = _scale##_order(_var->nelts);                       \
                                                                         \
       if(_sz >= _maxsize)                                               \
           free(_var);                                                   \
@@ -275,6 +277,7 @@ typedef struct freelist_t {
     {                                                                   \
         _inite;                                                         \
     }                                                                   \
+    _resizec;                                                           \
     return _var;                                                        \
   }                                                                     \
                                                                         \
@@ -289,6 +292,19 @@ typedef struct freelist_t {
       _finic;                                                           \
   }                                                                     \
   struct fake
+
+static inline void *frlmalloc(size_t sz) ATTR_MALLOC
+{
+    return malloc(sz > sizeof(freelist_t) ? sz : sizeof(freelist_t));
+}
+
+#define linear_order(_x) (_x)
+#define linear_size(_x) (_x)
+static inline unsigned log2_order(unsigned x)
+{
+    return sizeof(unsigned) * CHAR_BIT - count_leading_zeroes(x - 1);
+}
+#define log2_size(_x) (1u << (_x))
 
 #endif // defined(ALLOCATOR_IMP)
   
