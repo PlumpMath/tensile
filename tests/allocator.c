@@ -243,7 +243,7 @@ static void test_alloc_sizes(void)
     unsigned i;
     simple_array *prev = NULL;
 
-    for (i = 0; i <= 5; i++) 
+    for (i = 0; i < 5; i++) 
     {
         unsigned j;
         simple_array *arr = new_simple_array(i);
@@ -256,7 +256,7 @@ static void test_alloc_sizes(void)
             CU_ASSERT_EQUAL(arr->elts[j], j);
 
         free_simple_array(arr);
-        if (i != 5) 
+        if (i != 4) 
         {
             CU_ASSERT_EQUAL(arr->tag, 0xdeadbeef);
             for (j = 0; j < i; j++)
@@ -265,6 +265,24 @@ static void test_alloc_sizes(void)
         prev = arr;
     }
 }
+
+
+static void test_alloc_free_sizes(void)
+{
+    unsigned i;
+
+    for (i = 0; i < 4; i++) 
+    {
+        simple_array *arr = new_simple_array(i);
+        simple_array *arr1;
+
+        free_simple_array(arr);
+        arr1 = new_simple_array(i);
+        CU_ASSERT_PTR_EQUAL(arr, arr1);
+        free_simple_array(arr1);
+    }
+}
+
 
 test_suite_descr allocator_tests = {
     "allocator", NULL, NULL,
@@ -282,6 +300,7 @@ test_suite_descr allocator_tests = {
         TEST_DESCR(refcnt_use_destroy),
         TEST_DESCR(refcnt_destroy_alloc),
         TEST_DESCR(alloc_sizes),
+        TEST_DESCR(alloc_free_sizes),
         {NULL, NULL}
     }
 };
