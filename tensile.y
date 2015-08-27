@@ -29,11 +29,11 @@
 %token TOK_IMPORT
 %token TOK_PROTOTYPE
 %token TOK_PARTITION
-%token TOK_FOREIGN
 %token TOK_PRAGMA                        
 %token TOK_INCLUDE
 %token TOK_HOOK
-%token TOK_AUGMENT                                                
+%token TOK_AUGMENT
+%token TOK_FOREIGN
 
 %nonassoc ':'
 %left ';'                      
@@ -41,13 +41,13 @@
 %nonassoc TOK_RULE                        
 %nonassoc TOK_ASSIGN
 %right TOK_THEN                        
-%nonassoc TOK_HOT TOK_COLD TOK_IDLE
+%nonassoc TOK_HOT TOK_COLD TOK_IDLE TOK_GREEDY
 %nonassoc TOK_ELSE
 %right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_GENERIC TOK_SELECT TOK_WITH TOK_FREEZE TOK_WATCH
-%nonassoc TOK_SEQ
-%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_YIELD TOK_ERROR TOK_GOTO TOK_ASSERT
+%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_YIELD TOK_ERROR TOK_GOTO TOK_ASSERT TOK_POLL
 %right TOK_PUT TOK_PUT_ALL TOK_PUT_NEXT 
-%left '='                        
+%left '='
+%right '?'
 %nonassoc TOK_MATCH_BINDING
 %nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH TOK_IN TOK_ISTYPE
 %left '|' 
@@ -58,7 +58,7 @@
 %right '^'
 %nonassoc TOK_TYPECAST
 %left '[' 
-%right '!' '?' TOK_SIZEOF TOK_TRACING TOK_PEEK TOK_UMINUS
+%right '!' TOK_SIZEOF TOK_TRACING TOK_PEEK TOK_UMINUS
 %left '.'
 %nonassoc TOK_ID
 %{
@@ -98,21 +98,11 @@ version:        TOK_FLOAT
                 ;
 
 toplevelconditional: 
-                TOK_IF '(' tlmcondition ')' '{' body '}' toplevelelse
+                TOK_IF '(' expression ')' '{' body '}' toplevelelse
                 ;
 
 toplevelelse:   /*empty*/
         |       TOK_ELSE '{' body '}'
-                ;
-
-tlmcondition:   '(' tlmcondition ')'
-        |       TOK_ID versionconstraint
-        |       TOK_ID '.' TOK_ID
-        |       TOK_ID '.' TOK_ID '.' TOK_ID
-        |       '[' TOK_ID ']' envconstraint
-        |       '!' tlmcondition
-        |       tlmcondition '&' tlmcondition
-        |       tlmcondition '|' tlmcondition
                 ;
 
 versionconstraint: /*empty*/
@@ -124,11 +114,6 @@ versionconstraint: /*empty*/
         |       '~' version
                 ;
 
-envconstraint:  /*empty*/
-        |       TOK_EQ TOK_STRING
-        |       TOK_NE TOK_STRING
-                ;
-
 modulecontents:  /*empty*/
         |       modulecontents ';'
         |       modulecontents include ';'
@@ -136,28 +121,34 @@ modulecontents:  /*empty*/
         |       modulecontents moduleconditional
         |       modulecontents scope declaration
         |       modulecontents augment
+        |       modulecontents moduleforeign ';'
                 ;
 
 moduleconditional: 
-                TOK_IF '(' tlmcondition ')' '{' modulecontents '}' moduleelse
+                TOK_IF '(' expression ')' '{' modulecontents '}' moduleelse
                 ;
 
 moduleelse:   /*empty*/
         |       TOK_ELSE '{' modulecontents '}'
                 ;
 
+moduleforeign: TOK_FOREIGN strings
+                ;
+
+strings:  TOK_STRING
+        | strings TOK_STRING
+                ;
 
 scope:          /*empty*/
         |       TOK_EXTERN
         |       TOK_LOCAL
                 ;
 
-declaration:    foreign ';'
-        |       import ';'
+declaration:    import ';'
         |       nodedecl
                 ;
 
-import:         TOK_IMPORT importname versionconstraint importlist 
+import:         TOK_IMPORT TOK_ID versionconstraint importlist importalias
                 ;
 
 importlist:     /*empty*/
@@ -172,15 +163,8 @@ idlist:         TOK_ID
         |       idlist ',' TOK_ID
                 ;
 
-importname:     TOK_ID
-        |       TOK_ID TOK_ASSIGN TOK_ID
-                ;
-
-foreign:  TOK_FOREIGN TOK_ID TOK_ASSIGN TOK_STRING foreignsym
-                ;
-
-foreignsym:     /*empty*/
-        |        '.' TOK_ID
+importalias:    /*empty*/
+        |       TOK_TYPECAST TOK_ID
                 ;
 
 nodedecl:       nodekind TOK_ID '(' nodeargs ')' nodedef
@@ -192,6 +176,7 @@ nodekind:     /*empty*/
         ;
 
 nodedef:        instantiate ';'
+        |       foreignnode ';'
         |       nodeblock
                 ;
 
@@ -218,6 +203,9 @@ instanceargs:   instancearg
         ;
 
 instancearg:    TOK_ID TOK_ASSIGN expression
+                ;
+
+foreignnode: TOK_FOREIGN '(' TOK_ID ')' strings
                 ;
 
 nodeblock:   '{' sequence  '}'
@@ -270,7 +258,7 @@ expression: literal
         |       '^' expression %prec TOK_UMINUS
         |       TOK_SIZEOF expression
         |       TOK_TRACING expression
-        |       '?' expression 
+        |       '?' expression  %prec TOK_UMINUS
         |       '!' expression
         |       TOK_PEEK expression
         |       expression '+' expression 
@@ -281,7 +269,8 @@ expression: literal
         |       expression TOK_MOD expression
         |       expression '^' expression 
         |       expression '&' expression
-        |       expression '|' expression 
+        |       expression '|' expression
+        |       expression '?' expression 
         |       expression TOK_ELSE expression
         |       expression TOK_MIN expression 
         |       expression TOK_MAX expression
@@ -290,7 +279,6 @@ expression: literal
         |       expression TOK_CHOP expression
         |       expression TOK_SPLIT expression
         |       expression TOK_TYPECAST TOK_ID
-        |       expression TOK_SEQ expression
         |       expression TOK_THEN expression                
         |       expression TOK_EQ expression
         |       expression TOK_NE expression
@@ -313,6 +301,7 @@ expression: literal
         |       TOK_YIELD expression
         |       TOK_ERROR expression
         |       TOK_ASSERT expression
+        |       TOK_POLL expression
         |       TOK_GOTO TOK_ID
         |       TOK_IF '(' expression ')' expression %prec TOK_IF
         |       TOK_WHILE '(' expression ')' expression %prec TOK_WHILE
@@ -323,10 +312,11 @@ expression: literal
         |       TOK_SWITCH '(' expression ')' '{' alternatives '}'
         |       TOK_SELECT '{' select_alternatives '}'
         |       TOK_GENERIC '(' expression ')' '{' generic_alternatives '}'
-        |       TOK_WATCH '(' expression TOK_RULE TOK_ID ')' expression %prec TOK_WATCH
+        |       TOK_WATCH '(' expression TOK_RULE expression ')' expression %prec TOK_WATCH
         |       TOK_HOT expression
         |       TOK_COLD expression
         |       TOK_IDLE expression
+        |       TOK_GREEDY expression
                 ;
 
 anonymous_node: '@' noderef block

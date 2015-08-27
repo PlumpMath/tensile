@@ -5,7 +5,7 @@ BISON = bison -d
 FLEX = flex
 PKGCONFIG = pkg-config
 
-CFLAGS = -O2 -fstack-protector -W -Wall -Werror -Wmissing-declarations -Wformat=2 -Winit-self -Wuninitialized \
+CFLAGS = -ggdb3 -fstack-protector -W -Wall -Werror -Wmissing-declarations -Wformat=2 -Winit-self -Wuninitialized \
 	-Wsuggest-attribute=pure -Wsuggest-attribute=const -Wconversion -Wstack-protector -Wpointer-arith -Wwrite-strings \
 	-Wmissing-format-attribute
 CPPFLAGS = -I.

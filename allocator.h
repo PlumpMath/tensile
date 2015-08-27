@@ -277,6 +277,7 @@ typedef struct freelist_t {
     {                                                                   \
         _inite;                                                         \
     }                                                                   \
+    _var->nelts = _newn;                                                \
     _resizec;                                                           \
     return _var;                                                        \
   }                                                                     \
@@ -290,6 +291,7 @@ typedef struct freelist_t {
           _finie;                                                       \
       }                                                                 \
       _finic;                                                           \
+      dispose_##_type(_var);                                            \
   }                                                                     \
   struct fake
 

@@ -283,6 +283,74 @@ static void test_alloc_free_sizes(void)
     }
 }
 
+static void test_copy_sizes(void)
+{
+    unsigned i;
+
+    for (i = 0; i <= 4; i++) 
+    {
+        simple_array *arr = new_simple_array(i);
+        simple_array *arr1 = copy_simple_array(arr);
+        unsigned j;
+
+        CU_ASSERT_PTR_NOT_EQUAL(arr, arr1);
+        CU_ASSERT_EQUAL(arr1->tag, arr->tag + 1);
+        for (j = 0; j < i; j++)
+            CU_ASSERT_EQUAL(arr1->elts[j], arr->elts[j] + 1);
+        free_simple_array(arr1);
+        CU_ASSERT_EQUAL(arr->tag, 0x12345);
+        free_simple_array(arr);
+    }
+}
+
+static void test_resize_smaller_n(unsigned n)
+{
+    simple_array *arr = new_simple_array(n);
+    simple_array *arr1 = resize_simple_array(arr, n - 1);
+    unsigned j;
+
+    CU_ASSERT_PTR_EQUAL(arr, arr1);
+    CU_ASSERT_EQUAL(arr->nelts, n - 1);
+    CU_ASSERT_EQUAL(arr->tag, 0x80000000 | 0x12345);
+    for (j = 0; j < n - 1; j++)
+        CU_ASSERT_EQUAL(arr->elts[j], j);
+    CU_ASSERT_EQUAL(arr->elts[n - 1], 0xdeadbeef);
+
+    free_simple_array(arr);
+}
+
+
+static void test_resize_smaller(void)
+{
+    test_resize_smaller_n(3);
+    test_resize_smaller_n(4);
+    test_resize_smaller_n(5);
+}
+
+static void test_resize_larger_n(unsigned n)
+{
+    simple_array *arr = new_simple_array(n);
+    simple_array *arr1 = resize_simple_array(arr, n + 1);
+    unsigned j;
+
+    CU_ASSERT_PTR_NOT_EQUAL(arr, arr1);
+    CU_ASSERT_EQUAL(arr1->nelts, n + 1);
+    CU_ASSERT_EQUAL(arr1->tag, 0x80000000 | 0x123450);
+    for (j = 0; j < n; j++)
+        CU_ASSERT_EQUAL(arr1->elts[j], j << 4);
+    CU_ASSERT_EQUAL(arr1->elts[n], n);
+
+    free_simple_array(arr1);
+}
+
+static void test_resize_larger(void)
+{
+    test_resize_larger_n(2);
+    test_resize_larger_n(3);
+    test_resize_larger_n(4);
+}
+
+
 
 test_suite_descr allocator_tests = {
     "allocator", NULL, NULL,
@@ -301,6 +369,9 @@ test_suite_descr allocator_tests = {
         TEST_DESCR(refcnt_destroy_alloc),
         TEST_DESCR(alloc_sizes),
         TEST_DESCR(alloc_free_sizes),
+        TEST_DESCR(copy_sizes),
+        TEST_DESCR(resize_smaller),
+        TEST_DESCR(resize_larger),
         {NULL, NULL}
     }
 };

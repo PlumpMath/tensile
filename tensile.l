@@ -41,10 +41,8 @@ _ { return TOK_WILDCARD; }
 "->" { return TOK_PUT; }
 "->>" { return TOK_PUT_ALL; }
 "^->" { return TOK_PUT_NEXT; }
-">>" { return TOK_SEQ; }
 "*?" { return TOK_PEEK; }
-"::" { return TOK_TYPECAST; }
-"?::" { return TOK_ISTYPE; }
+"::" { return TOK_ISTYPE; }
 ":=" { return TOK_ASSIGN; }
 "++" { return TOK_APPEND; }
 "--" { return TOK_CHOP; }
@@ -52,6 +50,7 @@ _ { return TOK_WILDCARD; }
 "//" { return TOK_SPLIT; }
 "<>" { return TOK_QUEUE; }
 "/"([^/\\]|\\.)+"/" { return TOK_REGEXP; }
+as { return TOK_TYPECAST; }
 assert { return TOK_ASSERT; }
 augment { return TOK_AUGMENT; }
 cold { return TOK_COLD; }
@@ -66,6 +65,7 @@ foreign { return TOK_FOREIGN; }
 freeze { return TOK_FREEZE; }
 generic { return TOK_GENERIC; }
 goto { return TOK_GOTO; }
+greedy { return TOK_GREEDY; }
 hook { return TOK_HOOK; }
 hot { return TOK_HOT; }
 idle { return TOK_IDLE; }
@@ -79,6 +79,7 @@ mod { return TOK_MOD; }
 module { return TOK_MODULE; }
 null { yylval->value = NULL_VALUE;  return TOK_NULL; }
 partition { return TOK_PARTITION; }
+poll { return TOK_POLL; }
 pragma { return TOK_PRAGMA; }
 prototype { return TOK_PROTOTYPE; }
 resume { return TOK_RESUME; }
