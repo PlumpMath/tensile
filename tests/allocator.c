@@ -350,6 +350,93 @@ static void test_resize_larger(void)
     test_resize_larger_n(4);
 }
 
+static void test_resize_larger_free(void)
+{
+    simple_array *arr = new_simple_array(2);
+    simple_array *arr1 = resize_simple_array(arr, 3);
+    simple_array *arr2 = new_simple_array(2);
+
+    CU_ASSERT_PTR_EQUAL(arr2, arr);
+    free_simple_array(arr1);
+    free_simple_array(arr2);
+}
+
+DECLARE_ARRAY_TYPE(simple_log_array, void *ptr; unsigned tag;, unsigned);
+DECLARE_ARRAY_ALLOCATOR(simple_log_array);
+
+
+DEFINE_ARRAY_ALLOCATOR(simple_log_array, log2, 4, arr, i,
+                       {arr->tag = 0x12345;},
+                       {arr->elts[i] = i; },
+                       {NEW(arr)->tag = OLD(arr)->tag + 1; },
+                       {NEW(arr)->elts[i] = OLD(arr)->elts[i] + 1; },
+                       {NEW(arr)->tag = OLD(arr)->tag << 4; },
+                       {NEW(arr)->elts[i] = OLD(arr)->elts[i] << 4; },
+                       {arr->tag |= 0x80000000u; },
+                       {arr->tag = 0xdeadbeef; },
+                       {arr->elts[i] = 0xdeadbeef; });
+
+static void test_log2order(void)
+{
+    CU_ASSERT_EQUAL(log2_order(0), 0);
+    CU_ASSERT_EQUAL(log2_order(1), 0);
+    CU_ASSERT_EQUAL(log2_order(2), 1);
+    CU_ASSERT_EQUAL(log2_order(3), 2);
+    CU_ASSERT_EQUAL(log2_order(4), 2);
+    CU_ASSERT_EQUAL(log2_order(5), 3);    
+    CU_ASSERT_EQUAL(log2_order(65536), 16);
+}
+
+static void test_alloc_log2sizes(void)
+{
+    unsigned i;
+    simple_log_array *prev = NULL;
+
+    for (i = 0; i < 5; i++) 
+    {
+        simple_log_array *arr = new_simple_log_array(1u << i);
+
+        CU_ASSERT_PTR_NOT_NULL_FATAL(arr);
+        CU_ASSERT_PTR_NOT_EQUAL(arr, prev);
+        CU_ASSERT_EQUAL(arr->tag, 0x12345);
+        CU_ASSERT_EQUAL(arr->nelts, 1u << i);
+
+        free_simple_log_array(arr);
+        if (i != 4) 
+        {
+            CU_ASSERT_EQUAL(arr->tag, 0xdeadbeef);
+        }
+        prev = arr;
+    }
+}
+
+static void test_alloc_free_log2sizes(void)
+{
+    unsigned i;
+
+    for (i = 2; i < 4; i++) 
+    {
+        simple_log_array *arr = new_simple_log_array(1u << i);
+        simple_log_array *arr1;
+
+        free_simple_log_array(arr);
+        arr1 = new_simple_log_array((1u << i) - 1);
+        CU_ASSERT_PTR_EQUAL(arr, arr1);
+        free_simple_log_array(arr1);
+    }
+}
+
+static void test_resize_larger_log2(void)
+{
+    simple_log_array *arr = new_simple_log_array(9);
+    simple_log_array *arr1 = resize_simple_log_array(arr, 10);
+
+    CU_ASSERT_PTR_EQUAL(arr, arr1);
+    CU_ASSERT_EQUAL(arr1->nelts, 10);
+    CU_ASSERT_EQUAL(arr1->elts[9], 9);
+
+    free_simple_log_array(arr1);
+}
 
 
 test_suite_descr allocator_tests = {
@@ -372,6 +459,11 @@ test_suite_descr allocator_tests = {
         TEST_DESCR(copy_sizes),
         TEST_DESCR(resize_smaller),
         TEST_DESCR(resize_larger),
+        TEST_DESCR(resize_larger_free),
+        TEST_DESCR(log2order),
+        TEST_DESCR(alloc_log2sizes),
+        TEST_DESCR(alloc_free_log2sizes),
+        TEST_DESCR(resize_larger_log2),
         {NULL, NULL}
     }
 };

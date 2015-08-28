@@ -305,8 +305,8 @@ static inline void *frlmalloc(size_t sz)
 #define linear_size(_x) (_x)
 static inline unsigned log2_order(unsigned x)
 {
-    return ((unsigned)sizeof(unsigned) * CHAR_BIT -
-            count_leading_zeroes(x - 1));
+    return x ? ((unsigned)sizeof(unsigned) * CHAR_BIT -
+                count_leading_zeroes(x - 1)) : 0;
 }
 #define log2_size(_x) (1u << (_x))
 
