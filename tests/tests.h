@@ -47,6 +47,7 @@ typedef struct test_suite_descr {
 
 extern test_suite_descr support_tests;
 extern test_suite_descr allocator_tests;
+extern test_suite_descr stack_tests;
 
 
 #ifdef __cplusplus

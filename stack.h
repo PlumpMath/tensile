@@ -36,7 +36,7 @@ extern "C"
 #include "allocator.h"
 
 #define DECLARE_STACK_TYPE(_type, _eltype)              \
-    DECLARE_ARRAY_TYPE(_type, unsigned top; _eltype)
+    DECLARE_ARRAY_TYPE(_type, unsigned top;, _eltype)
 
 #define DECLARE_STACK_OPS(_type, _eltype,                           \
                           _popfunc, _pushfunc, _grow)               \
@@ -70,6 +70,37 @@ extern "C"
                                                                         \
     DECLARE_STACK_OPS(_type, _eltype *, trivial_pop, do_push_##_type, _grow)
     
+#if IMPLEMENT_STACK
+
+#define DEFINE_STACK_OPS(_type, _scale, _maxsize, _var, _idxvar,        \
+                         _inite, _clonee, _finie)                       \
+    DEFINE_ARRAY_ALLOCATOR(_type, _scale, _maxsize, _var, _idxvar,      \
+                           { _var->top = 0; }, _inite,                  \
+                           {}, _clonee, {}, {}, {},                     \
+                           { clear_##_type(_var); }, {});               \
+                                                                        \
+    void clear_##_type(_type *_var)                                     \
+    {                                                                   \
+        unsigned _idxvar;                                               \
+                                                                        \
+        for (_idxvar = 0; _idxvar < _var->top; _idxvar++)               \
+        {                                                               \
+            _finie;                                                     \
+            _inite;                                                     \
+        }                                                               \
+        _var->top = 0;                                                  \
+    }                                                                   \
+    struct fake
+
+#define DEFINE_STACK_REFCNT_OPS(_type, _eltype, _scale, _maxsize)       \
+    DEFINE_STACK_OPS(_type, _scale, _maxsize, stk, i,                   \
+                     { stk->elts[i] = NULL; },                          \
+                     { NEW(stk)->elts[i] =                              \
+                         use_##_eltype(OLD(stk)->elts[i]); }            \
+                     { free_##_eltype(stk->elts[i]); })
+
+#endif
+
 
 #ifdef __cplusplus
 }

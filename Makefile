@@ -17,7 +17,7 @@ MFLAGS = -MM -MT $(<:.c=.o)
 
 C_SOURCES = tensile.tab.c lex.yy.c
 
-TESTS = allocator support
+TESTS = allocator support stack
 
 C_TEST_SOURCES = tests/engine.c
 C_TEST_SOURCES += $(patsubst %,tests/%.c,$(TESTS))
