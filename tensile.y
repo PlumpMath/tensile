@@ -29,38 +29,39 @@
 %token TOK_IMPORT
 %token TOK_PROTOTYPE
 %token TOK_PARTITION
-%token TOK_PRAGMA                        
+%token TOK_PRAGMA
 %token TOK_INCLUDE
 %token TOK_HOOK
 %token TOK_AUGMENT
-%token TOK_FOREIGN
+
 
 %nonassoc ':'
 %left ';'                      
 %left ','
-%nonassoc TOK_RULE                        
+%nonassoc TOK_RULE
+%nonassoc TOK_FOREIGN                        
 %nonassoc TOK_ASSIGN
 %right TOK_THEN                        
 %nonassoc TOK_HOT TOK_COLD TOK_IDLE TOK_GREEDY
 %nonassoc TOK_ELSE
-%right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_GENERIC TOK_SELECT TOK_WITH TOK_FREEZE TOK_WATCH
-%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_YIELD TOK_ERROR TOK_GOTO TOK_ASSERT TOK_POLL
+%right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_GENERIC TOK_SELECT TOK_FREEZE TOK_WATCH
+%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_RETURN TOK_YIELD TOK_ERROR TOK_GOTO TOK_ASSERT TOK_EXPECT 
 %right TOK_PUT TOK_PUT_ALL TOK_PUT_NEXT 
 %left '='
 %right '?'
 %nonassoc TOK_MATCH_BINDING
-%nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH TOK_IN TOK_ISTYPE
 %left '|' 
 %left '&'
+%nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH TOK_IN TOK_ISTYPE
 %left TOK_MAX TOK_MIN 
 %left '+' '-' TOK_APPEND TOK_CHOP 
 %left '*' '/' TOK_DIV TOK_MOD TOK_INTERSPERSE TOK_SPLIT
 %right '^'
-%nonassoc TOK_TYPECAST
+%left TOK_TYPECAST
 %left '[' 
-%right '!' TOK_SIZEOF TOK_TRACING TOK_PEEK TOK_UMINUS
+%right '!' TOK_TRACING TOK_PEEK TOK_UMINUS
 %left '.'
-%nonassoc TOK_ID
+%nonassoc TOK_ID TOK_REGEXP
 %{
 extern int yylex(YYSTYPE* yylval_param, YYLTYPE * yylloc_param, exec_context *context);
 static void yyerror(YYLTYPE * yylloc_param, exec_context *context, const char *msg);
@@ -132,11 +133,7 @@ moduleelse:   /*empty*/
         |       TOK_ELSE '{' modulecontents '}'
                 ;
 
-moduleforeign: TOK_FOREIGN strings
-                ;
-
-strings:  TOK_STRING
-        | strings TOK_STRING
+moduleforeign: TOK_FOREIGN TOK_STRING
                 ;
 
 scope:          /*empty*/
@@ -176,7 +173,6 @@ nodekind:     /*empty*/
         ;
 
 nodedef:        instantiate ';'
-        |       foreignnode ';'
         |       nodeblock
                 ;
 
@@ -203,9 +199,6 @@ instanceargs:   instancearg
         ;
 
 instancearg:    TOK_ID TOK_ASSIGN expression
-                ;
-
-foreignnode: TOK_FOREIGN '(' TOK_ID ')' strings
                 ;
 
 nodeblock:   '{' sequence  '}'
@@ -256,7 +249,6 @@ expression: literal
         |       '-' expression %prec TOK_UMINUS 
         |       '*' expression %prec TOK_UMINUS 
         |       '^' expression %prec TOK_UMINUS
-        |       TOK_SIZEOF expression
         |       TOK_TRACING expression
         |       '?' expression  %prec TOK_UMINUS
         |       '!' expression
@@ -301,13 +293,13 @@ expression: literal
         |       TOK_YIELD expression
         |       TOK_ERROR expression
         |       TOK_ASSERT expression
-        |       TOK_POLL expression
+        |       TOK_EXPECT expression
         |       TOK_GOTO TOK_ID
+        |       TOK_RETURN
         |       TOK_IF '(' expression ')' expression %prec TOK_IF
         |       TOK_WHILE '(' expression ')' expression %prec TOK_WHILE
         |       TOK_FOR '(' bindings ';' expression ';' bindings ')' expression %prec TOK_FOR
         |       TOK_FOREACH '(' foreach_spec ')' expression %prec TOK_FOREACH
-        |       TOK_WITH '(' TOK_ID ')' expression %prec TOK_WITH
         |       TOK_FREEZE '(' expression ')' expression %prec TOK_FREEZE
         |       TOK_SWITCH '(' expression ')' '{' alternatives '}'
         |       TOK_SELECT '{' select_alternatives '}'
@@ -317,6 +309,7 @@ expression: literal
         |       TOK_COLD expression
         |       TOK_IDLE expression
         |       TOK_GREEDY expression
+        |       TOK_FOREIGN  TOK_ID '(' exprlist0 ')' TOK_STRING %prec TOK_FOREIGN
                 ;
 
 anonymous_node: '@' noderef block
@@ -356,8 +349,12 @@ assoclist:      assoc
         |       assoclist ',' assoc
                 ;
 
-assoc:          TOK_ID TOK_RULE expression
+assoc:          assockey TOK_RULE expression
                 ;
+
+assockey:       TOK_ID
+        |       literal
+        ;
 
 foreach_spec:   generators foreach_dest
         ;
@@ -421,6 +418,7 @@ pattern:        TOK_ID
         |       TOK_ID TOK_ASSIGN pattern 
         |       TOK_ID '(' patternlist0 ')' %prec '('
         |       '[' patternlist ']'
+        |       '[' patternassoclist ']'
         ;
 
 patternlist0: /*empty*/
@@ -429,6 +427,17 @@ patternlist0: /*empty*/
 
 patternlist:    pattern
         |       patternlist ',' pattern
+        ;
+
+patternassoclist:   patternassoc
+        |       patternassoclist ',' patternassoc
+        ;
+
+patternassoc:   passockey TOK_RULE pattern
+        ;
+
+passockey:      assockey
+        |       TOK_WILDCARD
         ;
 
 literal:        TOK_STRING

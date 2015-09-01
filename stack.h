@@ -29,11 +29,47 @@ extern "C"
 {
 #endif
 
+#if defined(IMPLEMENT_STACK) && !defined(IMPLEMENT_ALLOCATOR)
+#define IMPLEMENT_ALLOCATOR 1
+#endif
+
 #include "allocator.h"
 
-#define DECLARE_STACK_TYPE(_type, _eltype) \
-    DECLARE_ARRAY_TYPE
+#define DECLARE_STACK_TYPE(_type, _eltype)              \
+    DECLARE_ARRAY_TYPE(_type, unsigned top; _eltype)
 
+#define DECLARE_STACK_OPS(_type, _eltype,                           \
+                          _popfunc, _pushfunc, _grow)               \
+    DECLARE_ARRAY_ALLOCATOR(_type);                                 \
+    extern void clear_##_type(_type *stk) ATTR_NONNULL;             \
+                                                                    \
+    ATTR_NONNULL                                                    \
+    static inline _eltype pop_##_type(_type *stk)                   \
+    {                                                               \
+        assert(stk->top > 0);                                       \
+        return _popfunc(&stk->elts[--stk->top]);                    \
+    }                                                               \
+                                                                    \
+    ATTR_NONNULL_1ST                                                \
+    static inline void push_##_type(_type **stk,                    \
+                                    _eltype item)                   \
+    {                                                               \
+        *stk = ensure_##_type##_size(*stk, (*stk)->top + 1, _grow); \
+        _pushfunc(&(*stk)->elts[(*stk)->top++], &item);             \
+    }                                                               \
+    struct fake
+
+#define trivial_pop(_x) (*(_x))
+#define trivial_push(_x, _y) ((void)(*(_x) = *(_y)))
+
+#define DECLARE_STACK_REFCNT_OPS(_type, _eltype, _grow)                 \
+    static inline void do_push_##type(_eltype **dst, const _eltype **src) \
+    {                                                                   \
+        *dst = use_##_eltype(*src);                                     \
+    }                                                                   \
+                                                                        \
+    DECLARE_STACK_OPS(_type, _eltype *, trivial_pop, do_push_##_type, _grow)
+    
 
 #ifdef __cplusplus
 }

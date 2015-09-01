@@ -57,6 +57,7 @@ cold { return TOK_COLD; }
 div { return TOK_DIV; }
 else { return TOK_ELSE; }
 error { return TOK_ERROR; }
+expect { return TOK_EXPECT; }
 extern { return TOK_EXTERN; }
 false { return TOK_FALSE; }
 for { return TOK_FOR; }
@@ -79,12 +80,11 @@ mod { return TOK_MOD; }
 module { return TOK_MODULE; }
 null { yylval->value = NULL_VALUE;  return TOK_NULL; }
 partition { return TOK_PARTITION; }
-poll { return TOK_POLL; }
 pragma { return TOK_PRAGMA; }
 prototype { return TOK_PROTOTYPE; }
 resume { return TOK_RESUME; }
+return { return TOK_RETURN; }
 select { return TOK_SELECT; }
-sizeof { return TOK_SIZEOF; }
 suspend { return TOK_SUSPEND; }
 switch { return TOK_SWITCH; }
 then { return TOK_THEN; }
@@ -92,7 +92,6 @@ tracing { return TOK_TRACING; }
 true { return TOK_TRUE; }
 watch { return TOK_WATCH; }
 while { return TOK_WHILE; }
-with { return TOK_WITH; }
 yield { return TOK_YIELD; }
 [+-]?[0-9]+ {
     return TOK_INTEGER;
@@ -116,6 +115,9 @@ yield { return TOK_YIELD; }
 
 \"([^\"\\]+|{ESCAPE})*\" {
     return TOK_STRING; }
+\<\#([^#]+|\#[^>])*\#\> {
+    return TOK_STRING;
+ }
 [[:alpha:]_][[:alnum:]_]* { 
     return TOK_ID; 
 }

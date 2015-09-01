@@ -62,9 +62,9 @@ extern "C"
                                                unsigned req,            \
                                                unsigned delta)          \
     {                                                                   \
-        if (_arr->nelts <= req)                                         \
-            return _arr;                                                \
-        return resize_##_type(_arr, _arr->nelts + delta);               \
+        if (_arr->nelts >= req)                                         \
+            return  _arr;                                               \
+        return resize_##_type(_arr, req + delta);                       \
     }                                                                   \
     struct fake
 
@@ -298,7 +298,9 @@ typedef struct freelist_t {
 ATTR_MALLOC
 static inline void *frlmalloc(size_t sz) 
 {
-    return malloc(sz > sizeof(freelist_t) ? sz : sizeof(freelist_t));
+    void *result = malloc(sz > sizeof(freelist_t) ? sz : sizeof(freelist_t));
+    assert(result != NULL);
+    return result;
 }
 
 #define linear_order(_x) (_x)
@@ -332,10 +334,10 @@ static inline unsigned log2_order(unsigned x)
                               { _var->refcnt = 1; _initc}, _inite,      \
                               { NEW(_var)->refcnt = 1; _clonec}, _clone, \
                               _adjustc, _adjuste,                       \
-                              {assert(_var->refcnt == 1; _resizec},     \
-                                  static inline void destroy_##_type,   \
-                              _finic, _finie)
-
+                              {assert(_var->refcnt == 1); _resizec},    \
+                              static inline void destroy_##_type,       \
+                              _finic, _finie);                          \
+    DEFINE_REFCNT_FREE(_type, _var)
 
 #endif // defined(ALLOCATOR_IMP)
   

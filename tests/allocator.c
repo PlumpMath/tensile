@@ -223,6 +223,20 @@ static void test_refcnt_destroy_alloc(void)
     CU_ASSERT_EQUAL(rt1->tag, 0xdeadbeef);    
 }
 
+static void test_refcnt_copy(void) 
+{
+    refcnt_type *rt = new_refcnt_type(0x12345);
+    refcnt_type *rt1 = copy_refcnt_type(rt);
+
+    CU_ASSERT_PTR_NOT_EQUAL(rt, rt1);
+    CU_ASSERT_EQUAL(rt->refcnt, 1);
+    CU_ASSERT_EQUAL(rt1->refcnt, 1);
+    CU_ASSERT_EQUAL(rt1->tag, 0x12346);
+    free_refcnt_type(rt1);
+    free_refcnt_type(rt);
+}
+
+
 DECLARE_ARRAY_TYPE(simple_array, void *ptr; unsigned tag;, unsigned);
 DECLARE_ARRAY_ALLOCATOR(simple_array);
 
@@ -438,6 +452,77 @@ static void test_resize_larger_log2(void)
     free_simple_log_array(arr1);
 }
 
+DECLARE_ARRAY_TYPE(refcnt_array,
+                   void *ptr; unsigned refcnt; unsigned tag;,
+                   unsigned);
+
+DECLARE_REFCNT_ARRAY_ALLOCATOR(refcnt_array);
+DEFINE_REFCNT_ARRAY_ALLOCATOR(refcnt_array,
+                              linear, 4, arr, i,
+                              {arr->tag = 0x12345;},
+                              {},
+                              {},
+                              {},
+                              {},
+                              {},
+                              {},
+                              {arr->tag = 0xdeadbeef; },
+                              {});
+
+static void test_refcnt_array_alloc_init_destroy(void) 
+{
+    refcnt_array *rt = new_refcnt_array(2);
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(rt);
+    CU_ASSERT_EQUAL(rt->tag, 0x12345);
+    CU_ASSERT_EQUAL(rt->nelts, 2);
+    CU_ASSERT_EQUAL(rt->refcnt, 1);
+    free_refcnt_array(rt);
+    CU_ASSERT_EQUAL(rt->tag, 0xdeadbeef);
+}
+
+static void test_refcnt_array_use_destroy(void) 
+{
+    refcnt_array *rt = new_refcnt_array(2);
+    refcnt_array *use = use_refcnt_array(rt);
+
+    CU_ASSERT_PTR_EQUAL(use, rt);
+    CU_ASSERT_EQUAL(use->refcnt, 2);
+    free_refcnt_array(rt);
+    CU_ASSERT_EQUAL(use->refcnt, 1);
+    CU_ASSERT_EQUAL(use->tag, 0x12345);
+    free_refcnt_array(use);
+    CU_ASSERT_EQUAL(use->tag, 0xdeadbeef);    
+}
+
+static void test_refcnt_array_copy(void) 
+{
+    refcnt_array *rt = new_refcnt_array(2);
+    refcnt_array *rt1 = copy_refcnt_array(rt);
+
+    CU_ASSERT_PTR_NOT_EQUAL(rt, rt1);
+    CU_ASSERT_EQUAL(rt->refcnt, 1);
+    CU_ASSERT_EQUAL(rt1->refcnt, 1);
+    CU_ASSERT_EQUAL(rt1->tag, 0x12345);
+    CU_ASSERT_EQUAL(rt1->nelts, 2);
+    free_refcnt_array(rt1);
+    free_refcnt_array(rt);
+}
+
+static void test_ensure_size(void)
+{
+    simple_array *arr = new_simple_array(2);
+    simple_array *arr1 = NULL;
+
+    arr1 = ensure_simple_array_size(arr, 1, 1);
+    CU_ASSERT_PTR_EQUAL(arr, arr1);
+    CU_ASSERT_EQUAL(arr->nelts, 2);
+    arr1 = ensure_simple_array_size(arr, 3, 2);
+    CU_ASSERT_PTR_NOT_EQUAL(arr, arr1);
+    CU_ASSERT_EQUAL(arr1->nelts, 5);
+
+    free_simple_array(arr1);
+}
 
 test_suite_descr allocator_tests = {
     "allocator", NULL, NULL,
@@ -454,6 +539,7 @@ test_suite_descr allocator_tests = {
         TEST_DESCR(refcnt_destroy),
         TEST_DESCR(refcnt_use_destroy),
         TEST_DESCR(refcnt_destroy_alloc),
+        TEST_DESCR(refcnt_copy),
         TEST_DESCR(alloc_sizes),
         TEST_DESCR(alloc_free_sizes),
         TEST_DESCR(copy_sizes),
@@ -464,6 +550,10 @@ test_suite_descr allocator_tests = {
         TEST_DESCR(alloc_log2sizes),
         TEST_DESCR(alloc_free_log2sizes),
         TEST_DESCR(resize_larger_log2),
+        TEST_DESCR(refcnt_array_alloc_init_destroy),
+        TEST_DESCR(refcnt_array_use_destroy),
+        TEST_DESCR(refcnt_array_copy),
+        TEST_DESCR(ensure_size),
         {NULL, NULL}
     }
 };
