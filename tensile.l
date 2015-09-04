@@ -5,9 +5,7 @@
 %{
 
 #include <stdlib.h>
-#include "engine.h"
 #include "tensile.tab.h"
-#include "ops.h"
 
 #define YY_DECL int yylex(YYSTYPE* yylval_param,    \
                           YYLTYPE * yylloc_param,   \

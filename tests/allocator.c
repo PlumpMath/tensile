@@ -317,6 +317,18 @@ static void test_copy_sizes(void)
     }
 }
 
+static void test_resize_null(void)
+{
+    simple_array *arr = resize_simple_array(NULL, 3);
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(arr);
+    CU_ASSERT_EQUAL(arr->nelts, 3);
+    CU_ASSERT_EQUAL(arr->tag, 0x12345);
+    CU_ASSERT_EQUAL(arr->elts[2], 2);
+
+    free_simple_array(arr);
+}
+
 static void test_resize_smaller_n(unsigned n)
 {
     simple_array *arr = new_simple_array(n);
@@ -543,6 +555,7 @@ test_suite_descr allocator_tests = {
         TEST_DESCR(alloc_sizes),
         TEST_DESCR(alloc_free_sizes),
         TEST_DESCR(copy_sizes),
+        TEST_DESCR(resize_null),
         TEST_DESCR(resize_smaller),
         TEST_DESCR(resize_larger),
         TEST_DESCR(resize_larger_free),

@@ -4,6 +4,8 @@ RM = rm -f
 BISON = bison -d
 FLEX = flex
 PKGCONFIG = pkg-config
+DOXYGEN = doxygen
+ETAGS = ctags-exuberant -e -R --exclude='doc/*' --exclude='tests/*'
 
 CFLAGS = -ggdb3 -fstack-protector -W -Wall -Werror -Wmissing-declarations -Wformat=2 -Winit-self -Wuninitialized \
 	-Wsuggest-attribute=pure -Wsuggest-attribute=const -Wconversion -Wstack-protector -Wpointer-arith -Wwrite-strings \
@@ -17,7 +19,7 @@ MFLAGS = -MM -MT $(<:.c=.o)
 
 C_SOURCES = tensile.tab.c lex.yy.c
 
-TESTS = allocator support stack
+TESTS = allocator support stack queue
 
 C_TEST_SOURCES = tests/engine.c
 C_TEST_SOURCES += $(patsubst %,tests/%.c,$(TESTS))
@@ -49,6 +51,14 @@ lex.yy.o lex.yy.d : lex.yy.c tensile.tab.h
 
 include $(C_SOURCES:.c=.d)
 include $(C_TEST_SOURCES:.c=.d)
+
+.PHONY : doc
+doc :
+	$(DOXYGEN) Doxyfile
+
+TAGS : $(C_SOURCES)
+	$(ETAGS)
+
 
 .PHONY : clean
 clean :

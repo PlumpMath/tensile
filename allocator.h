@@ -55,7 +55,7 @@ extern "C"
 
 #define DECLARE_ARRAY_ALLOC_COMMON(_type)                               \
     extern _type *resize_##_type(_type *arr, unsigned newn)             \
-        ATTR_NONNULL_1ST ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT;  \
+        ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT;                   \
                                                                         \
     ATTR_NONNULL_1ST ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT       \
     static inline _type *ensure_##_type##_size(_type *_arr,             \
@@ -251,6 +251,9 @@ typedef struct freelist_t {
   {                                                                     \
     unsigned _idxvar;                                                   \
                                                                         \
+    if (_var == NULL)                                                   \
+        return new_##_type(_newn);                                      \
+                                                                        \
     for (_idxvar = _newn; _idxvar < _var->nelts; _idxvar++)             \
     {                                                                   \
         _finie;                                                         \
@@ -295,7 +298,7 @@ typedef struct freelist_t {
   }                                                                     \
   struct fake
 
-ATTR_MALLOC
+ATTR_MALLOC ATTR_RETURNS_NONNULL
 static inline void *frlmalloc(size_t sz) 
 {
     void *result = malloc(sz > sizeof(freelist_t) ? sz : sizeof(freelist_t));

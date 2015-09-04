@@ -63,7 +63,8 @@ extern "C"
 #define trivial_push(_x, _y) ((void)(*(_x) = *(_y)))
 
 #define DECLARE_STACK_REFCNT_OPS(_type, _eltype, _grow)                 \
-    static inline void do_push_##type(_eltype **dst, const _eltype **src) \
+    ATTR_NONNULL                                                        \
+    static inline void do_push_##_type(_eltype **dst, _eltype **src)    \
     {                                                                   \
         *dst = use_##_eltype(*src);                                     \
     }                                                                   \
@@ -96,7 +97,7 @@ extern "C"
     DEFINE_STACK_OPS(_type, _scale, _maxsize, stk, i,                   \
                      { stk->elts[i] = NULL; },                          \
                      { NEW(stk)->elts[i] =                              \
-                         use_##_eltype(OLD(stk)->elts[i]); }            \
+                             use_##_eltype(OLD(stk)->elts[i]); },       \
                      { free_##_eltype(stk->elts[i]); })
 
 #endif

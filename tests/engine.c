@@ -60,7 +60,8 @@ int main(int argc ATTR_UNUSED, char *argv[] ATTR_UNUSED)
 
     add_test_suite(&support_tests);
     add_test_suite(&allocator_tests);
-    add_test_suite(&stack_tests);    
+    add_test_suite(&stack_tests);
+    add_test_suite(&queue_tests);
     
     CU_basic_set_mode(CU_BRM_VERBOSE);
     CU_basic_run_tests();
