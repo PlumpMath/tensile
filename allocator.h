@@ -16,7 +16,7 @@
  * Boston, MA 02110-1301, USA.
  *
  */
-/**
+/** @file
  * @brief fast object allocation macros
  *
  * @author Artem V. Andreev <artem@AA5779.spb.edu>
@@ -33,6 +33,9 @@ extern "C"
 #include <limits.h>
 #include "support.h"
 
+/**
+ * Generates declarations for freelist-based typed memory allocations
+ */
 #define DECLARE_TYPE_ALLOCATOR(_type, _args)                            \
     extern _type *new_##_type _args                                     \
     ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL;                       \
@@ -40,6 +43,10 @@ extern "C"
     extern _type *copy_##_type(const _type *_oldobj)                    \
         ATTR_NONNULL ATTR_RETURNS_NONNULL
 
+/**
+ * Generates declarations for freelist-based typed memory allocations
+ * which are reference-counted
+ */
 #define DECLARE_REFCNT_ALLOCATOR(_type, _args)                          \
     DECLARE_TYPE_ALLOCATOR(_type, _args);                               \
     static inline _type *use_##_type(_type *val)                        \
@@ -50,9 +57,17 @@ extern "C"
     }                                                                   \
     struct fake
 
+/**
+ * Generates a declaration for a function to pre-allocate a free-list
+ */
 #define DECLARE_TYPE_PREALLOC(_type)                    \
     extern void preallocate_##_type##s(unsigned size)
 
+/** @cond DEV */
+
+/**
+ * Generate declarations for specific array-handling functions
+ */
 #define DECLARE_ARRAY_ALLOC_COMMON(_type)                               \
     extern _type *resize_##_type(_type *arr, unsigned newn)             \
         ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT;                   \
@@ -68,15 +83,28 @@ extern "C"
     }                                                                   \
     struct fake
 
+/** @endcond */
+
+
+/**
+ * Generate declarations for free-list based array allocations
+ */
 #define DECLARE_ARRAY_ALLOCATOR(_type)              \
     DECLARE_TYPE_ALLOCATOR(_type, (unsigned n));    \
     DECLARE_ARRAY_ALLOC_COMMON(_type)       
 
+/**
+ * Generate declarations for free-list based array allocations
+ * which are reference-counted
+ */
 #define DECLARE_REFCNT_ARRAY_ALLOCATOR(_type)           \
     DECLARE_REFCNT_ALLOCATOR(_type, (unsigned n));      \
     DECLARE_ARRAY_ALLOC_COMMON(_type)
 
-
+/**
+ * Generate a declaration for an array usable with
+ * DECLARE_ARRAY_ALLOCATOR() and DECLARE_REFCNT_ARRAY_ALLOCATOR()
+ */
 #define DECLARE_ARRAY_TYPE(_name, _contents, _eltype)   \
     typedef struct _name                                \
     {                                                   \
@@ -86,16 +114,36 @@ extern "C"
     } _name
     
 
-#if defined(IMPLEMENT_ALLOCATOR)
+#if defined(IMPLEMENT_ALLOCATOR) || defined(__DOXYGEN__)
 
+/** @cond DEV */
+
+/**
+ * Generic free list
+ */
 typedef struct freelist_t {
     struct freelist_t * chain;
 } freelist_t;
 
+/** @endcond */
 
+
+/**
+ * A helpers to reference old objects in clone and resize handlers
+ */
 #define OLD(_var) old_##_var
+
+/**
+ * A helpers to reference old objects in clone and resize handlers
+ */
 #define NEW(_var) new_##_var
 
+/** @cond DEV */
+
+/**
+ * Generates definitions for allocator functions declared per
+ * DECLARE_TYPE_ALLOCATOR()
+ */
 #define DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var, _init, _clone,     \
                                  _destructor, _fini)                    \
     static freelist_t *freelist_##_type;                                \
@@ -140,6 +188,8 @@ typedef struct freelist_t {
         freelist_##_type = (freelist_t *)_var;                          \
     }                                                                   \
     struct fake
+
+/** @endcond */
 
 #define DEFINE_TYPE_ALLOCATOR(_type, _args, _var, _init, _clone, _fini) \
     DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var, _init, _clone,         \
@@ -314,6 +364,18 @@ static inline unsigned log2_order(unsigned x)
                 count_leading_zeroes(x - 1)) : 0;
 }
 #define log2_size(_x) (1u << (_x))
+
+#define DEFINE_LINEAR_SCALE(_n)                                 \
+    static inline unsigned linear##_n##_order(unsigned x)       \
+    {                                                           \
+        return x / (_n);                                        \
+    }                                                           \
+                                                                \
+    static inline unsigned linear##_n##_size(unsigned order)    \
+    {                                                           \
+        return (order + 1) * (_n);                              \
+    }                                                           \
+    struct fake
 
 
 #define DEFINE_ARRAY_ALLOCATOR(_type, _scale, _maxsize, _var, _idxvar,  \

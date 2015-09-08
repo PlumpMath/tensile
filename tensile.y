@@ -251,6 +251,7 @@ expression: literal
         |       '^' expression %prec TOK_UMINUS
         |       TOK_TRACING expression
         |       '?' expression  %prec TOK_UMINUS
+        |       '&' expression  %prec TOK_UMINUS
         |       '!' expression
         |       TOK_PEEK expression
         |       expression '+' expression 
@@ -270,7 +271,7 @@ expression: literal
         |       expression TOK_INTERSPERSE expression
         |       expression TOK_CHOP expression
         |       expression TOK_SPLIT expression
-        |       expression TOK_TYPECAST TOK_ID
+        |       expression TOK_TYPECAST typename
         |       expression TOK_THEN expression                
         |       expression TOK_EQ expression
         |       expression TOK_NE expression
@@ -314,6 +315,7 @@ expression: literal
 
 anonymous_node: '@' noderef block
         |       '@' TOK_FOR  '(' bindings ';' expression0 ';' bindings ')' expression %prec TOK_FOR
+        |       '@' TOK_FOREACH '(' foreach_spec ')' expression %prec TOK_FOREACH
                 ;
 
 expression0:    /*empty*/
@@ -406,8 +408,12 @@ generic_alternative: typechoice TOK_RULE expression
         |       TOK_ELSE TOK_RULE expression
         ;
 
-typechoice:     TOK_ID
-        |       typechoice '|' TOK_ID
+typechoice:     typename
+        |       typechoice '|' typename %prec '.'
+        ;
+
+typename:       TOK_ID
+        |       '&' expression
         ;
 
 pattern:        TOK_ID

@@ -16,7 +16,7 @@
  * Boston, MA 02110-1301, USA.
  *
  */
-/**
+/** @file
  * @brief general-purpose tagged lists
  *
  * @author Artem V. Andreev <artem@AA5779.spb.edu>
@@ -28,6 +28,8 @@
 extern "C"
 {
 #endif
+
+#include <stdbool.h>
 
 #if defined(IMPLEMENT_TAGLIST) && !defined(IMPLEMENT_ALLOCATOR)
 #define IMPLEMENT_ALLOCATOR 1
@@ -67,15 +69,16 @@ extern "C"
                 _body;                                          \
             }                                                   \
         }                                                       \
-    } while(1)
-
+    } while(0)
 
 #define DECLARE_TAGLIST_REFCNT_OPS(_type, _valtype)                     \
+    DECLARE_TAGLIST_OPS(_type, _valtype *);                             \
+                                                                        \
     ATTR_NONNULL_1ST ATTR_WARN_UNUSED_RESULT                            \
     static inline _valtype *get_##_type(_type *list, unsigned tag)      \
     {                                                                   \
-        _valtype **loc = lookup_##_type(list, tag, false);              \
-        return loc ? use_##_type(*loc) : NULL;                          \
+        _valtype **loc = lookup_##_type(&list, tag, false);             \
+        return loc ? use_##_valtype(*loc) : NULL;                       \
     }                                                                   \
                                                                         \
                                                                         \
@@ -88,7 +91,7 @@ extern "C"
                                                                         \
         assert(loc != NULL);                                            \
         prev = *loc;                                                    \
-        *loc = use_##_type(obj);                                        \
+        *loc = use_##_valtype(obj);                                     \
         return prev;                                                    \
     }                                                                   \
                                                                         \
@@ -101,8 +104,8 @@ extern "C"
 
 #if defined(IMPLEMENT_TAGLIST)
 
-#define DEFINE_TAGLIST_OPS(_type, _valtype, _maxsize, _grow, _var, _idxvar, \
-                           _inite, _clonee, _finie)                     \
+#define DEFINE_TAGLIST_OPS(_type, _valtype, _maxsize, _var, _idxvar,    \
+                           _inite, _clonee, _finie, _grow)              \
     DEFINE_ARRAY_ALLOCATOR(_type, linear, _maxsize, _var, _idxvar,      \
                            {},                                          \
                            { _var->elts[_idxvar].tag = NULL_TAG; _inite; }, \
@@ -149,10 +152,23 @@ extern "C"
         {                                                               \
             if (_var->elts[_idxvar].tag == tag)                         \
             {                                                           \
-            }
-        }
-    }
-    
+                _var->elts[_idxvar].tag = 0;                            \
+                _finie;                                                 \
+                _inite;                                                 \
+                if (!all) break;                                        \
+            }                                                           \
+        }                                                               \
+    }                                                                   \
+    struct fake
+
+#define DEFINE_TAGLIST_REFCNT_OPS(_type, _valtype, _maxsize, _grow)     \
+    DEFINE_TAGLIST_OPS(_type, _valtype *, _maxsize, list, i,     \
+                       { list->elts[i].value = NULL; },                 \
+                       { NEW(list)->elts[i].value =                     \
+                               OLD(list)->elts[i].value; },             \
+                       { free_##_valtype(list->elts[i].value); },       \
+                       _grow)
+
 
 #endif
 

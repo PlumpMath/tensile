@@ -16,7 +16,7 @@
  * Boston, MA 02110-1301, USA.
  *
  */
-/**
+/** @file
  * @brief queue operations
  *
  * @author Artem V. Andreev <artem@AA5779.spb.edu>

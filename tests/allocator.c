@@ -16,15 +16,18 @@
  * Boston, MA 02110-1301, USA.
  *
  */
-/**
- * @author Artem V. Andreev <artem@AA5779.spb.edu>
+/** @file
+ *  @author Artem V. Andreev <artem@AA5779.spb.edu>
  */
 
 #include <stdlib.h>
 #include "tests.h"
+/** @cond OMIT */
 #define IMPLEMENT_ALLOCATOR 1
+/** @endcond */
 #include "allocator.h"
 
+/** @cond OMIT */
 typedef struct simple_type {
     void *ptr;
     unsigned tag;
@@ -36,7 +39,12 @@ DEFINE_TYPE_ALLOCATOR(simple_type, (unsigned tag), obj,
                       { obj->tag = tag; },
                       { NEW(obj)->tag = OLD(obj)->tag + 1; },
                       { obj->tag = 0xdeadbeef; });
+/** @endcond */
 
+/**
+ * @test Allocate an object 
+ * @invariant Verify it is initialized
+ */
 static void test_alloc_init(void) 
 {
     simple_type *st = new_simple_type(0x12345);
@@ -46,6 +54,10 @@ static void test_alloc_init(void)
     free_simple_type(st);
 }
 
+/**
+ * @test Allocate and deallocate an object.
+ * @invariant Verify it is properly finalized.
+ */
 static void test_destroy(void) 
 {
     simple_type *st = new_simple_type(0x12345);
@@ -54,6 +66,10 @@ static void test_destroy(void)
     CU_ASSERT_EQUAL(st->tag, 0xdeadbeef);
 }
 
+/**
+ * @test Allocate, deallocate and allocate an object
+ * @invariant Verify the object memory is reused
+ */
 static void test_destroy_alloc(void) 
 {
     simple_type *st = new_simple_type(0x12345);
@@ -110,7 +126,7 @@ static void test_dealloc_copy(void)
     free_simple_type(st2);
 }
 
-
+/** @cond OMIT */
 typedef struct simple_type2 {
     void *ptr;
 } simple_type2;
@@ -123,6 +139,7 @@ DEFINE_TYPE_ALLOCATOR(simple_type2, (), obj,
                       {},
                       {});
 DEFINE_TYPE_PREALLOC(simple_type2);
+/** @endcond */
 
 
 static void test_prealloc(void) 
@@ -464,6 +481,88 @@ static void test_resize_larger_log2(void)
     free_simple_log_array(arr1);
 }
 
+
+DEFINE_LINEAR_SCALE(2);
+
+DECLARE_ARRAY_TYPE(simple_linear2_array, void *ptr; unsigned tag;, unsigned);
+DECLARE_ARRAY_ALLOCATOR(simple_linear2_array);
+
+
+DEFINE_ARRAY_ALLOCATOR(simple_linear2_array, linear2, 4, arr, i,
+                       {arr->tag = 0x12345;},
+                       {arr->elts[i] = i; },
+                       {NEW(arr)->tag = OLD(arr)->tag + 1; },
+                       {NEW(arr)->elts[i] = OLD(arr)->elts[i] + 1; },
+                       {NEW(arr)->tag = OLD(arr)->tag << 4; },
+                       {NEW(arr)->elts[i] = OLD(arr)->elts[i] << 4; },
+                       {arr->tag |= 0x80000000u; },
+                       {arr->tag = 0xdeadbeef; },
+                       {arr->elts[i] = 0xdeadbeef; });
+
+static void test_linear2order(void)
+{
+    CU_ASSERT_EQUAL(linear2_order(0), 0);
+    CU_ASSERT_EQUAL(linear2_order(1), 0);
+    CU_ASSERT_EQUAL(linear2_order(2), 1);
+    CU_ASSERT_EQUAL(linear2_order(3), 1);
+    CU_ASSERT_EQUAL(linear2_order(4), 2);
+    CU_ASSERT_EQUAL(linear2_order(5), 2);    
+    CU_ASSERT_EQUAL(linear2_order(65536), 32768);
+}
+
+static void test_alloc_linear2sizes(void)
+{
+    unsigned i;
+    simple_linear2_array *prev = NULL;
+
+    for (i = 0; i < 5; i++) 
+    {
+        simple_linear2_array *arr = new_simple_linear2_array(i * 2);
+
+        CU_ASSERT_PTR_NOT_NULL_FATAL(arr);
+        CU_ASSERT_PTR_NOT_EQUAL(arr, prev);
+        CU_ASSERT_EQUAL(arr->tag, 0x12345);
+        CU_ASSERT_EQUAL(arr->nelts, i * 2);
+
+        free_simple_linear2_array(arr);
+        if (i != 4) 
+        {
+            CU_ASSERT_EQUAL(arr->tag, 0xdeadbeef);
+        }
+        prev = arr;
+    }
+}
+
+static void test_alloc_free_linear2sizes(void)
+{
+    unsigned i;
+
+    for (i = 0; i < 4; i++) 
+    {
+        simple_linear2_array *arr = new_simple_linear2_array(i * 2);
+        simple_linear2_array *arr1;
+
+        free_simple_linear2_array(arr);
+        arr1 = new_simple_linear2_array(i * 2 + 1);
+        CU_ASSERT_PTR_EQUAL(arr, arr1);
+        free_simple_linear2_array(arr1);
+    }
+}
+
+static void test_resize_larger_linear2(void)
+{
+    simple_linear2_array *arr = new_simple_linear2_array(8);
+    simple_linear2_array *arr1 = resize_simple_linear2_array(arr, 9);
+
+    CU_ASSERT_PTR_EQUAL(arr, arr1);
+    CU_ASSERT_EQUAL(arr1->nelts, 9);
+    CU_ASSERT_EQUAL(arr1->elts[8], 8);
+
+    free_simple_linear2_array(arr1);
+}
+
+
+
 DECLARE_ARRAY_TYPE(refcnt_array,
                    void *ptr; unsigned refcnt; unsigned tag;,
                    unsigned);
@@ -563,6 +662,10 @@ test_suite_descr allocator_tests = {
         TEST_DESCR(alloc_log2sizes),
         TEST_DESCR(alloc_free_log2sizes),
         TEST_DESCR(resize_larger_log2),
+        TEST_DESCR(linear2order),
+        TEST_DESCR(alloc_linear2sizes),
+        TEST_DESCR(alloc_free_linear2sizes),
+        TEST_DESCR(resize_larger_linear2),        
         TEST_DESCR(refcnt_array_alloc_init_destroy),
         TEST_DESCR(refcnt_array_use_destroy),
         TEST_DESCR(refcnt_array_copy),

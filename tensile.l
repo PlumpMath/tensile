@@ -38,7 +38,7 @@ _ { return TOK_WILDCARD; }
 "<-" { return TOK_IN; }
 "->" { return TOK_PUT; }
 "->>" { return TOK_PUT_ALL; }
-"^->" { return TOK_PUT_NEXT; }
+"?=" { return TOK_PUT_NEXT; }
 "*?" { return TOK_PEEK; }
 "::" { return TOK_ISTYPE; }
 ":=" { return TOK_ASSIGN; }

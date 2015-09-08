@@ -30,7 +30,7 @@ DECLARE_QUEUE_OPS(simple_queue, unsigned, trivial_dequeue);
 
 DEFINE_QUEUE_OPS(simple_queue, unsigned, linear, 16, q, i,
                  {q->elts[i] = 0; },
-                 {NEW(q->elts[i]) = OLD(q->elts[i]) + 1;},
+                 {NEW(q)->elts[i] = OLD(q)->elts[i] + 1;},
                  {q->elts[i] = 0xdeadbeef; },
                  trivial_enqueue, 4);
 

@@ -13,16 +13,14 @@ CFLAGS = -ggdb3 -fstack-protector -W -Wall -Werror -Wmissing-declarations -Wform
 CPPFLAGS = -I.
 LDFLAGS = -Wl,-export-dynamic
 LIBS = -lm -lfl -lunistring -ltre
-CUNIT_CPPFLAGS = 
-CUNIT_LIBS = -lcunit
+CHECK_CPPFLAGS = 
+CHECK_LIBS = -lcheck
 MFLAGS = -MM -MT $(<:.c=.o)
+CHECKMK = checkmk
 
 C_SOURCES = tensile.tab.c lex.yy.c
 
-TESTS = allocator support stack queue
-
-C_TEST_SOURCES = tests/engine.c
-C_TEST_SOURCES += $(patsubst %,tests/%.c,$(TESTS))
+TESTS = allocator support stack queue taglist
 
 APPLICATION = tensile
 TESTENGINE = tests/testengine
@@ -30,9 +28,11 @@ TESTENGINE = tests/testengine
 $(APPLICATION) : $(C_SOURCES:.c=.o)
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LIBS)
 
-$(TESTENGINE) : $(C_TEST_SOURCES:.c=.o)
-	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LIBS) $(CUNIT_LIBS)
+$(TESTENGINE) : tests/engine.o
+	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LIBS) $(CHECK_LIBS)
 
+tests/engine.c : $(patsubst %,tests/%.ts,$(TESTS))
+	$(CHECKMK) $^ >$@
 
 tensile.tab.h : tensile.tab.c
 	touch $@
@@ -42,7 +42,7 @@ tensile.tab.c : tensile.y
 
 tensile.tab.o lex.yy.o : CFLAGS += -Wno-conversion -Wno-unused-function -Wno-suggest-attribute=pure
 
-tests/%.o : CPPFLAGS += $(CUNIT_CPPFLAGS)
+tests/%.o : CPPFLAGS += $(CHECK_CPPFLAGS)
 
 lex.yy.c : tensile.l
 	$(FLEX) $<
@@ -50,7 +50,7 @@ lex.yy.c : tensile.l
 lex.yy.o lex.yy.d : lex.yy.c tensile.tab.h
 
 include $(C_SOURCES:.c=.d)
-include $(C_TEST_SOURCES:.c=.d)
+include tests/engine.d
 
 .PHONY : doc
 doc :
