@@ -162,10 +162,10 @@ extern "C"
     struct fake
 
 #define DEFINE_TAGLIST_REFCNT_OPS(_type, _valtype, _maxsize, _grow)     \
-    DEFINE_TAGLIST_OPS(_type, _valtype *, _maxsize, list, i,     \
+    DEFINE_TAGLIST_OPS(_type, _valtype *, _maxsize, list, i,            \
                        { list->elts[i].value = NULL; },                 \
                        { NEW(list)->elts[i].value =                     \
-                               OLD(list)->elts[i].value; },             \
+                               use_##_valtype(OLD(list)->elts[i].value); }, \
                        { free_##_valtype(list->elts[i].value); },       \
                        _grow)
 
