@@ -99,6 +99,8 @@ __ASSERT_CMP_INLINE_PACK(wstr, const wchar_t *, "%ls",
                          wcscmp(_arg1, _arg2) >= 0);
 __ASSERT_CMP_INLINE(ptr_eq, const void *, "%p", _arg1 == _arg2);
 __ASSERT_CMP_INLINE(ptr_neq, const void *, "%p", _arg1 != _arg2);
+__ASSERT_CMP_INLINE(bits_eq, unsigned long long, "%llx", _arg1 == _arg2);
+__ASSERT_CMP_INLINE(bits_neq, unsigned long long, "%llx", _arg1 != _arg2);
 
 #define ASSERT_INT_EQ(_arg1, _arg2)                 \
     __ASSERT_CMP_WRAP(int_eq, "==", _arg1, _arg2)
@@ -179,6 +181,11 @@ __ASSERT_CMP_INLINE(ptr_neq, const void *, "%p", _arg1 != _arg2);
     __ASSERT_CMP_WRAP(ptr_eq, "==", _arg1, _arg2)
 #define ASSERT_PTR_NEQ(_arg1, _arg2)                \
     __ASSERT_CMP_WRAP(ptr_neq, "!=", _arg1, _arg2)
+
+#define ASSERT_BITS_EQ(_arg1, _arg2)                 \
+    __ASSERT_CMP_WRAP(bits_eq, "==", _arg1, _arg2)
+#define ASSERT_BITS_NEQ(_arg1, _arg2)                \
+    __ASSERT_CMP_WRAP(bits_neq, "!=", _arg1, _arg2)
 
 
 #ifdef __cplusplus
