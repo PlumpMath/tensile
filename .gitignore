@@ -30,5 +30,7 @@
 lex.yy.c
 
 doc/*
+tests/*
+!tests/*.ts
 
 TAGS

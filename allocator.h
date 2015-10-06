@@ -20,6 +20,10 @@
  * @brief fast object allocation macros
  *
  * @author Artem V. Andreev <artem@AA5779.spb.edu>
+ * @test Background:
+ * @code
+ * #define IMPLEMENT_ALLOCATOR 1
+ * @endcode
  */
 #ifndef ALLOCATOR_H
 #define ALLOCATOR_H 1
@@ -34,7 +38,118 @@ extern "C"
 #include "support.h"
 
 /**
- * Generates declarations for freelist-based typed memory allocations
+ * Generates declarations for freelist-based typed memory allocations:
+ * - `_type *new_<_type>(_args)`
+ * - `void free_<_type>(void)`
+ * - `_type *copy_<_type>(const _type *obj)`
+ *
+ * @test Background:
+ * @code
+ * typedef struct simple_type {
+ *    void *ptr;
+ *    unsigned tag;
+ * } simple_type;
+ *
+ * DECLARE_TYPE_ALLOCATOR(simple_type, (unsigned tag));
+ *
+ * DEFINE_TYPE_ALLOCATOR(simple_type, (unsigned tag), obj,
+ * { obj->tag = tag; },
+ * { NEW(obj)->tag = OLD(obj)->tag + 1; },
+ * { obj->tag = 0xdeadbeef; });
+ * @endcode
+ * @test Allocate
+ * - Given a fresh object `simple_type *st = new_simple_type(0x12345);`
+ * - Then it is allocated `ASSERT_PTR_NEQ(st, NULL);`
+ * - And it is initialized `ASSERT_UINT_EQ(st->tag, 0x12345);`
+ * - Clean up `free_simple_type(st);`
+ * @test Allocate and free
+ * - Given an allocated object `simple_type *st = new_simple_type(0x12345);`
+ * - Then it is destroyed `free_simple_type(st);`
+ * - And the free list is in proper state `ASSERT_PTR_EQ(freelist_simple_type, st);`
+ * - And the object is finalized `ASSERT_UINT_EQ(st->tag, 0xdeadbeef);`
+ * @test Allocate, free and reallocate
+ * - Given an allocated object
+ * @code
+ * simple_type *st = new_simple_type(0x12345);
+ * simple_type *st1;
+ * @endcode
+ * - When it is destroyed `free_simple_type(st);`
+ * - And when another object is allocated `st1 = new_simple_type(0x54321);`
+ * - Then the memory is reused `ASSERT_PTR_EQ(st, st1);`
+ * - And the free list is in proper state `ASSERT_PTR_EQ(freelist_simple_type, NULL);`
+ * - And the new object is initialized `ASSERT_UINT_EQ(st1->tag, 0x54321);`
+ * - Clean up `free_simple_type(st1);`
+ * @test Allocate, free, reallocate and allocate another
+ * - Given an allocated object
+ * @code
+ * simple_type *st = new_simple_type(0x12345);
+ * simple_type *st1;
+ * simple_type *st2;
+ * @endcode
+ * - When it is destroyed `free_simple_type(st);`
+ * - And when a new object is allocated `st1 = new_simple_type(0x54321);`
+ * - Then the memory is reused `ASSERT_PTR_EQ(st, st1);`
+ * - When another object is allocated `st2 = new_simple_type(0);`
+ * - Then the memory is not reused `ASSERT_PTR_NEQ(st2, st1);`
+ * - Clean up:
+ * @code
+ * free_simple_type(st1);
+ * free_simple_type(st2);
+ * @endcode
+ * @test Copy
+ * - Given an allocated object
+ * @code
+ * simple_type *st = new_simple_type(0x12345);
+ * simple_type *st1;
+ * st->ptr = &st;
+ * @endcode
+ * - When it is copied `st1 = copy_simple_type(st);`
+ * - Then the memory is not shared `ASSERT_PTR_NEQ(st, st1);`
+ * - And the contents is copied `ASSERT_PTR_EQ(st1->ptr, st->ptr);`
+ * - And the copy hook is executed `ASSERT_UINT_EQ(st1->tag, 0x12346);`
+ * - Cleanup:
+ * @code
+ * free_simple_type(st);
+ * free_simple_type(st1);
+ * @endcode
+ * @test Deallocate and copy
+ * - Given two allocated objects
+ * @code
+ * simple_type *st = new_simple_type(0x12345);
+ * simple_type *st1 = new_simple_type(0);
+ * simple_type *st2;
+ * @endcode
+ * - When the first is freed `free_simple_type(st);`
+ * - And when the second is copied `st2 = copy_simple_type(st1);`
+ * - Then the memory of the first object is reused `ASSERT_PTR_EQ(st2, st);`
+ * - Clean up:
+ * @code
+ * free_simple_type(st1);
+ * free_simple_type(st2);
+ * @endcode
+ * @test
+ * Background:
+ * @code
+ *  typedef short small_type;
+ *
+ *  DECLARE_TYPE_ALLOCATOR(small_type, ());
+ *  DEFINE_TYPE_ALLOCATOR(small_type, (), obj,
+ *  {*obj = 0x1234;},
+ *  {}, {});
+ * @endcode
+ * @test Allocate and free small
+ * - Given a new small object:
+ * @code
+ * small_type *sm;
+ * small_type *sm1;
+ * sm = new_small_type();
+ * @endcode
+ * - Then it is initialized `ASSERT_INT_EQ(*sm, 0x1234);`
+ * - When it is freed `free_small_type(sm);`
+ * - And when a new object is allocated `sm1 = new_small_type();`
+ * - Then the memory is reused `ASSERT_PTR_EQ(sm, sm1);`
+ * - And the second object is initialized `ASSERT_INT_EQ(*sm1, 0x1234);`
+ * - Cleanup `free_small_type(sm1);`
  */
 #define DECLARE_TYPE_ALLOCATOR(_type, _args)                            \
     extern _type *new_##_type _args                                     \
@@ -43,9 +158,78 @@ extern "C"
     extern _type *copy_##_type(const _type *_oldobj)                    \
         ATTR_NONNULL ATTR_RETURNS_NONNULL
 
+
 /**
  * Generates declarations for freelist-based typed memory allocations
  * which are reference-counted
+ * - see DECLARE_TYPE_ALLOCATOR()
+ * - `_type *use_<_type>(_type *)`
+ *
+ * @test Background:
+ * @code
+ *  typedef struct refcnt_type {
+ *    unsigned refcnt;
+ *    void *ptr;
+ *    unsigned tag;
+ *  } refcnt_type;
+ *
+ * DECLARE_REFCNT_ALLOCATOR(refcnt_type, (unsigned tag));
+ * DEFINE_REFCNT_ALLOCATOR(refcnt_type, (unsigned tag), obj,
+ *                       {obj->tag = tag;},
+ *                       {NEW(obj)->tag = OLD(obj)->tag + 1;},
+ *                       {obj->tag = 0xdeadbeef;});
+ * @endcode
+ * @test Allocate refcounted
+ * - Given a fresh refcounted object `refcnt_type *rt = new_refcnt_type(0x12345);`
+ * - Then it is allocated `ASSERT_PTR_NEQ(rt, NULL);`
+ * - And it is initialized `ASSERT_UINT_EQ(rt->tag, 0x12345);`
+ * - And its ref counter is 1 `ASSERT_UINT_EQ(rt->refcnt, 1);`
+ * - Cleanup `free_refcnt_type(rt);`
+ * @test Allocate and free refcounted
+ * - Given a fresh refcounted object `refcnt_type *rt = new_refcnt_type(0x12345);`
+ * - When it is destroyed `free_refcnt_type(rt);`
+ * - Then it is finalized `ASSERT_UINT_EQ(rt->tag, 0xdeadbeef);`
+ * @test  Allocate, use and free refcounted
+ * - Given a fresh refcounted object
+ * `refcnt_type *rt = new_refcnt_type(0x12345);`
+ * - When it is referenced `refcnt_type *use = use_refcnt_type(rt);`
+ * - Then the referenced pointer is the same `ASSERT_PTR_EQ(use, rt);`
+ * - And the reference counter is incremented by 1 `ASSERT_UINT_EQ(use->refcnt, 2);`
+ * - When it is freed `free_refcnt_type(rt);`
+ * - Then the reference counter is decremented `ASSERT_UINT_EQ(use->refcnt, 1);`
+ * - But the object is not finalized `ASSERT_UINT_EQ(use->tag, 0x12345);`
+ * - When the object is freed again `free_refcnt_type(use);`
+ * - Then it is finalized `ASSERT_UINT_EQ(use->tag, 0xdeadbeef);`
+ * @test Allocate, free and reallocate refcounted
+ * - Given a fresh refcounted object
+ * @code
+ * refcnt_type *rt = new_refcnt_type(0x12345);
+ * refcnt_type *rt1;
+ * @endcode
+ * - When it is freed `free_refcnt_type(rt);`
+ * - And when the new object is allocated `rt1 = new_refcnt_type(0x54321);`
+ * - Then their pointers are the same `ASSERT_PTR_EQ(rt, rt1);`
+ * - And the reference counter is 1 `ASSERT_UINT_EQ(rt1->refcnt, 1);`
+ * - And the object is initialized `ASSERT_UINT_EQ(rt1->tag, 0x54321);`
+ * - When the copy is freed `free_refcnt_type(rt1);`
+ * - Then it is finitalized `ASSERT_UINT_EQ(rt1->tag, 0xdeadbeef);`
+ * @test Copy refcounted
+ * - Setup:
+ * refcnt_type *rt = new_refcnt_type(0x12345);
+ * refcnt_type *rt1 = copy_refcnt_type(rt);
+ * @endcode
+ * - refcnt_copy
+ * @code
+ * ASSERT_PTR_NEQ(rt, rt1);
+ * ASSERT_UINT_EQ(rt->refcnt, 1);
+ * ASSERT_UINT_EQ(rt1->refcnt, 1);
+ * ASSERT_UINT_EQ(rt1->tag, 0x12346);
+ * @endcode
+ * - Cleanup:
+ * @code
+ * free_refcnt_type(rt1);
+ * free_refcnt_type(rt);
+ * @endcode
  */
 #define DECLARE_REFCNT_ALLOCATOR(_type, _args)                          \
     DECLARE_TYPE_ALLOCATOR(_type, _args);                               \
@@ -59,11 +243,44 @@ extern "C"
 
 /**
  * Generates a declaration for a function to pre-allocate a free-list
+ * - `void preallocate_<_type>s(unsigned size)`
+ * @test Globals:
+ * @code
+  typedef struct simple_type2 {
+    void *ptr;
+  } simple_type2;
+
+
+  DECLARE_TYPE_ALLOCATOR(simple_type2, ());
+  DECLARE_TYPE_PREALLOC(simple_type2);
+
+  DEFINE_TYPE_ALLOCATOR(simple_type2, (), obj,
+                       {},
+                       {},
+                      {});
+  DEFINE_TYPE_PREALLOC(simple_type2);
+ * @endcode
+ * @test prealloc
+   @code
+    simple_type2 *st;
+    simple_type2 *st1;
+    simple_type2 *st2;
+
+    preallocate_simple_type2s(2);
+    st = new_simple_type2();
+    st1 = new_simple_type2();
+    st2 = new_simple_type2();
+    ASSERT_PTR_EQ(st1, st + 1);
+    ASSERT_PTR_NEQ(st2, st);
+    ASSERT_PTR_NEQ(st2, st1);
+    free_simple_type2(st);
+    free_simple_type2(st1);
+    free_simple_type2(st2));   
+ * @endcode
  */
 #define DECLARE_TYPE_PREALLOC(_type)                    \
     extern void preallocate_##_type##s(unsigned size)
 
-/** @cond DEV */
 
 /**
  * Generate declarations for specific array-handling functions
@@ -83,11 +300,212 @@ extern "C"
     }                                                                   \
     struct fake
 
-/** @endcond */
-
 
 /**
- * Generate declarations for free-list based array allocations
+ * Generate declarations for free-list based array allocations 
+ *
+ *
+ * @test Globals: 
+ * @code
+ enum simple_array_state {
+   SA_INITIALIZED = 0xabc,
+   SA_C
+ };
+
+ DECLARE_ARRAY_TYPE(simple_array, void *ptr; unsigned tag;, unsigned);
+ DECLARE_ARRAY_ALLOCATOR(simple_array);
+
+
+ DEFINE_ARRAY_ALLOCATOR(simple_array, linear, 4, arr, i,
+                       {arr->tag = 0x12345;},
+                       {arr->elts[i] = i; },
+                       {NEW(arr)->tag = OLD(arr)->tag + 1; },
+                       {NEW(arr)->elts[i] = OLD(arr)->elts[i] + 1; },
+                       {NEW(arr)->tag = OLD(arr)->tag << 4; },
+                       {NEW(arr)->elts[i] = OLD(arr)->elts[i] << 4; },
+                       {arr->tag |= 0x80000000u; },
+                       {arr->tag = 0xdeadbeef; },
+                       {arr->elts[i] = 0xdeadbeef; });
+static void test_resize_smaller_n(unsigned n)
+{
+    simple_array *arr = new_simple_array(n);
+    simple_array *arr1 = resize_simple_array(arr, n - 1);
+
+    ASSERT_PTR_EQ(arr, arr1);
+    ASSERT_UINT_EQ(arr->nelts, n - 1);
+    ASSERT_UINT_EQ(arr->tag, 0x80000000 | 0x12345);
+    FORALL(j, 0, n - 1, 
+        ASSERT_UINT_EQ(arr->elts[j], j));
+    ASSERT_UINT_EQ(arr->elts[n - 1], 0xdeadbeef);
+
+    free_simple_array(arr);
+}
+
+static void test_resize_larger_n(unsigned n)
+{
+    simple_array *arr = new_simple_array(n);
+    simple_array *arr1 = resize_simple_array(arr, n + 1);
+
+    ASSERT_PTR_NEQ(arr, arr1);
+    ASSERT_UINT_EQ(arr1->nelts, n + 1);
+    ASSERT_UINT_EQ(arr1->tag, 0x80000000 | 0x123450);
+    FORALL(j, 0, n, 
+       ASSERT_UINT_EQ(arr1->elts[j], j << 4));
+    ASSERT_UINT_EQ(arr1->elts[n], n);
+
+    free_simple_array(arr1);
+}
+
+ * @endcode
+ * @test 
+ * - Setup:
+ simple_array *prev = NULL;
+ * - For each `unsigned` `i` 
+ *   + `0` `1` `2` `3` `4`  
+ * alloc_sizes
+ * @code
+ * simple_array *arr = new_simple_array(i);
+ * unsigned j;
+ * ASSERT_PTR_NEQ(arr, NULL);
+ * ASSERT_PTR_NEQ(arr, prev);
+ * ASSERT_UINT_EQ(arr->tag, 0x12345);
+ * ASSERT_UINT_EQ(arr->nelts, i);
+ * for (j = 0; j < i; j++) ASSERT_UINT_EQ(arr->elts[j], j);
+ *
+ * free_simple_array(arr);
+ * if (i != 4)
+ * {
+ * ASSERT_UINT_EQ(arr->tag, 0xdeadbeef);
+ * for(j = 0; j < i; j++)  ASSERT_UINT_EQ(arr->elts[j], 0xdeadbeef));
+ * }
+ * prev = arr;
+ * @endcode
+ * @test 
+ * @code
+ TESTCASE(
+    FORALL(i, 0, 4,
+        simple_array *arr = new_simple_array(i);
+        simple_array *arr1;
+
+        free_simple_array(arr);
+        arr1 = new_simple_array(i);
+        ASSERT_PTR_EQ(arr, arr1);
+        free_simple_array(arr1);
+    ));
+ * @endcode
+ * @test
+ * @code
+ TESTCASE(copy_sizes, 
+    FORALL(i, 0, 5,
+        simple_array *arr = new_simple_array(i);
+        simple_array *arr1 = copy_simple_array(arr);
+
+        ASSERT_PTR_NEQ(arr, arr1);
+        ASSERT_UINT_EQ(arr1->tag, arr->tag + 1);
+        FORALL (j, 0, i,
+            ASSERT_UINT_EQ(arr1->elts[j], arr->elts[j] + 1));
+        free_simple_array(arr1);
+        ASSERT_UINT_EQ(arr->tag, 0x12345);
+        free_simple_array(arr);
+    ));
+ * @endcode
+ * @test
+ * @code
+ TESTCASE(resize_null, 
+    simple_array *arr = resize_simple_array(NULL, 3);
+
+    ASSERT_PTR_NEQ(arr, NULL);
+    ASSERT_UINT_EQ(arr->nelts, 3);
+    ASSERT_UINT_EQ(arr->tag, 0x12345);
+    ASSERT_UINT_EQ(arr->elts[2], 2);
+
+    free_simple_array(arr));
+ * @endcode
+ * @test
+ * @code
+ TESTCASE(resize_smaller,
+    test_resize_smaller_n(3);
+    test_resize_smaller_n(4);
+    test_resize_smaller_n(5));
+ * @endcode
+ * @test
+ * @code
+ TESTCASE(resize_larger,
+    test_resize_larger_n(2);
+    test_resize_larger_n(3);
+    test_resize_larger_n(4));
+ * @endcode
+ * @test
+ * @code
+ TESTCASE(resize_larger_free,
+    simple_array *arr = new_simple_array(2);
+    simple_array *arr1 = resize_simple_array(arr, 3);
+    simple_array *arr2 = new_simple_array(2);
+
+    ASSERT_PTR_EQ(arr2, arr);
+    free_simple_array(arr1);
+    free_simple_array(arr2));
+ * @endcode
+
+   );
+* @endcode
+ * @test
+ * @code
+   TESTCASE(alloc_log2sizes,
+    unsigned i;
+    simple_log_array *prev = NULL;
+
+    for (i = 0; i < 5; i++)
+    {
+        simple_log_array *arr = new_simple_log_array(1u << i);
+
+        ck_assert_ptr_ne(arr, NULL);
+        ck_assert_ptr_ne(arr, prev);
+        ck_assert_uint_eq(arr->tag, 0x12345);
+        ck_assert_uint_eq(arr->nelts, 1u << i);
+
+        free_simple_log_array(arr);
+        if (i != 4)
+        {
+            ck_assert_uint_eq(arr->tag, 0xdeadbeef);
+        }
+        prev = arr;
+    }
+
+   );
+* @endcode
+ * @test
+ * @code
+   TESTCASE(alloc_free_log2sizes,
+    unsigned i;
+
+    for (i = 2; i < 4; i++)
+    {
+        simple_log_array *arr = new_simple_log_array(1u << i);
+        simple_log_array *arr1;
+
+        free_simple_log_array(arr);
+        arr1 = new_simple_log_array((1u << i) - 1);
+        ck_assert_ptr_eq(arr, arr1);
+        free_simple_log_array(arr1);
+    }
+
+   );
+* @endcode
+ * @test
+ * @code
+   TESTCASE(resize_larger_log2,
+    simple_log_array *arr = new_simple_log_array(9);
+    simple_log_array *arr1 = resize_simple_log_array(arr, 10);
+
+    ASSERT_PTR_EQ(arr, arr1);
+    ASSERT_UINT_EQ(arr1->nelts, 10);
+    ASSERT_UINT_EQ(arr1->elts[9], 9);
+
+    free_simple_log_array(arr1);
+
+
+  @endcode
  */
 #define DECLARE_ARRAY_ALLOCATOR(_type)              \
     DECLARE_TYPE_ALLOCATOR(_type, (unsigned n));    \
@@ -122,11 +540,10 @@ extern "C"
  * Generic free list
  */
 typedef struct freelist_t {
-    struct freelist_t * chain;
+    struct freelist_t * chain; /**< Next free item */
 } freelist_t;
 
 /** @endcond */
-
 
 /**
  * A helpers to reference old objects in clone and resize handlers
@@ -139,10 +556,10 @@ typedef struct freelist_t {
 #define NEW(_var) new_##_var
 
 /** @cond DEV */
-
 /**
  * Generates definitions for allocator functions declared per
- * DECLARE_TYPE_ALLOCATOR()
+ * DECLARE_TYPE_ALLOCATOR() and family
+ * 
  */
 #define DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var, _init, _clone,     \
                                  _destructor, _fini)                    \
@@ -191,10 +608,19 @@ typedef struct freelist_t {
 
 /** @endcond */
 
+
+/** 
+ * Generates definitions for allocator functions declared per
+ * DECLARE_TYPE_ALLOCATOR()
+ */
 #define DEFINE_TYPE_ALLOCATOR(_type, _args, _var, _init, _clone, _fini) \
     DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var, _init, _clone,         \
                              void free_##_type, _fini)
 
+/** @cond DEV */
+/**
+ * Generates a reference-counting `free` function
+ */
 #define DEFINE_REFCNT_FREE(_type, _var)                                 \
     void free_##_type(_type *_var)                                      \
     {                                                                   \
@@ -206,6 +632,10 @@ typedef struct freelist_t {
     struct fake
 
 
+/** 
+ * Generates definitions for allocator functions declared per
+ * DECLARE_REFCNT_ALLOCATOR()
+ */
 #define DEFINE_REFCNT_ALLOCATOR(_type, _args, _var, _init, _clone, _fini) \
     DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var,                        \
                              { _var->refcnt = 1; _init; },              \
@@ -213,6 +643,10 @@ typedef struct freelist_t {
                              static inline void destroy_##_type, _fini); \
     DEFINE_REFCNT_FREE(_type, _var)
 
+/** 
+ * Generates definition for the preallocated declared by
+ * DECLARE_TYPE_PREALLOC()
+ */
 #define DEFINE_TYPE_PREALLOC(_type)                                     \
     void preallocate_##_type##s(unsigned size)                          \
     {                                                                   \
@@ -229,6 +663,11 @@ typedef struct freelist_t {
         freelist_##_type = (freelist_t *)objs;                          \
     }    
 
+/** @cond DEV */
+/** 
+ * Generates definitions for allocator functions declared per
+ * DECLARE_ARRAY_ALLOCATOR() and family
+ */
 #define DEFINE_ARRAY_ALLOC_COMMON(_type, _scale, _maxsize, _var, _idxvar, \
                                   _initc, _inite,                       \
                                   _clonec, _clonee,                      \
@@ -347,7 +786,13 @@ typedef struct freelist_t {
       dispose_##_type(_var);                                            \
   }                                                                     \
   struct fake
+/** @endcond */
 
+
+/**
+ * Like `malloc`, but ensures that allocated block will be able to hold
+ * freelist_t object
+ */
 ATTR_MALLOC ATTR_RETURNS_NONNULL
 static inline void *frlmalloc(size_t sz) 
 {
@@ -358,13 +803,32 @@ static inline void *frlmalloc(size_t sz)
 
 #define linear_order(_x) (_x)
 #define linear_size(_x) (_x)
-static inline unsigned log2_order(unsigned x)
+
+/**
+ * @test log2order
+ * @p x | Result
+ * -------------
+ * 0    | 0
+ * 1    | 0
+ * 2    | 1
+ * 3    | 2
+ * 4    | 2
+ * 5    | 3
+ * 65536| 16
+ */
+static_inline unsigned log2_order(unsigned x)
 {
     return x ? ((unsigned)sizeof(unsigned) * CHAR_BIT -
                 count_leading_zeroes(x - 1)) : 0;
 }
+/** 
+ * The inverse of log2_order()
+ */
 #define log2_size(_x) (1u << (_x))
 
+/**
+ * Defines a linear allocation sc
+ */
 #define DEFINE_LINEAR_SCALE(_n)                                 \
     static inline unsigned linear##_n##_order(unsigned x)       \
     {                                                           \

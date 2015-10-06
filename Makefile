@@ -6,6 +6,7 @@ FLEX = flex
 PKGCONFIG = pkg-config
 DOXYGEN = doxygen
 ETAGS = ctags-exuberant -e -R --exclude='doc/*' --exclude='tests/*'
+XSLTPROC = xsltproc
 
 CFLAGS = -ggdb3 -fstack-protector -W -Wall -Werror -Wmissing-declarations -Wformat=2 -Winit-self -Wuninitialized \
 	-Wsuggest-attribute=pure -Wsuggest-attribute=const -Wconversion -Wstack-protector -Wpointer-arith -Wwrite-strings \
@@ -13,14 +14,11 @@ CFLAGS = -ggdb3 -fstack-protector -W -Wall -Werror -Wmissing-declarations -Wform
 CPPFLAGS = -I.
 LDFLAGS = -Wl,-export-dynamic
 LDLIBS = -lm -lfl -lunistring -ltre
-CHECK_CPPFLAGS = 
-CHECK_LDLIBS = -lcheck -lrt 																																				-lpthread 
 MFLAGS = -MM -MT $(<:.c=.o)
-CHECKMK = checkmk
 
 C_SOURCES = tensile.tab.c lex.yy.c
 
-TESTS = support allocator stack queue taglist
+TESTS := $(patsubst %.xml,%,$(notdir $(wildcard doc/xml/*[ch].xml)))
 
 APPLICATION = tensile
 
@@ -40,12 +38,12 @@ lex.yy.c : tensile.l
 
 lex.yy.o lex.yy.d : lex.yy.c tensile.tab.h
 
-tests/%.o : CPPFLAGS += $(CHECK_CPPFLAGS)
-tests/% : LDLIBS += $(CHECK_LDLIBS)
+EXTRACT_TESTS = $(XSLTPROC) extract_tests.xsl
 
-%.c : %.ts
-	$(CHECKMK) $< >$@
+tests/%.c : doc/xml/%.xml extract_tests.xsl
+	$(EXTRACT_TESTS) $< >$@
 
+tests/% : CPPFLAGS += -I.
 
 ifneq ($(MAKECMDGOALS),clean)
 include $(C_SOURCES:.c=.d)
@@ -54,7 +52,7 @@ endif
 
 .PHONY : check
 check : $(addprefix tests/,$(TESTS))
-	set -e; \
+	@set -e; \
 	for t in $^; do \
 		$(CHECK_TOOL) ./$$t;		\
 	done

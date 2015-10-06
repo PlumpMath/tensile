@@ -31,6 +31,8 @@ extern "C"
 
 #include <limits.h>
 
+/** @cond DEV */
+
 /* Info on which gcc versions support which attributes is mostly borrowed from
  * glib/gmacro.h header
  */
@@ -39,13 +41,16 @@ extern "C"
 #define ATTR_PURE __attribute__((__pure__))
 #define ATTR_MALLOC __attribute__((__malloc__))
 #else
+/** Indicates that the function has no side effects */
 #define ATTR_PURE
+/** Indicates that the function returns a pointer to unaliased uninitalized memory */
 #define ATTR_MALLOC
 #endif
 
 #if     __GNUC__ >= 4
 #define ATTR_SENTINEL  __attribute__((__sentinel__))
 #else
+/** Indicates that a vararg function shall have NULL at the end of varargs */
 #define ATTR_SENTINEL
 #endif
 
@@ -53,19 +58,33 @@ extern "C"
 #define ATTR_ALLOC_SIZE(x) __attribute__((__alloc_size__(x)))
 #define ATTR_ALLOC_SIZE2(x,y) __attribute__((__alloc_size__(x,y)))
 #else
+/** 
+ * Indicates that a function returns a pointer to memory, the size of
+ * which is given in its @p x 'th argument
+ */
 #define ATTR_ALLOC_SIZE(x)
+
+/** 
+ * Indicates that a function returns a pointer to memory, which consists
+ * of a number of elements given in its @p x 'th argument, where each
+ * element has the size given in the @p y 'th argument
+ */
 #define ATTR_ALLOC_SIZE2(x,y)
 #endif
 
 #if     (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9)
 #define ATTR_RETURNS_NONNULL __attribute__((returns_nonnull))
 #else
+/** Indicates that a function returns a non-NULL pointer */
 #define ATTR_RETURNS_NONNULL 
 #endif
 
 #if     __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
 #define ATTR_WEAK __attribute__((weak)
 #else
+/** Marks the symbol as weak, that is a library symbol that can be
+ * overriden in the application code 
+ */
 #define ATTR_WEAK
 #endif
 
@@ -80,17 +99,34 @@ extern "C"
 #define ATTR_CONST  __attribute__((__const__))
 #define ATTR_UNUSED __attribute__((__unused__))
 #else   /* !__GNUC__ */
+/** Indicates that a function is printf-like, and the format string is
+ *  in the @p _format_idx 'th argument
+ */
 #define ATTR_PRINTF(_format_idx, _arg_idx)
+/** Indicates that a function is scanf-like, and the format string is
+ *  in the @p _format_idx 'th argument
+ */
 #define ATTR_SCANF(_format_idx, _arg_idx)
+/** Indicates that a @p _arg_idx 'th argument to the function is 
+ *  a printf/scanf/strftime format string that is transformed in some way
+ *  and returned by the function
+ */
 #define ATTR_FORMAT(_arg_idx)
+/** Indicates that the function never returns */
 #define ATTR_NORETURN
+/** Indicates that a function value only depends on its arguments, and
+ * that the function produces no side effects
+ * @sa ATTR_PURE
+ */
 #define ATTR_CONST
+/** Indicates that an object may remain unused */
 #define ATTR_UNUSED
 #endif  /* !__GNUC__ */
 
 #if    __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)
 #define ATTR_DEPRECATED __attribute__((__deprecated__))
 #else
+/** Marks the symbol as deprecated */
 #define ATTR_DEPRECATED
 #endif /* __GNUC__ */
 
@@ -100,30 +136,60 @@ extern "C"
 #define ATTR_NONNULL __attribute__ ((__nonnull__))
 #define ATTR_NONNULL_ARGS(_args) __attribute__ ((__nonnull__ _args))
 #else
+/** Indicates ELF symbol visibility (default, hidden, internal or protected) */
 #define ATTR_VISIBILITY(_scope)
+/** Indicates that no pointer arguments should ever be passed NULL */
 #define ATTR_NONNULL
+/** Indicates that pointer arguments listed in @p _args are never NULL */
 #define ATTR_NONNULL_ARGS(_args)
 #endif
 
+/** Indicates that the first argument is never NULL */
 #define ATTR_NONNULL_1ST ATTR_NONNULL_ARGS((1))
 
 #if    __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
 #define ATTR_WARN_UNUSED_RESULT               \
   __attribute__((__warn_unused_result__))
 #else
+/** Requires a warning if a result value of the function is throw away */
 #define ATTR_WARN_UNUSED_RESULT
 #endif /* __GNUC__ */
 
+/** @endcond */
+
+#if !__DOXYGEN__
+/** 
+ * Doxygen does treat C static inline functions as static
+ * and thus does not generate documentation for them.
+ * So in Doxygen config we just define `static_inline` to `inline`
+ */
+#define static_inline static inline
+#endif
 
 #if __GNUC__ >= 4
-static inline unsigned count_leading_zeroes(unsigned i)
+static_inline unsigned count_leading_zeroes(unsigned i)
 {
     if (i == 0u)
         return (unsigned)sizeof(i) * CHAR_BIT;
     return (unsigned)__builtin_clz(i);
 }
 #else
-static inline unsigned count_leading_zeroes(unsigned i)
+/**
+ * @return Number of leading zero bits in a 32-bit unsigned integer
+ * @test
+ *  Calculate number of leading zeroes
+ * `ASSERT_UINT_EQ(count_leading_zeroes(i), expected);`
+ *  `unsigned` @p i | `unsigned` @p expected
+ *  ----------------|------------------------
+ *  `0u`            | `sizeof(unsigned) * CHAR_BIT`
+ *  `1u`            | `sizeof(unsigned) * CHAR_BIT - 1`
+ *  `0x12340u`      | `sizeof(unsigned) * CHAR_BIT - 17`
+ *  `UINT_MAX`      | `0`
+ *  `UINT_MAX >> 1` | `1`
+ *  `UINT_MAX >> 2` | `2`
+ *
+ */
+static_inline unsigned count_leading_zeroes(unsigned i)
 {
     unsigned j;
   
