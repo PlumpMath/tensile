@@ -31,6 +31,8 @@ lex.yy.c
 
 doc/*
 tests/*
-!tests/*.ts
 
 TAGS
+core
+core.*
+vgcore.*

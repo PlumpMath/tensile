@@ -45,6 +45,13 @@ extern "C"
  *
  * @test Background:
  * @code
+ *  enum object_state {
+ *    STATE_INITIALIZED = 0xb1ff,
+ *    STATE_CLONED = 0x20000000,
+ *    STATE_ADJUSTED = 0x10000000,
+ *    STATE_RESIZED = 0xc001,
+ *    STATE_FINALIZED = 0xdead
+ *  };
  * typedef struct simple_type {
  *    void *ptr;
  *    unsigned tag;
@@ -54,40 +61,52 @@ extern "C"
  *
  * DEFINE_TYPE_ALLOCATOR(simple_type, (unsigned tag), obj,
  * { obj->tag = tag; },
- * { NEW(obj)->tag = OLD(obj)->tag + 1; },
- * { obj->tag = 0xdeadbeef; });
+ * { NEW(obj)->tag = OLD(obj)->tag | STATE_CLONED; },
+ * { obj->tag = STATE_FINALIZED; });
  * @endcode
  * @test Allocate
- * - Given a fresh object `simple_type *st = new_simple_type(0x12345);`
+ * - Given a fresh object 
+ * @code
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
+ * simple_type *st = new_simple_type(thetag);
+ * @endcode
  * - Then it is allocated `ASSERT_PTR_NEQ(st, NULL);`
- * - And it is initialized `ASSERT_UINT_EQ(st->tag, 0x12345);`
+ * - And it is initialized `ASSERT_UINT_EQ(st->tag, thetag);`
  * - Clean up `free_simple_type(st);`
  * @test Allocate and free
- * - Given an allocated object `simple_type *st = new_simple_type(0x12345);`
- * - Then it is destroyed `free_simple_type(st);`
- * - And the free list is in proper state `ASSERT_PTR_EQ(freelist_simple_type, st);`
- * - And the object is finalized `ASSERT_UINT_EQ(st->tag, 0xdeadbeef);`
+ * - Given an allocated object 
+ * @code
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
+ * simple_type *st = new_simple_type(thetag);
+ * @endcode
+ * - When it is destroyed `free_simple_type(st);`
+ * - Then the free list is in proper state `ASSERT_PTR_EQ(freelist_simple_type, st);`
+ * - And the object is finalized `ASSERT_UINT_EQ(st->tag, STATE_FINALIZED);`
  * @test Allocate, free and reallocate
  * - Given an allocated object
  * @code
- * simple_type *st = new_simple_type(0x12345);
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
+ * unsigned thetag2 = ARBITRARY(unsigned, 1, 0xfffff);
+ * simple_type *st = new_simple_type(thetag);
  * simple_type *st1;
  * @endcode
  * - When it is destroyed `free_simple_type(st);`
- * - And when another object is allocated `st1 = new_simple_type(0x54321);`
+ * - And when another object is allocated `st1 = new_simple_type(thetag2);`
  * - Then the memory is reused `ASSERT_PTR_EQ(st, st1);`
  * - And the free list is in proper state `ASSERT_PTR_EQ(freelist_simple_type, NULL);`
- * - And the new object is initialized `ASSERT_UINT_EQ(st1->tag, 0x54321);`
+ * - And the new object is initialized `ASSERT_UINT_EQ(st1->tag, thetag2);`
  * - Clean up `free_simple_type(st1);`
  * @test Allocate, free, reallocate and allocate another
  * - Given an allocated object
  * @code
- * simple_type *st = new_simple_type(0x12345);
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
+ * unsigned thetag2 = ARBITRARY(unsigned, 1, 0xfffff);
+ * simple_type *st = new_simple_type(thetag);
  * simple_type *st1;
  * simple_type *st2;
  * @endcode
  * - When it is destroyed `free_simple_type(st);`
- * - And when a new object is allocated `st1 = new_simple_type(0x54321);`
+ * - And when a new object is allocated `st1 = new_simple_type(thetag2);`
  * - Then the memory is reused `ASSERT_PTR_EQ(st, st1);`
  * - When another object is allocated `st2 = new_simple_type(0);`
  * - Then the memory is not reused `ASSERT_PTR_NEQ(st2, st1);`
@@ -99,14 +118,15 @@ extern "C"
  * @test Copy
  * - Given an allocated object
  * @code
- * simple_type *st = new_simple_type(0x12345);
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
+ * simple_type *st = new_simple_type(thetag);
  * simple_type *st1;
  * st->ptr = &st;
  * @endcode
  * - When it is copied `st1 = copy_simple_type(st);`
  * - Then the memory is not shared `ASSERT_PTR_NEQ(st, st1);`
  * - And the contents is copied `ASSERT_PTR_EQ(st1->ptr, st->ptr);`
- * - And the copy hook is executed `ASSERT_UINT_EQ(st1->tag, 0x12346);`
+ * - And the copy hook is executed `ASSERT_UINT_EQ(st1->tag, thetag | STATE_CLONED);`
  * - Cleanup:
  * @code
  * free_simple_type(st);
@@ -115,8 +135,10 @@ extern "C"
  * @test Deallocate and copy
  * - Given two allocated objects
  * @code
- * simple_type *st = new_simple_type(0x12345);
- * simple_type *st1 = new_simple_type(0);
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
+ * unsigned thetag2 = ARBITRARY(unsigned, 1, 0xfffff);
+ * simple_type *st = new_simple_type(thetag);
+ * simple_type *st1 = new_simple_type(thetag2);
  * simple_type *st2;
  * @endcode
  * - When the first is freed `free_simple_type(st);`
@@ -134,7 +156,7 @@ extern "C"
  *
  *  DECLARE_TYPE_ALLOCATOR(small_type, ());
  *  DEFINE_TYPE_ALLOCATOR(small_type, (), obj,
- *  {*obj = 0x1234;},
+ *  {*obj = (short)STATE_INITIALIZED;},
  *  {}, {});
  * @endcode
  * @test Allocate and free small
@@ -144,11 +166,11 @@ extern "C"
  * small_type *sm1;
  * sm = new_small_type();
  * @endcode
- * - Then it is initialized `ASSERT_INT_EQ(*sm, 0x1234);`
- * - When it is freed `free_small_type(sm);`
+ * - Then it is initialized `ASSERT_INT_EQ(*sm, (short)STATE_INITIALIZED);`
+ * - When it is freed `*sm = 0; free_small_type(sm);`
  * - And when a new object is allocated `sm1 = new_small_type();`
  * - Then the memory is reused `ASSERT_PTR_EQ(sm, sm1);`
- * - And the second object is initialized `ASSERT_INT_EQ(*sm1, 0x1234);`
+ * - And the second object is initialized `ASSERT_INT_EQ(*sm1, (short)STATE_INITIALIZED);`
  * - Cleanup `free_small_type(sm1);`
  */
 #define DECLARE_TYPE_ALLOCATOR(_type, _args)                            \
@@ -176,52 +198,68 @@ extern "C"
  * DECLARE_REFCNT_ALLOCATOR(refcnt_type, (unsigned tag));
  * DEFINE_REFCNT_ALLOCATOR(refcnt_type, (unsigned tag), obj,
  *                       {obj->tag = tag;},
- *                       {NEW(obj)->tag = OLD(obj)->tag + 1;},
- *                       {obj->tag = 0xdeadbeef;});
+ *                       {NEW(obj)->tag = OLD(obj)->tag | STATE_CLONED;},
+ *                       {obj->tag = STATE_FINALIZED;});
  * @endcode
  * @test Allocate refcounted
- * - Given a fresh refcounted object `refcnt_type *rt = new_refcnt_type(0x12345);`
+ * - Given a fresh refcounted object 
+ * @code
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
+ * refcnt_type *rt = new_refcnt_type(thetag);
+ * @endcode
  * - Then it is allocated `ASSERT_PTR_NEQ(rt, NULL);`
- * - And it is initialized `ASSERT_UINT_EQ(rt->tag, 0x12345);`
+ * - And it is initialized `ASSERT_UINT_EQ(rt->tag, thetag);`
  * - And its ref counter is 1 `ASSERT_UINT_EQ(rt->refcnt, 1);`
  * - Cleanup `free_refcnt_type(rt);`
  * @test Allocate and free refcounted
- * - Given a fresh refcounted object `refcnt_type *rt = new_refcnt_type(0x12345);`
+ * - Given a fresh refcounted object 
+ * @code
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
+ * refcnt_type *rt = new_refcnt_type(thetag);
+ * @endcode
  * - When it is destroyed `free_refcnt_type(rt);`
- * - Then it is finalized `ASSERT_UINT_EQ(rt->tag, 0xdeadbeef);`
+ * - Then it is finalized `ASSERT_UINT_EQ(rt->tag, STATE_FINALIZED);`
  * @test  Allocate, use and free refcounted
  * - Given a fresh refcounted object
- * `refcnt_type *rt = new_refcnt_type(0x12345);`
+ * @code
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
+ * refcnt_type *rt = new_refcnt_type(thetag);
+ * @endcode
  * - When it is referenced `refcnt_type *use = use_refcnt_type(rt);`
  * - Then the referenced pointer is the same `ASSERT_PTR_EQ(use, rt);`
  * - And the reference counter is incremented by 1 `ASSERT_UINT_EQ(use->refcnt, 2);`
  * - When it is freed `free_refcnt_type(rt);`
  * - Then the reference counter is decremented `ASSERT_UINT_EQ(use->refcnt, 1);`
- * - But the object is not finalized `ASSERT_UINT_EQ(use->tag, 0x12345);`
+ * - But the object is not finalized `ASSERT_UINT_EQ(use->tag, thetag);`
  * - When the object is freed again `free_refcnt_type(use);`
- * - Then it is finalized `ASSERT_UINT_EQ(use->tag, 0xdeadbeef);`
+ * - Then it is finalized `ASSERT_UINT_EQ(use->tag, STATE_FINALIZED);`
  * @test Allocate, free and reallocate refcounted
  * - Given a fresh refcounted object
  * @code
- * refcnt_type *rt = new_refcnt_type(0x12345);
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
+ * unsigned thetag2 = ARBITRARY(unsigned, 1, 0xfffff);
+ * refcnt_type *rt = new_refcnt_type(thetag);
  * refcnt_type *rt1;
  * @endcode
  * - When it is freed `free_refcnt_type(rt);`
- * - And when the new object is allocated `rt1 = new_refcnt_type(0x54321);`
+ * - And when the new object is allocated `rt1 = new_refcnt_type(thetag2);`
  * - Then their pointers are the same `ASSERT_PTR_EQ(rt, rt1);`
  * - And the reference counter is 1 `ASSERT_UINT_EQ(rt1->refcnt, 1);`
- * - And the object is initialized `ASSERT_UINT_EQ(rt1->tag, 0x54321);`
+ * - And the object is initialized `ASSERT_UINT_EQ(rt1->tag, thetag2);`
  * - When the copy is freed `free_refcnt_type(rt1);`
- * - Then it is finitalized `ASSERT_UINT_EQ(rt1->tag, 0xdeadbeef);`
+ * - Then it is finitalized `ASSERT_UINT_EQ(rt1->tag, STATE_FINALIZED);`
  * @test Copy refcounted
  * - Given a fresh refcounted object
- * `refcnt_type *rt = new_refcnt_type(0x12345);`
+ * @code
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
+ * refcnt_type *rt = new_refcnt_type(thetag);
+ * @endcode
  * - When it is copied
  * `refcnt_type *rt1 = copy_refcnt_type(rt);`
  * - Then the memory is not shared `ASSERT_PTR_NEQ(rt, rt1);`
  * - And the old object's refcounter is intact `ASSERT_UINT_EQ(rt->refcnt, 1);`
  * - And the new object's refcounter is 1 `ASSERT_UINT_EQ(rt1->refcnt, 1);`
- * - And the new object is initialiozed `ASSERT_UINT_EQ(rt1->tag, 0x12346);`
+ * - And the new object is initialiazed `ASSERT_UINT_EQ(rt1->tag, thetag | STATE_CLONED);`
  * - Cleanup:
  * @code
  * free_refcnt_type(rt1);
@@ -281,7 +319,7 @@ extern "C"
  * @code
  * free_simple_type2(st);
  * free_simple_type2(st1);
- * free_simple_type2(st2));   
+ * free_simple_type2(st2);   
  * @endcode
  */
 #define DECLARE_TYPE_PREALLOC(_type)                    \
@@ -314,28 +352,21 @@ extern "C"
  *
  * @test Background:
  * @code
- *  enum simple_array_state {
- *    SA_INITIALIZED = 0xabc,
- *    SA_CLONED = 0xdef,
- *    SA_ADJUSTED = 0x10000000,
- *    SA_RESIZED = 0x999,
- *    SA_FINALIZED = 0xdeadbeef
- *  };
  * 
  *  DECLARE_ARRAY_TYPE(simple_array, void *ptr; unsigned tag;, unsigned);
  *  DECLARE_ARRAY_ALLOCATOR(simple_array);
  * 
  * 
  *  DEFINE_ARRAY_ALLOCATOR(simple_array, linear, 4, arr, i,
- *                        {arr->tag = SA_INITIALIZED;},
+ *                        {arr->tag = STATE_INITIALIZED;},
  *                        {arr->elts[i] = i; },
- *                        {NEW(arr)->tag = SA_CLONED; },
- *                        {NEW(arr)->elts[i] = OLD(arr)->elts[i] + 1; },
- *                        {NEW(arr)->tag = SA_ADJUSTED; },
- *                        {NEW(arr)->elts[i] = OLD(arr)->elts[i] | SA_ADJUSTED; },
- *                        {arr->tag |= SA_RESIZED; },
- *                        {arr->tag = SA_FINALIZED; },
- *                        {arr->elts[i] = SA_FINALIZED; });
+ *                        {NEW(arr)->tag = STATE_CLONED; },
+ *                        {NEW(arr)->elts[i] = OLD(arr)->elts[i] | STATE_CLONED; },
+ *                        {NEW(arr)->tag = STATE_ADJUSTED; },
+ *                        {NEW(arr)->elts[i] = OLD(arr)->elts[i] | STATE_ADJUSTED; },
+ *                        {arr->tag |= STATE_RESIZED; },
+ *                        {arr->tag = STATE_FINALIZED; },
+ *                        {arr->elts[i] = STATE_FINALIZED; });
  *
  * static void test_resize_smaller_n(unsigned n)
  * {
@@ -345,10 +376,10 @@ extern "C"
  * 
  *     ASSERT_PTR_EQ(arr, arr1);
  *     ASSERT_UINT_EQ(arr->nelts, n - 1);
- *     ASSERT_BITS_EQ(arr->tag, SA_RESIZED);
+ *     ASSERT_BITS_EQ(arr->tag, STATE_INITIALIZED | STATE_RESIZED);
  *     for(j = 0; j < n - 1; j++)
  *         ASSERT_UINT_EQ(arr->elts[j], j);
- *     ASSERT_BITS_EQ(arr->elts[n - 1], SA_FINALIZED);
+ *     ASSERT_BITS_EQ(arr->elts[n - 1], STATE_FINALIZED);
  * 
  *     free_simple_array(arr);
  * }
@@ -361,164 +392,167 @@ extern "C"
  * 
  *     ASSERT_PTR_NEQ(arr, arr1);
  *     ASSERT_UINT_EQ(arr1->nelts, n + 1);
- *     ASSERT_BITS_EQ(arr1->tag, SA_ADJUSTED | SA_RESIZED);
+ *     ASSERT_BITS_EQ(arr1->tag, STATE_ADJUSTED | STATE_RESIZED);
  *     for (j = 0; j < n; j++)
- *        ASSERT_BITS_EQ(arr1->elts[j], j | SA_ADJUSTED);
+ *        ASSERT_BITS_EQ(arr1->elts[j], j | STATE_ADJUSTED);
  *     ASSERT_UINT_EQ(arr1->elts[n], n);
  * 
  *     free_simple_array(arr1);
  * }
  * @endcode
- * @test Allocate
+ * @test Allocate and free
  * `simple_array *prev = NULL;`
- * |`unsigned` `size`|
- * |-----------------|
- * | 0               |
- * | 1               |
- * | 2               |
- * | 3               |
- * | 4               |
+ * | Varying          | From|To |
+ * |------------------|-----|---|
+ * | `unsigned` `size`|`0`  |`4`|
  * - Given an allocated array of a given size
  * @code
- * simple_array *arr = new_simple_array(i);
+ * simple_array *arr = new_simple_array(size);
  * unsigned j;
  * @endcode
  * - Then it is allocated `ASSERT_PTR_NEQ(arr, NULL);`
  * - And the memory is not shared with an array of lesser size `ASSERT_PTR_NEQ(arr, prev);`
- * - And it is initialized `ASSERT_UINT_EQ(arr->tag, SA_INITIALIZED);`
+ * - And it is initialized `ASSERT_UINT_EQ(arr->tag, STATE_INITIALIZED);`
  * - And the number of elements is set correctly `ASSERT_UINT_EQ(arr->nelts, size);`
  * - And the elements are initialized `for (j = 0; j < size; j++) ASSERT_UINT_EQ(arr->elts[j], j);`
  * - When it is destroyed `free_simple_array(arr);`
  * - When the array is allocated through free-lists `if (size != 4)`
- *   + Then it is finalized `ASSERT_UINT_EQ(arr->tag, SA_FINALIZED);`
- *   + And the elements are finalized: `for(j = 0; j < size; j++)  ASSERT_UINT_EQ(arr->elts[j], SA_FINALIZED);`
+ *   + Then it is finalized `ASSERT_UINT_EQ(arr->tag, STATE_FINALIZED);`
+ *   + And the elements are finalized: `for(j = 0; j < size; j++)  ASSERT_UINT_EQ(arr->elts[j], STATE_FINALIZED);`
  * - Cleanup `prev = arr;`
- * @test 
+ * @test Allocate, free and reallocate
+ * | Varying          | From|To |
+ * |------------------|-----|---|
+ * | `unsigned` `size`|`0`  |`4`|
+ * - Given an allocated array of a given size
  * @code
- TESTCASE(
-    FORALL(i, 0, 4,
-        simple_array *arr = new_simple_array(i);
-        simple_array *arr1;
-
-        free_simple_array(arr);
-        arr1 = new_simple_array(i);
-        ASSERT_PTR_EQ(arr, arr1);
-        free_simple_array(arr1);
-    ));
+ * simple_array *arr = new_simple_array(size);
+ * simple_array *arr1;
  * @endcode
- * @test
+ * - When it is freed `free_simple_array(arr);`
+ * - And when a new array of the same size is allocated `arr1 = new_simple_array(size);`
+ * - Then the memory is shared `ASSERT_PTR_EQ(arr, arr1);`
+ * - Cleanup: `free_simple_array(arr1);`
+ * @test Copy
+ * | Varying          | From|To |
+ * |------------------|-----|---|
+ * | `unsigned` `size`|`0`  |`5`|
+ * - Given an array:
  * @code
- TESTCASE(copy_sizes, 
-    FORALL(i, 0, 5,
-        simple_array *arr = new_simple_array(i);
-        simple_array *arr1 = copy_simple_array(arr);
-
-        ASSERT_PTR_NEQ(arr, arr1);
-        ASSERT_UINT_EQ(arr1->tag, arr->tag + 1);
-        FORALL (j, 0, i,
-            ASSERT_UINT_EQ(arr1->elts[j], arr->elts[j] + 1));
-        free_simple_array(arr1);
-        ASSERT_UINT_EQ(arr->tag, 0x12345);
-        free_simple_array(arr);
-    ));
+ * simple_array *arr = new_simple_array(size);
+ * unsigned j;
  * @endcode
- * @test
+ * - When it is copied `simple_array *arr1 = copy_simple_array(arr);`
+ * - Then the memory is not shared `ASSERT_PTR_NEQ(arr, arr1);`
+ * - And the copy is initialiazed `ASSERT_UINT_EQ(arr1->tag, STATE_CLONED);
+ * - And the items are initialized: 
  * @code
- TESTCASE(resize_null, 
-    simple_array *arr = resize_simple_array(NULL, 3);
-
-    ASSERT_PTR_NEQ(arr, NULL);
-    ASSERT_UINT_EQ(arr->nelts, 3);
-    ASSERT_UINT_EQ(arr->tag, 0x12345);
-    ASSERT_UINT_EQ(arr->elts[2], 2);
-
-    free_simple_array(arr));
+ * for(j = 0; j < size; j++) ASSERT_UINT_EQ(arr1->elts[j], arr->elts[j] | STATE_CLONED);
  * @endcode
- * @test
+ * - When the copy is freed `free_simple_array(arr1);`
+ * - Then the original is untouched `ASSERT_UINT_EQ(arr->tag, STATE_INITIALIZED);`
+ * - Cleanup: `free_simple_array(arr);`
+ * @test Resize Null
+ * - When a NULL pointer to an array is resized 
  * @code
- TESTCASE(resize_smaller,
-    test_resize_smaller_n(3);
-    test_resize_smaller_n(4);
-    test_resize_smaller_n(5));
+ * simple_array *arr = resize_simple_array(NULL, 3);
+ * unsigned j;
  * @endcode
- * @test
+ * - Then the result is not NULL `ASSERT_PTR_NEQ(arr, NULL);`
+ * - And the number of elements is correct `ASSERT_UINT_EQ(arr->nelts, 3);`
+ * - And the array is initialized `ASSERT_UINT_EQ(arr->tag, STATE_INITIALIZED);`
+ * - And the elements are initialized `for (j = 0; j < arr->nelts; j++) ASSERT_UINT_EQ(arr->elts[j], j);`
+ * - Cleanup `free_simple_array(arr);`
+ * @test Verify that resizing to a lesser size works
+ * Varying           | From | To
+ * ------------------|------|----
+ * `unsigned` `size` | `3`  | `5`
  * @code
- TESTCASE(resize_larger,
-    test_resize_larger_n(2);
-    test_resize_larger_n(3);
-    test_resize_larger_n(4));
+ * test_resize_smaller_n(size);
  * @endcode
- * @test
+ * @test Verify that resizing to a larger size works
+ * Varying           | From | To
+ * ------------------|------|----
+ * `unsigned` `size` | `2`  | `4`
  * @code
- TESTCASE(resize_larger_free,
-    simple_array *arr = new_simple_array(2);
-    simple_array *arr1 = resize_simple_array(arr, 3);
-    simple_array *arr2 = new_simple_array(2);
-
-    ASSERT_PTR_EQ(arr2, arr);
-    free_simple_array(arr1);
-    free_simple_array(arr2));
+ * test_resize_larger_n(size);
  * @endcode
-
-   );
-* @endcode
- * @test
+ * @test Resize and Allocate
+ * - Given an array
  * @code
-   TESTCASE(alloc_log2sizes,
-    unsigned i;
-    simple_log_array *prev = NULL;
-
-    for (i = 0; i < 5; i++)
-    {
-        simple_log_array *arr = new_simple_log_array(1u << i);
-
-        ck_assert_ptr_ne(arr, NULL);
-        ck_assert_ptr_ne(arr, prev);
-        ck_assert_uint_eq(arr->tag, 0x12345);
-        ck_assert_uint_eq(arr->nelts, 1u << i);
-
-        free_simple_log_array(arr);
-        if (i != 4)
-        {
-            ck_assert_uint_eq(arr->tag, 0xdeadbeef);
-        }
-        prev = arr;
-    }
-
-   );
-* @endcode
- * @test
+ * simple_array *arr = new_simple_array(2);
+ * @endcode
+ * - When it is resized
  * @code
-   TESTCASE(alloc_free_log2sizes,
-    unsigned i;
-
-    for (i = 2; i < 4; i++)
-    {
-        simple_log_array *arr = new_simple_log_array(1u << i);
-        simple_log_array *arr1;
-
-        free_simple_log_array(arr);
-        arr1 = new_simple_log_array((1u << i) - 1);
-        ck_assert_ptr_eq(arr, arr1);
-        free_simple_log_array(arr1);
-    }
-
-   );
-* @endcode
- * @test
+ * simple_array *arr1 = resize_simple_array(arr, 3);
+ * @endcode
+ * - And when a new array with the same size as the original is allocated
  * @code
-   TESTCASE(resize_larger_log2,
-    simple_log_array *arr = new_simple_log_array(9);
-    simple_log_array *arr1 = resize_simple_log_array(arr, 10);
-
-    ASSERT_PTR_EQ(arr, arr1);
-    ASSERT_UINT_EQ(arr1->nelts, 10);
-    ASSERT_UINT_EQ(arr1->elts[9], 9);
-
-    free_simple_log_array(arr1);
-
-
-  @endcode
+ * simple_array *arr2 = new_simple_array(2);
+ * @endcode
+ * - Then the memory is reused `ASSERT_PTR_EQ(arr2, arr);`
+ * - Cleanup
+ * @code
+ * free_simple_array(arr1);
+ * free_simple_array(arr2);
+ * @endcode
+ * @test Background:
+ * @code
+ * DECLARE_ARRAY_TYPE(simple_log_array, void *ptr; unsigned tag;, unsigned);
+ * DECLARE_ARRAY_ALLOCATOR(simple_log_array);
+ *
+ * DEFINE_ARRAY_ALLOCATOR(simple_log_array, log2, 4, arr, i,
+ *                      {arr->tag = STATE_INITIALIZED;},
+ *                      {arr->elts[i] = i; },
+ *                      {NEW(arr)->tag = STATE_CLONED; },
+ *                      {NEW(arr)->elts[i] = OLD(arr)->elts[i] | STATE_CLONED; },
+ *                      {NEW(arr)->tag = STATE_ADJUSTED; },
+ *                      {NEW(arr)->elts[i] = OLD(arr)->elts[i] | STATE_ADJUSTED; },
+ *                      {arr->tag |= STATE_RESIZED; },
+ *                      {arr->tag = STATE_FINALIZED; },
+ *                      {arr->elts[i] = STATE_FINALIZED; });
+ * @endcode
+ * @test Allocate and free (log scale)
+ * `simple_log_array *prev = NULL;`
+ * | Varying           | From|To |
+ * |-------------------|-----|---|
+ * | `unsigned` `order`|`0`  |`4`|
+ * - Given an allocated array of a certain size
+ *   `simple_log_array *arr = new_simple_log_array(1u << order);`
+ * - Verify it is allocated `ASSERT_PTR_NEQ(arr, NULL);`
+ * - Verify the memory is not shared with `ASSERT_PTR_NEQ(arr, prev);`
+ * - Verify that it is initialzied `ASSERT_UINT_EQ(arr->tag, STATE_INITIALIZED);`
+ * - Verify that the number of elements is correct `ASSERT_UINT_EQ(arr->nelts, 1u << order);`
+ * - When it is freed `free_simple_log_array(arr);`
+ * - When it is not so large `if (order != 4)`
+     + Then it is finalized `ASSERT_UINT_EQ(arr->tag, STATE_FINALIZED);`
+ * - Cleanup `prev = arr;`
+ * @test Allocate, free and allocate slightly lesser
+ * | Varying           | From|To |
+ * |-------------------|-----|---|
+ * | `unsigned` `order`|`2`  |`3`|
+ * - Given an allocated array of a certain size
+ * @code
+ * simple_log_array *arr = new_simple_log_array(1u << order);
+ * simple_log_array *arr1;
+ * @endcode
+ * - When it freed `free_simple_log_array(arr);`
+ * - And when a new array which is slightly less is allocated
+ *   `arr1 = new_simple_log_array((1u << order) - 1);`
+ * - Then it shares memory with the first array `ASSERT_PTR_EQ(arr, arr1);`
+ * - Cleanup `free_simple_log_array(arr1);`
+ * @test Make slightly larger
+ * - Given an allocated array of a certain size
+ * `simple_log_array *arr = new_simple_log_array(9);`
+ * - When it is enlarged such that log2 size is still the same
+ * `simple_log_array *arr1 = resize_simple_log_array(arr, 10);`
+ * - Then the memory is not reallocated
+ * `ASSERT_PTR_EQ(arr, arr1);`
+ * - And the number of elements is set properly
+ * `ASSERT_UINT_EQ(arr1->nelts, 10);`
+ * - And the extra elements are initialized
+ * `ASSERT_UINT_EQ(arr1->elts[9], 9);`
+ * - Cleanup `free_simple_log_array(arr1);`
  */
 #define DECLARE_ARRAY_ALLOCATOR(_type)              \
     DECLARE_TYPE_ALLOCATOR(_type, (unsigned n));    \
@@ -819,18 +853,20 @@ static inline void *frlmalloc(size_t sz)
 #define linear_size(_x) (_x)
 
 /**
- * @test log2order
- * @p x | Result
- * -------------
- * 0    | 0
- * 1    | 0
- * 2    | 1
- * 3    | 2
- * 4    | 2
- * 5    | 3
- * 65536| 16
+ * @test 
+ *  Verify that the logarithmic order is correct
+ * `ASSERT_UINT_EQ(log2_order(x), expected);`
+ * `unsigned` `x`   | `unsigned` `expected`
+ * -----------------|----------------------
+ * `0`              | `0`
+ * `1`              | `0`
+ * `2`              | `1`
+ * `3`              | `2`
+ * `4`              | `2`
+ * `5`              | `3`
+ * `65536`          | `16`
  */
-static_inline unsigned log2_order(unsigned x)
+static inline unsigned log2_order(unsigned x)
 {
     return x ? ((unsigned)sizeof(unsigned) * CHAR_BIT -
                 count_leading_zeroes(x - 1)) : 0;

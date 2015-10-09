@@ -34,6 +34,7 @@ extern "C"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <wchar.h>
 
 #define ASSERT(_cond) assert(_cond)
@@ -48,7 +49,7 @@ extern "C"
     {                                                                   \
         if (!(_cmp))                                                    \
         {                                                               \
-            fprintf(stderr, "Assertion %s failed at %s(%s):%u"          \
+            fprintf(stderr, "Assertion %s failed at %s(%s):%u: "        \
                     _fmt " vs. " _fmt "\n",                             \
                     _descr, _file, _func, _line, _arg1, _arg2);         \
             abort();                                                    \
@@ -186,6 +187,80 @@ __ASSERT_CMP_INLINE(bits_neq, unsigned long long, "%llx", _arg1 != _arg2);
     __ASSERT_CMP_WRAP(bits_eq, "==", _arg1, _arg2)
 #define ASSERT_BITS_NEQ(_arg1, _arg2)                \
     __ASSERT_CMP_WRAP(bits_neq, "!=", _arg1, _arg2)
+
+
+#define ARBITRARY(_type, _min, _max) \
+    (_type)(rand() % ((_max) - (_min) + 1) + (_min))
+    
+#define SET_RANDOM_SEED()                               \
+    do {                                                \
+        const char *seedstr = getenv("TESTSEED");       \
+        unsigned seed;                                  \
+                                                        \
+        if (seedstr != NULL)                            \
+        {                                               \
+            seed = (unsigned)strtoul(seedstr, NULL, 0); \
+        }                                               \
+        else                                            \
+        {                                               \
+            seed = (unsigned)time(NULL);                \
+        }                                               \
+        fprintf(stderr, "Random seed is %u\n", seed);   \
+        srand(seed);                                    \
+    } while(0)
+
+#define BEGIN_TESTSUITE(_msg) fprintf(stderr, "%s:\n", (_msg))
+#define BEGIN_TESTCASE(_msg) BEGIN_TESTSUITE(_msg)
+
+#define BEGIN_TESTSTEP_VERBOSE(_indent, _msg)            \
+    do {                                                \
+        fprintf(stderr, "%*s", 2 * (_indent), (_msg));   \
+        fflush(stderr);                                 \
+    } while(0)
+#define BEGIN_TESTSTEP_SILENT(_indent, _msg) ((void)0)
+
+#define BEGIN_TESTSTEP_CLEANUP BEGIN_TESTSTEP_SILENT
+#define BEGIN_TESTSTEP_PREREQ BEGIN_TESTSTEP_VERBOSE
+#define BEGIN_TESTSTEP_CONDITION BEGIN_TESTSTEP_VERBOSE
+#define BEGIN_TESTSTEP_ASSERTION BEGIN_TESTSTEP_VERBOSE
+#define BEGIN_TESTSTEP_DESCRIPTION BEGIN_TESTSTEP_VERBOSE
+
+#define TESTITER_level_chars ".o*+#"
+
+#define BEGIN_TESTITER_VERBOSE(_level)                                  \
+    do {                                                                \
+        assert((_level) > 0 && (_level) < sizeof(TESTITER_level_chars)); \
+        fputc(TESTITER_level_chars[(_level) - 1], stderr);              \
+        fflush(stderr);                                                 \
+    } while(0)
+
+#define BEGIN_TESTITER_SILENT(_level) ((void)0)
+
+#define BEGIN_TESTITER_CLEANUP BEGIN_TESTITER_SILENT
+#define BEGIN_TESTITER_PREREQ BEGIN_TESTITER_SILENT
+#define BEGIN_TESTITER_CONDITION BEGIN_TESTITER_SILENT
+#define BEGIN_TESTITER_ASSERTION BEGIN_TESTITER_VERBOSE
+#define BEGIN_TESTITER_DESCRIPTION BEGIN_TESTITER_SILENT
+
+#define BEGIN_TESTSUBSTEP_VERBOSE() fputc('\n', stderr)
+#define BEGIN_TESTSUBSTEP_SILENT() ((void)0)
+
+#define BEGIN_TESTSUBSTEP_CLEANUP BEGIN_TESTSUBSTEP_SILENT
+#define BEGIN_TESTSUBSTEP_PREREQ BEGIN_TESTSUBSTEP_VERBOSE
+#define BEGIN_TESTSUBSTEP_CONDITION BEGIN_TESTSUBSTEP_VERBOSE
+#define BEGIN_TESTSUBSTEP_ASSERTION BEGIN_TESTSUBSTEP_VERBOSE
+#define BEGIN_TESTSUBSTEP_DESCRIPTION BEGIN_TESTSUBSTEP_VERBOSE
+
+#define END_TESTSTEP_VERBOSE(_indent)               \
+    fprintf(stderr, "%*s\n", 2 * (_indent), " OK")
+#define END_TESTSTEP_NEWLINE(_indent) fputc('\n', stderr)
+#define END_TESTSTEP_SILENT(_indent) ((void)0)
+
+#define END_TESTSTEP_CLEANUP END_TESTSTEP_SILENT
+#define END_TESTSTEP_PREREQ END_TESTSTEP_NEWLINE
+#define END_TESTSTEP_CONDITION END_TESTSTEP_NEWLINE
+#define END_TESTSTEP_ASSERTION END_TESTSTEP_VERBOSE
+#define END_TESTSTEP_DESCRIPTION END_TESTSTEP_NEWLINE
 
 
 #ifdef __cplusplus

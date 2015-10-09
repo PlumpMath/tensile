@@ -157,17 +157,8 @@ extern "C"
 
 /** @endcond */
 
-#if !__DOXYGEN__
-/** 
- * Doxygen does treat C static inline functions as static
- * and thus does not generate documentation for them.
- * So in Doxygen config we just define `static_inline` to `inline`
- */
-#define static_inline static inline
-#endif
-
 #if __GNUC__ >= 4
-static_inline unsigned count_leading_zeroes(unsigned i)
+static inline unsigned count_leading_zeroes(unsigned i)
 {
     if (i == 0u)
         return (unsigned)sizeof(i) * CHAR_BIT;
@@ -177,7 +168,7 @@ static_inline unsigned count_leading_zeroes(unsigned i)
 /**
  * @return Number of leading zero bits in a 32-bit unsigned integer
  * @test
- *  Calculate number of leading zeroes
+ *  Verify that the number of leading zeroes is correct
  * `ASSERT_UINT_EQ(count_leading_zeroes(i), expected);`
  *  `unsigned` @p i | `unsigned` @p expected
  *  ----------------|------------------------
@@ -189,7 +180,7 @@ static_inline unsigned count_leading_zeroes(unsigned i)
  *  `UINT_MAX >> 2` | `2`
  *
  */
-static_inline unsigned count_leading_zeroes(unsigned i)
+static inline unsigned count_leading_zeroes(unsigned i)
 {
     unsigned j;
   
