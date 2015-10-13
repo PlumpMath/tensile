@@ -170,14 +170,14 @@ static inline unsigned count_leading_zeroes(unsigned i)
  * @test
  *  Verify that the number of leading zeroes is correct
  * `ASSERT_UINT_EQ(count_leading_zeroes(i), expected);`
- *  `unsigned` @p i | `unsigned` @p expected
- *  ----------------|------------------------
- *  `0u`            | `sizeof(unsigned) * CHAR_BIT`
- *  `1u`            | `sizeof(unsigned) * CHAR_BIT - 1`
- *  `0x12340u`      | `sizeof(unsigned) * CHAR_BIT - 17`
- *  `UINT_MAX`      | `0`
- *  `UINT_MAX >> 1` | `1`
- *  `UINT_MAX >> 2` | `2`
+ *  @testvar{unsigned,i,u} | @testvar{unsigned,expected}
+ *  -----------------------|------------------------
+ *  `0u`                   | `sizeof(unsigned) * CHAR_BIT`
+ *  `1u`                   | `sizeof(unsigned) * CHAR_BIT - 1`
+ *  `0x12340u`             | `sizeof(unsigned) * CHAR_BIT - 17`
+ *  `UINT_MAX`             | `0`
+ *  `UINT_MAX >> 1`        | `1`
+ *  `UINT_MAX >> 2`        | `2`
  *
  */
 static inline unsigned count_leading_zeroes(unsigned i)

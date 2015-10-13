@@ -402,9 +402,9 @@ extern "C"
  * @endcode
  * @test Allocate and free
  * `simple_array *prev = NULL;`
- * | Varying          | From|To |
- * |------------------|-----|---|
- * | `unsigned` `size`|`0`  |`4`|
+ * | Varying                  | From|To |
+ * |--------------------------|-----|---|
+ * | @testvar{unsigned,size,u}|`0`  |`4`|
  * - Given an allocated array of a given size
  * @code
  * simple_array *arr = new_simple_array(size);
@@ -421,9 +421,9 @@ extern "C"
  *   + And the elements are finalized: `for(j = 0; j < size; j++)  ASSERT_UINT_EQ(arr->elts[j], STATE_FINALIZED);`
  * - Cleanup `prev = arr;`
  * @test Allocate, free and reallocate
- * | Varying          | From|To |
- * |------------------|-----|---|
- * | `unsigned` `size`|`0`  |`4`|
+ * | Varying                  | From|To |
+ * |--------------------------|-----|---|
+ * | @testvar{unsigned,size,u}|`0`  |`4`|
  * - Given an allocated array of a given size
  * @code
  * simple_array *arr = new_simple_array(size);
@@ -434,9 +434,9 @@ extern "C"
  * - Then the memory is shared `ASSERT_PTR_EQ(arr, arr1);`
  * - Cleanup: `free_simple_array(arr1);`
  * @test Copy
- * | Varying          | From|To |
- * |------------------|-----|---|
- * | `unsigned` `size`|`0`  |`5`|
+ * | Varying                  | From|To |
+ * |--------------------------|-----|---|
+ * | @testvar{unsigned,size,u}|`0`  |`5`|
  * - Given an array:
  * @code
  * simple_array *arr = new_simple_array(size);
@@ -444,7 +444,7 @@ extern "C"
  * @endcode
  * - When it is copied `simple_array *arr1 = copy_simple_array(arr);`
  * - Then the memory is not shared `ASSERT_PTR_NEQ(arr, arr1);`
- * - And the copy is initialiazed `ASSERT_UINT_EQ(arr1->tag, STATE_CLONED);
+ * - And the copy is initialiazed `ASSERT_UINT_EQ(arr1->tag, STATE_CLONED);`
  * - And the items are initialized: 
  * @code
  * for(j = 0; j < size; j++) ASSERT_UINT_EQ(arr1->elts[j], arr->elts[j] | STATE_CLONED);
@@ -464,16 +464,16 @@ extern "C"
  * - And the elements are initialized `for (j = 0; j < arr->nelts; j++) ASSERT_UINT_EQ(arr->elts[j], j);`
  * - Cleanup `free_simple_array(arr);`
  * @test Verify that resizing to a lesser size works
- * Varying           | From | To
- * ------------------|------|----
- * `unsigned` `size` | `3`  | `5`
+ * Varying                  | From | To
+ * -------------------------|------|----
+ * @testvar{unsigned,size,u}| `3`  | `5`
  * @code
  * test_resize_smaller_n(size);
  * @endcode
  * @test Verify that resizing to a larger size works
- * Varying           | From | To
- * ------------------|------|----
- * `unsigned` `size` | `2`  | `4`
+ * Varying                  | From | To
+ * -------------------------|------|----
+ * @testvar{unsigned,size,u}| `2`  | `4`
  * @code
  * test_resize_larger_n(size);
  * @endcode
@@ -514,9 +514,9 @@ extern "C"
  * @endcode
  * @test Allocate and free (log scale)
  * `simple_log_array *prev = NULL;`
- * | Varying           | From|To |
- * |-------------------|-----|---|
- * | `unsigned` `order`|`0`  |`4`|
+ * | Varying                  | From|To |
+ * |--------------------------|-----|---|
+ * |@testvar{unsigned,order,u}|`0`  |`4`|
  * - Given an allocated array of a certain size
  *   `simple_log_array *arr = new_simple_log_array(1u << order);`
  * - Verify it is allocated `ASSERT_PTR_NEQ(arr, NULL);`
@@ -528,9 +528,9 @@ extern "C"
      + Then it is finalized `ASSERT_UINT_EQ(arr->tag, STATE_FINALIZED);`
  * - Cleanup `prev = arr;`
  * @test Allocate, free and allocate slightly lesser
- * | Varying           | From|To |
- * |-------------------|-----|---|
- * | `unsigned` `order`|`2`  |`3`|
+ * | Varying                   | From|To |
+ * |---------------------------|-----|---|
+ * | @testvar{unsigned,order,u}|`2`  |`3`|
  * - Given an allocated array of a certain size
  * @code
  * simple_log_array *arr = new_simple_log_array(1u << order);
@@ -553,6 +553,28 @@ extern "C"
  * - And the extra elements are initialized
  * `ASSERT_UINT_EQ(arr1->elts[9], 9);`
  * - Cleanup `free_simple_log_array(arr1);`
+ * @test
+ * Ensure Size
+ * - Given an allocated array
+ * @code
+ * unsigned sz = ARBITRARY(unsigned, 1, 4);
+ * unsigned delta = ARBITRARY(unsigned, 0, 4);
+ * simple_array *arr = new_simple_array(sz);
+ * simple_array *arr1 = NULL;
+ * @endcode
+ * - When a lesser size is ensured:
+ *   `arr1 = ensure_simple_array_size(arr, sz - 1, 1);`
+ * - Then the array is not reallocated:
+ *   `ASSERT_PTR_EQ(arr, arr1);`
+ * - And the number of elements is unchanged:
+ *  `ASSERT_UINT_EQ(arr->nelts, sz);`
+ * - When a larger size is ensured
+ *   `arr1 = ensure_simple_array_size(arr, sz + 1, delta);`
+ * - Then the array is reallocated:
+ *   `ASSERT_PTR_NEQ(arr, arr1);`
+ * - And the number of elements is incremented:
+ *   `ASSERT_UINT_EQ(arr1->nelts, sz + 1 + delta);`
+ * - Cleanup: `free_simple_array(arr1);`
  */
 #define DECLARE_ARRAY_ALLOCATOR(_type)              \
     DECLARE_TYPE_ALLOCATOR(_type, (unsigned n));    \
@@ -561,6 +583,78 @@ extern "C"
 /**
  * Generate declarations for free-list based array allocations
  * which are reference-counted
+ * @test Background:
+ * @code
+ * DECLARE_ARRAY_TYPE(refcnt_array,
+ * void *ptr; unsigned refcnt; unsigned tag;,
+ * unsigned);
+ *
+ * DECLARE_REFCNT_ARRAY_ALLOCATOR(refcnt_array);
+ * DEFINE_REFCNT_ARRAY_ALLOCATOR(refcnt_array,
+ * linear, 4, arr, i,
+ * {arr->tag = STATE_INITIALIZED;},
+ * {}, {}, {}, {}, {}, {},
+ * {arr->tag = STATE_FINALIZED;}, {});
+ * @endcode
+ * @test
+ * Allocate and free refcounted array
+ * - Given a fresh array
+ * @code
+ * unsigned sz = ARBITRARY(unsigned, 1, 4);
+ * refcnt_array *rt = new_refcnt_array(sz);
+ * @endcode
+ * - Verify that it is allocated `ASSERT_PTR_NEQ(rt, NULL);`
+ * - Verify that it is initialized 
+ *   `ASSERT_UINT_EQ(rt->tag, STATE_INITIALIZED);`
+ * - Verify that the number of elements is correct
+ *   `ASSERT_UINT_EQ(rt->nelts, sz);`
+ * - Verify that the refcounter is 1
+ *   `ASSERT_UINT_EQ(rt->refcnt, 1);`
+ * @test 
+ * Allocate, use and free refcounted array
+ * - Given a fresh array
+ * @code
+ * unsigned sz = ARBITRARY(unsigned, 1, 4);
+ * refcnt_array *rt = new_refcnt_array(sz); 
+ * @endcode
+ * - When it is used
+ * `refcnt_array *use = use_refcnt_array(rt);`
+ * - Then the pointer does not change
+ * `ASSERT_PTR_EQ(use, rt);`
+ * - And the refcounter is incremented
+ * `ASSERT_UINT_EQ(use->refcnt, 2);`
+ * - When it is freed:
+ * `free_refcnt_array(rt);`
+ * - Then the refcounter is decremented
+ * `ASSERT_UINT_EQ(use->refcnt, 1);`
+ * - But the object is not finalized:
+ * `ASSERT_UINT_EQ(use->tag, STATE_INITIALIZED);`
+ * - When it is freed again:
+ * `free_refcnt_array(use);`
+ * - Then it is finalized:
+ * `ASSERT_UINT_EQ(use->tag, STATE_FINALIZED);`
+ * @test
+ * Copy a refcounted array
+ * - Given a new refcounted array:
+ * @code
+ * unsigned sz = ARBITRARY(unsigned, 1, 4);
+ * refcnt_array *rt = new_refcnt_array(sz);
+ * @endcode
+ * - When it is copied:
+ * `refcnt_array *rt1 = copy_refcnt_array(rt);`
+ * - Then the memory is not shared `ASSERT_PTR_NEQ(rt, rt1);`
+ * - And the refcounter is not changed: `ASSERT_UINT_EQ(rt->refcnt, 1);`
+ * - And the refcounter of the copy is 1:
+ * `ASSERT_UINT_EQ(rt1->refcnt, 1);`
+ * - And the copy is initialized:
+ * `ASSERT_UINT_EQ(rt1->tag, STATE_INITIALIZED);`
+ * - And the number of elements of the copy is correct
+ * `ASSERT_UINT_EQ(rt1->nelts, sz);`
+ * - Cleanup:
+ * @code
+ * free_refcnt_array(rt1);
+ * free_refcnt_array(rt);
+ * @endcode
  */
 #define DECLARE_REFCNT_ARRAY_ALLOCATOR(_type)           \
     DECLARE_REFCNT_ALLOCATOR(_type, (unsigned n));      \
@@ -856,28 +950,45 @@ static inline void *frlmalloc(size_t sz)
  * @test 
  *  Verify that the logarithmic order is correct
  * `ASSERT_UINT_EQ(log2_order(x), expected);`
- * `unsigned` `x`   | `unsigned` `expected`
- * -----------------|----------------------
- * `0`              | `0`
- * `1`              | `0`
- * `2`              | `1`
- * `3`              | `2`
- * `4`              | `2`
- * `5`              | `3`
- * `65536`          | `16`
+ * @testvar{unsigned,x,u}  | @testvar{unsigned,expected}
+ * ------------------------|---------------------------
+ * `0`                     | `0`
+ * `1`                     | `0`
+ * `2`                     | `1`
+ * `3`                     | `2`
+ * `4`                     | `2`
+ * `5`                     | `3`
+ * `65536`                 | `16`
  */
 static inline unsigned log2_order(unsigned x)
 {
     return x ? ((unsigned)sizeof(unsigned) * CHAR_BIT -
                 count_leading_zeroes(x - 1)) : 0;
 }
+
 /** 
  * The inverse of log2_order()
  */
 #define log2_size(_x) (1u << (_x))
 
 /**
- * Defines a linear allocation sc
+ * Defines a linear allocation scale
+ * @test Background:
+ * @code
+ * DEFINE_LINEAR_SCALE(2);
+ * @endcode
+ * @test 
+ *  Verify that the linear scaled order is correct
+ * `ASSERT_UINT_EQ(linear2_order(x), expected);`
+ * @testvar{unsigned,x,u}  | @testvar{unsigned,expected}
+ * ------------------------|---------------------------
+ * `0`                     | `0`
+ * `1`                     | `0`
+ * `2`                     | `1`
+ * `3`                     | `1`
+ * `4`                     | `2`
+ * `5`                     | `2`
+ * `65536`                 | `32768`
  */
 #define DEFINE_LINEAR_SCALE(_n)                                 \
     static inline unsigned linear##_n##_order(unsigned x)       \

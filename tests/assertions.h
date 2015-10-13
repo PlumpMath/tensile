@@ -212,10 +212,13 @@ __ASSERT_CMP_INLINE(bits_neq, unsigned long long, "%llx", _arg1 != _arg2);
 #define BEGIN_TESTSUITE(_msg) fprintf(stderr, "%s:\n", (_msg))
 #define BEGIN_TESTCASE(_msg) BEGIN_TESTSUITE(_msg)
 
-#define BEGIN_TESTSTEP_VERBOSE(_indent, _msg)            \
-    do {                                                \
-        fprintf(stderr, "%*s", 2 * (_indent), (_msg));   \
-        fflush(stderr);                                 \
+#define BEGIN_TESTSTEP_VERBOSE(_indent, _msg)                       \
+    do {                                                            \
+        if ((_indent) > 0)                                          \
+            fprintf(stderr, "%*c%s", 2 * (_indent), ' ', (_msg));   \
+        else                                                        \
+            fputs((_msg), stderr);                                  \
+        fflush(stderr);                                             \
     } while(0)
 #define BEGIN_TESTSTEP_SILENT(_indent, _msg) ((void)0)
 
@@ -225,22 +228,20 @@ __ASSERT_CMP_INLINE(bits_neq, unsigned long long, "%llx", _arg1 != _arg2);
 #define BEGIN_TESTSTEP_ASSERTION BEGIN_TESTSTEP_VERBOSE
 #define BEGIN_TESTSTEP_DESCRIPTION BEGIN_TESTSTEP_VERBOSE
 
-#define TESTITER_level_chars ".o*+#"
-
-#define BEGIN_TESTITER_VERBOSE(_level)                                  \
+#define BEGIN_TESTITER_VERBOSE(_indent, _level, _fmt, ...)              \
     do {                                                                \
-        assert((_level) > 0 && (_level) < sizeof(TESTITER_level_chars)); \
-        fputc(TESTITER_level_chars[(_level) - 1], stderr);              \
+        fprintf(stderr, "\n%*c" _fmt, 2 * (_indent) + (_level) + 1, ' ', \
+                __VA_ARGS__);                                           \
         fflush(stderr);                                                 \
     } while(0)
 
-#define BEGIN_TESTITER_SILENT(_level) ((void)0)
+#define BEGIN_TESTITER_SILENT(_indent, _level, _fmt, ...) ((void)0)
 
 #define BEGIN_TESTITER_CLEANUP BEGIN_TESTITER_SILENT
-#define BEGIN_TESTITER_PREREQ BEGIN_TESTITER_SILENT
-#define BEGIN_TESTITER_CONDITION BEGIN_TESTITER_SILENT
+#define BEGIN_TESTITER_PREREQ BEGIN_TESTITER_VERBOSE
+#define BEGIN_TESTITER_CONDITION BEGIN_TESTITER_VERBOSE
 #define BEGIN_TESTITER_ASSERTION BEGIN_TESTITER_VERBOSE
-#define BEGIN_TESTITER_DESCRIPTION BEGIN_TESTITER_SILENT
+#define BEGIN_TESTITER_DESCRIPTION BEGIN_TESTITER_VERBOSE
 
 #define BEGIN_TESTSUBSTEP_VERBOSE() fputc('\n', stderr)
 #define BEGIN_TESTSUBSTEP_SILENT() ((void)0)

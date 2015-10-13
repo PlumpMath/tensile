@@ -81,6 +81,12 @@
             <xsl:value-of select="$indexvar" /> &lt;=  <xsl:value-of select="string(row[2]/entry[3]/para/computeroutput)" />;
             <xsl:value-of select="$indexvar" /> += <xsl:choose><xsl:when test="row[2]/entry[4]"><xsl:value-of select="string(row[2]/entry[4]/para/computeroutput)" /></xsl:when><xsl:otherwise>1</xsl:otherwise></xsl:choose>)
             {
+            <xsl:if test="row[2]/entry[1]/para/computeroutput[3]">
+              BEGIN_TESTITER_<xsl:value-of select="$step"/>(<xsl:value-of select="count(ancestor::listitem)"/>,
+              <xsl:value-of select="position() - 1" />,
+              "For <xsl:value-of select="$indexvar" />=%<xsl:value-of select="string(row[2]/entry[1]/para/computeroutput[3])" />",
+              <xsl:value-of select="$indexvar" />);
+            </xsl:if>
           </xsl:when>
           <xsl:otherwise>
             {
@@ -104,17 +110,33 @@
               <xsl:value-of select="string(computeroutput[1])" /><xsl:text>&#32;</xsl:text><xsl:value-of select="string(computeroutput[2])" /> =
               __<xsl:value-of select="string(computeroutput[2])" />__array[<xsl:value-of select="$indexvar" />];
             </xsl:for-each>
-            <xsl:if test="not($table/../itemizedlist) and not($table/../orderedlist)">
-              BEGIN_TESTITER_<xsl:value-of select="$step"/>(<xsl:value-of select="position()" />);
-            </xsl:if>
+            BEGIN_TESTITER_<xsl:value-of select="$step"/>(<xsl:value-of select="count(ancestor::listitem)"/>,
+            <xsl:value-of select="position() - 1" />,
+            <xsl:choose>
+              <xsl:when test="row[1]/entry[@thead = 'yes']/para[computeroutput[3]]">
+                "For "              
+                <xsl:for-each select="row[1]/entry[@thead = 'yes']/para[computeroutput[3]]">
+                  "<xsl:if test="position() > 1"><xsl:text>, </xsl:text></xsl:if><xsl:value-of select="string(computeroutput[2])" />=%<xsl:value-of select="string(computeroutput[3])" />"
+                </xsl:for-each>
+                <xsl:for-each select="row[1]/entry[@thead = 'yes']/para[computeroutput[3]]">
+                  , <xsl:value-of select="string(computeroutput[2])" />
+                </xsl:for-each>
+              </xsl:when>
+              <xsl:otherwise>
+                "[%u]", <xsl:value-of select="$indexvar" />
+              </xsl:otherwise>
+            </xsl:choose>
+            );
           </xsl:otherwise>
         </xsl:choose>
       </xsl:for-each>
       <xsl:apply-templates select="programlisting|computeroutput" />
       <xsl:if test="orderedlist|itemizedlist">
+        {
         BEGIN_TESTSUBSTEP_<xsl:value-of select="$step"/>();
         {
         <xsl:apply-templates select="(orderedlist|itemizedlist)/listitem/para" />
+        }
         }
       </xsl:if>
       <xsl:for-each select="table">}}</xsl:for-each>
