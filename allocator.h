@@ -976,6 +976,19 @@ static inline unsigned log2_order(unsigned x)
  * @test Background:
  * @code
  * DEFINE_LINEAR_SCALE(2);
+ * DECLARE_ARRAY_TYPE(simple_linear2_array, void *ptr; unsigned tag;, unsigned);
+ * DECLARE_ARRAY_ALLOCATOR(simple_linear2_array);
+ * 
+ * DEFINE_ARRAY_ALLOCATOR(simple_linear2_array, linear2, 4, arr, i,
+ *                        {arr->tag = STATE_INITIALIZED;},
+ *                        {arr->elts[i] = i; },
+ *                        {NEW(arr)->tag = STATE_CLONED; },
+ *                        {NEW(arr)->elts[i] = OLD(arr)->elts[i] | STATE_CLONED; },
+ *                        {NEW(arr)->tag = STATE_ADJUSTED; },
+ *                        {NEW(arr)->elts[i] = OLD(arr)->elts[i] | STATE_ADJUSTED; },
+ *                        {arr->tag |= STATE_RESIZED; },
+ *                        {arr->tag = STATE_FINALIZED; },
+ *                        {arr->elts[i] = STATE_FINALIZED; });
  * @endcode
  * @test 
  *  Verify that the linear scaled order is correct
@@ -989,6 +1002,64 @@ static inline unsigned log2_order(unsigned x)
  * `4`                     | `2`
  * `5`                     | `2`
  * `65536`                 | `32768`
+ * @test Alloc and free a scaled-linear array
+ * @code
+ * simple_linear2_array *prev = NULL;
+ * @endcode
+ * Varying                   | From | To
+ * --------------------------|------|-----
+ * @testvar{unsigned,size,u} | `0`  |`4`
+ * - Given a fresh array:
+ *   `simple_linear2_array *arr = new_simple_linear2_array(size * 2);`
+ * - Verify that it is allocated
+ *   `ASSERT_PTR_NEQ(arr, NULL);`
+ * - Verify that it does not share memory with a lesser array:
+ *   `ASSERT_PTR_NEQ(arr, prev);`
+ * - Verify that it is initialized:
+ *   `ASSERT_UINT_EQ(arr->tag, STATE_INITIALIZED);`
+ * - Verify that the number of elements is correct:
+ *   `ASSERT_UINT_EQ(arr->nelts, size * 2);`
+ * - When it is freed: `free_simple_linear2_array(arr);`
+ * - And when it is not so large: `if (size != 4)`
+ *    + Verify that it is finalized: `ASSERT_UINT_EQ(arr->tag, STATE_FINALIZED);`
+ * - Cleanup: `prev = arr;`
+ * @test Alloc, free and realloc a scaled-linear array
+ * Varying                   | From | To
+ * --------------------------|------|-----
+ * @testvar{unsigned,size,u} | `0`  |`3`
+ * - Given a fresh array:
+ * @code
+ * simple_linear2_array *arr = new_simple_linear2_array(size * 2);
+ * simple_linear2_array *arr1;
+ * @endcode
+ * - When it is freed: `free_simple_linear2_array(arr);`
+ * - And when a new, slightly larger array, is allocated:
+ *   `arr1 = new_simple_linear2_array(size * 2 + 1);`
+ * - Then the memory is reused: `ASSERT_PTR_EQ(arr, arr1);`
+ * - Cleanup: `free_simple_linear2_array(arr1);`
+ * @test Resize a scaled-linear to a larger size
+ * - Given an allocated scaled linear array:
+ * @code
+ * unsigned sz = ARBITRARY(unsigned, 1, 4);
+ * simple_linear2_array *arr = new_simple_linear2_array(sz * 2);
+ * @endcode
+ * - When it is reallocated to a slightly larger size:
+ *   `simple_linear2_array *arr1 = resize_simple_linear2_array(arr, sz * 2 + 1);`
+ * - Then the memory is reused:
+ *   `ASSERT_PTR_EQ(arr, arr1);`
+ * - And the number of elements is correct:
+ *   `ASSERT_UINT_EQ(arr1->nelts, sz * 2 + 1);`
+ * - And the extra elements are initialized:
+ *   `ASSERT_UINT_EQ(arr1->elts[sz * 2], sz * 2);`
+ * - When it is reallocate to a yet larger size:
+ *   `arr1 = resize_simple_linear2_array(arr, (sz + 1) * 2);`
+ * - Then the memory is not reused:
+ *   `ASSERT_PTR_NEQ(arr, arr1);`
+ * - And the number of elements is correct:
+ *   `ASSERT_UINT_EQ(arr1->nelts, (sz + 1) * 2);`
+ * - And the extra elements are initialized:
+ *   `ASSERT_UINT_EQ(arr1->elts[sz * 2 + 1], sz * 2 + 1);` 
+ * - Cleanup: `free_simple_linear2_array(arr1);`
  */
 #define DEFINE_LINEAR_SCALE(_n)                                 \
     static inline unsigned linear##_n##_order(unsigned x)       \
