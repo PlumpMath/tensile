@@ -105,7 +105,20 @@ extern void testfunc1(void);
  * - When something happens: `state++;`
  *
  * @test Test with Background
- * - Then the state is correct: `ASSERT_UINT_EQ(state, 1)`;
+ * - Then the state is correct: `ASSERT_UINT_EQ(state, 1);`
+ *
+ * @test Test with Background 2
+ * - Then the state is correct: `ASSERT_UINT_LESS(state, 10);`
+ *
+ * @test Background:
+ * @testvar{unsigned,i,u}|@testvar{unsigned,expected}
+ * ----------------------|---------------------------
+ * `0`                   |`1`
+ * `1`                   |`2`
+ * @li Given a certain state: `unsigned state = i;`
+ *
+ * @test Test with tabled Background
+ * - Then the state is correct: `ASSERT_UINT_EQ(state + 1, expected);`
  */
 extern void testfunc2(void);
 

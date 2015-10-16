@@ -68,6 +68,7 @@ extern "C"
  *                  {q->elts[i] = STATE_FINALIZED; },
  *                  trivial_enqueue, 4);
  * @endcode
+ *
  * @test Alloc Queue
  * - Given a new queue:
  * @code
@@ -76,7 +77,7 @@ extern "C"
  *     unsigned i;
  * @endcode
  * - Verify that it is allocated:
- *  `ASSERT_PTR_ne(q, NULL);`
+ *  `ASSERT_PTR_NEQ(q, NULL);`
  * - Verify that the number of elements is correct:
  *   `ASSERT_UINT_EQ(q->nelts, sz);`
  * - Verify that the top element is zero:
@@ -88,11 +89,12 @@ extern "C"
  * - When it is freed: `free_simple_queue(q);`
  * - Then the elements are not finalized:
  *   `for (i = 0; i < sz; i++) ASSERT_UINT_EQ(q->elts[0], STATE_INITIALIZED);`
+ *
  * @test Enqueue and dequeue
  * - Given a queue:
  * @code
  *     unsigned sz = ARBITRARY(unsigned, 1, 16);
- *     simple_queue *q = new_simple_queue(8);
+ *     simple_queue *q = new_simple_queue(sz);
  *     simple_queue *q1 = q;
  *     unsigned thetag = ARBITRARY(unsigned, 1, 0xffff);
  *     unsigned x;
@@ -114,6 +116,7 @@ extern "C"
  * - And the dequeued element is the same as one enqueued:
  *   `ASSERT_UINT_EQ(x, thetag);`
  * - Cleanup: `free_simple_queue(q);`
+ *
  * @test Background:
  * - Given a queue:
  * @code
@@ -122,19 +125,17 @@ extern "C"
  *     unsigned thetag1 = ARBITRARY(unsigned, 1, 0xffff);
  *     unsigned thetag2 = ARBITRARY(unsigned, 1, 0xffff);
  * @endcode
+ *
  * @test Enqueue two and dequeue
- * - Given a queue:
+ * - When two elements are enqueued:
  * @code
  *     simple_queue *q1 = q;
  *     unsigned x;
- * @endcode
- * - When two elements are enqueued:
- * @code
  *     enqueue_simple_queue(&q, thetag1);
  *     enqueue_simple_queue(&q, thetag2);    
  * @endcode
  * - Then the queue is not reallocated:
- *   `ASSERT_PTR_eq(q, q1);`
+ *   `ASSERT_PTR_EQ(q, q1);`
  * - And the top pointer is incremented:
  *   `ASSERT_UINT_EQ(q->top, 2);`
  * - But the bottom pointer is intact:
@@ -148,17 +149,11 @@ extern "C"
  * - And the dequeued element is the first one that was enqueued:
  *   `ASSERT_UINT_EQ(x, thetag1);`
  * - Cleanup: free_simple_queue(q);
+ *
  * @test Enqueue and dequeue from the back
- * - Given a queue:
- * @code
- *     unsigned sz = ARBITRARY(unsigned, 2, 16);
- *     simple_queue *q = new_simple_queue(sz);
- *     unsigned thetag1 = ARBITRARY(unsigned, 1, 0xffff);
- *     unsigned thetag2 = ARBITRARY(unsigned, 1, 0xffff);
- *     unsigned x;
- * @endcode
  * - When two elements are enqueued:
  * @code
+ *     unsigned x;
  *     enqueue_simple_queue(&q, thetag1);
  *     enqueue_simple_queue(&q, thetag2);
  * @endcode
@@ -171,15 +166,8 @@ extern "C"
  * - And the dequeued element is the last one that was enqueued:
  *   `ASSERT_UINT_EQ(x, thetag2);`
  * - Cleanup: `free_simple_queue(q);`
+ *
  * @test Enqueue at the front
- * - Given a queue:
- * @code
- *     unsigned sz = ARBITRARY(unsigned, 2, 16);
- *     simple_queue *q = new_simple_queue(sz);
- *     unsigned thetag1 = ARBITRARY(unsigned, 1, 0xffff);
- *     unsigned thetag2 = ARBITRARY(unsigned, 1, 0xffff);
- *     unsigned x;
- * @endcode
  * - When an element is enqueued at the front:
  *   `enqueue_front_simple_queue(&q, thetag1);`
  * - Then the top pointer is incremented:
@@ -193,77 +181,122 @@ extern "C"
  * - And the bottom pointer is 2 elements lower:
  *   `ASSERT_UINT_EQ(q->bottom, sz - 2);`
  * - Cleanup: `free_simple_queue(q);`
+ *
  * @test Enqueue, dequeue and enqueue at the front 
- *     simple_queue *q = new_simple_queue(8);
+ * - When two elements are enqueued:
+ * @code
+ *     unsigned thetag3 = ARBITRARY(unsigned, 1, 0xffff);
  *     unsigned x;
- * 
- *     enqueue_simple_queue(&q, 1);
- *     enqueue_simple_queue(&q, 2);
- *     dequeue_simple_queue(q);
- *     enqueue_front_simple_queue(&q, 3);
- *     ASSERT_UINT_EQ(q->bottom, 0);
- *     ASSERT_UINT_EQ(q->top, 2);
- *     x = dequeue_simple_queue(q);
- *     ASSERT_UINT_EQ(x, 3);
- *     free_simple_queue(q);
- * 
- * 
- * @test enqueue_grow
+ *     enqueue_simple_queue(&q, thetag1);
+ *     enqueue_simple_queue(&q, thetag2);
+ * @endcode
+ * - And when an element is dequeued:
+ *   `dequeue_simple_queue(q);`
+ * - And when a new element is enqueued at the front:
+ *   `enqueue_front_simple_queue(&q, thetag3);`
+ * - Then the bottom pointer is at start:
+ *   `ASSERT_UINT_EQ(q->bottom, 0);`
+ * - And the top pointer is two elements above:
+ *   `ASSERT_UINT_EQ(q->top, 2);
+ * - When an element is dequeued:
+ *    `x = dequeue_simple_queue(q);`
+ * - Then it is an element that was last enqueued at front:
+ *   `ASSERT_UINT_EQ(x, 3);`
+ * - Cleanup: `free_simple_queue(q);`
+ *
+ * @test Background:
+ * - Given a queue with a single reserved element:
+ * @code
  *     simple_queue *q = new_simple_queue(1);
  *     simple_queue *q1 = q;
+ *     unsigned thetag1 = ARBITRARY(unsigned, 1, 0xffff);
+ *     unsigned thetag2 = ARBITRARY(unsigned, 1, 0xffff);
+ * @endcode
+ *
+ * @test Enqueue with grow
+ * - When two elements are enqeed:
+ * @code
  *     unsigned x;
- * 
- *     enqueue_simple_queue(&q, 1);
- *     enqueue_simple_queue(&q, 2);
- *     ASSERT_UINT_EQ(q->top, 2);
- *     ASSERT_PTR_ne(q, q1);
- *     ASSERT_UINT_EQ(q->nelts, 6);
- *     ASSERT_UINT_EQ(q->elts[0], 1);
+ *     unsigned thetag3 = ARBITRARY(unsigned, 1, 0xffff);
+ *     enqueue_simple_queue(&q, thetag1);
+ *     enqueue_simple_queue(&q, thetag2);
+ * @endcode
+ * - Then the top pointer is correct:
+ *   `ASSERT_UINT_EQ(q->top, 2);`
+ * - And the queue is reallocated:
+ *   `ASSERT_PTR_NEQ(q, q1);`
+ * - And the right number of elements is reserved:
+ *   `ASSERT_UINT_EQ(q->nelts, 6);`
+ * - And the first element in the queue is the first one enqueued:
+ *   `ASSERT_UINT_EQ(q->elts[0], thetag1);`
+ * - When the third element is enqueued:
+ * @code
  *     q1 = q;
- *     enqueue_simple_queue(&q, 3);
- *     ASSERT_PTR_eq(q1, q);
- *     ASSERT_UINT_EQ(q->nelts, 6);
- *     x = dequeue_simple_queue(q);
- *     ASSERT_UINT_EQ(q->nelts, 6);
- *     ASSERT_UINT_EQ(x, 1);
- *     x = dequeue_simple_queue(q);
- *     ASSERT_UINT_EQ(x, 2);
- *     x = dequeue_simple_queue(q);
- *     ASSERT_UINT_EQ(x, 3);
+ *     enqueue_simple_queue(&q, thetag3);
+ * @endcode
+ * - The queue is not reallocated:
+ *   `ASSERT_PTR_EQ(q1, q);`
+ * - And the number of reserved elements remain the same:
+ *   `ASSERT_UINT_EQ(q->nelts, 6);`
+ * - When an element is dequeued:
+ *   `x = dequeue_simple_queue(q);`
+ * - Then the number of reserved elements is still the same:
+ *   `ASSERT_UINT_EQ(q->nelts, 6);`
+ * - And the dequeued element is the first one enqueued:
+ *   `ASSERT_UINT_EQ(x, thetag1);`
+ * - When another element is dequeued
+ *   `x = dequeue_simple_queue(q);`
+ * - Then it is the second one enqueued:
+ *   `ASSERT_UINT_EQ(x, 2);`
+ * - When yet another element is dequeued:
+ *   `x = dequeue_simple_queue(q);`
+ * - Then it is the last element enqueued:
+ *   `ASSERT_UINT_EQ(x, 3);`
+ * - Cleanup: `free_simple_queue(q);`
  * 
- *     free_simple_queue(q);
- * 
- * @test enqueue_front_grow
- *     simple_queue *q = new_simple_queue(1);
- *     simple_queue *q1 = q;
- * 
- *     enqueue_front_simple_queue(&q, 1);
- *     enqueue_front_simple_queue(&q, 2);
- *     ASSERT_PTR_ne(q, q1);
- *     ASSERT_UINT_EQ(q->top, 6);
- *     ASSERT_UINT_EQ(q->bottom, 4);    
- *     ASSERT_UINT_EQ(q->nelts, 6);
- *     ASSERT_UINT_EQ(q->elts[4], 2);
- *     ASSERT_UINT_EQ(q->elts[5], 1);
- * 
- *     free_simple_queue(q);
- * 
- * 
- * @test clear_queue
- *     simple_queue *q = new_simple_queue(3);
- * 
- *     enqueue_simple_queue(&q, 1);
- *     enqueue_simple_queue(&q, 2);
- *     enqueue_simple_queue(&q, 3);
- *     clear_simple_queue(q);
- *     ASSERT_UINT_EQ(q->top, 0);
- *     ASSERT_UINT_EQ(q->bottom, 0);    
- *     ASSERT_UINT_EQ(q->nelts, 3);
- *     ASSERT_UINT_EQ(q->elts[0], 0);
- *     ASSERT_UINT_EQ(q->elts[1], 0);
- *     ASSERT_UINT_EQ(q->elts[2], 0);
- * 
- *     free_simple_queue(q);
+ * @test Enqueue at the front and grow:
+ * - When two elements are enqueued at the front:
+ * @code
+ *     enqueue_front_simple_queue(&q, thetag1);
+ *     enqueue_front_simple_queue(&q, thetag2);
+ * @endcode
+ * - Then the queue is reallocated:
+ *   `ASSERT_PTR_NEQ(q, q1);`
+ * - And the top pointer is after the last reserved element:
+ *   `ASSERT_UINT_EQ(q->top, 6);`
+ * - And the bottom pointer is two elements below:
+ *   `ASSERT_UINT_EQ(q->bottom, 4);`
+ * - And the number of elements is correct:
+ *   `ASSERT_UINT_EQ(q->nelts, 6);`
+ * - And the order of enqueued elements is correct:
+ * @code
+ *    ASSERT_UINT_EQ(q->elts[4], thetag2);
+ *    ASSERT_UINT_EQ(q->elts[5], thetag1);
+ * @endcode
+ * - Cleanup: free_simple_queue(q);
+ *
+ * @test Background: none
+ *
+ * @test Clear queue
+ * - Given a queue:
+ * @code
+ * unsigned sz = ARBITRARY(unsigned, 2, 16);
+ * simple_queue *q = new_simple_queue(sz);
+ * unsigned i;
+ * @endcode
+ * - When it is filled up:
+ * `for (i = 0; i < sz; i++) enqueue_simple_queue(&q, i + 1);`
+ * - And when it is cleared:
+ *  `clear_simple_queue(q);`
+ * - The the top pointer is reset:
+ *  `ASSERT_UINT_EQ(q->top, 0);`
+ * - And the bottom pointer is reset:
+ *   `ASSERT_UINT_EQ(q->bottom, 0);`
+ * - But the number of reserved elements is intact:
+ *   `ASSERT_UINT_EQ(q->nelts, sz);`
+ * - And the elements are reset:
+ *   `for (i = 0; i < sz; i++) ASSERT_UINT_EQ(q->elts[i], STATE_INITIALIZED);`
+ * - Cleanup: `free_simple_queue(q);`
  *  */
 #define DECLARE_QUEUE_OPS(_type, _eltype, _deqfunc)                 \
     DECLARE_ARRAY_ALLOCATOR(_type);                                 \

@@ -65,6 +65,7 @@ extern "C"
  * {NEW(stk->elts[i]) = OLD(stk->elts[i]) | STATE_CLONED;},
  * {stk->elts[i] = STATE_FINALIZED; });
  * @endcode
+ *
  * @test Alloc stack
  * - Given a new stack:
  * @code
@@ -82,6 +83,7 @@ extern "C"
  * - When it is freed: `free_simple_stack(stk);`
  * - Then the elements above the top are not finalized:
  *   `for (i = 0; i < sz; i++) ASSERT_UINT_EQ(stk->elts[i], STATE_INITIALIZED);`
+ *
  * @test Push and pop
  * - Given a new stack:
  * @code
@@ -103,6 +105,7 @@ extern "C"
  * - And the popped element is the same as was pushed:
  *   `ASSERT_UINT_EQ(x, any);`
  * - Cleanup: `free_simple_stack(stk);`
+ *
  * @test Push with grow
  * - Given a new stack with a single reserved element:
  * @code
@@ -145,6 +148,7 @@ extern "C"
  * - Then it is the second element:
  *   `ASSERT_UINT_EQ(x, any2);`
  * - Cleanup: `free_simple_stack(stk);`
+ *
  * @test Clear stack
  * - Given a new stack
  * @code
@@ -191,6 +195,7 @@ extern "C"
 
 /**
  * Declare operations for a stack of refcounter objects
+ *
  * @test Background:
  * @code
  * typedef struct stacked_refcnt {
@@ -208,6 +213,7 @@ extern "C"
  *                         { obj->value = STATE_FINALIZED; });
  * DEFINE_STACK_REFCNT_OPS(refcnt_stack, stacked_refcnt, linear, 8);
  * @endcode
+ *
  * @test Push and pop from a stack of refcounted objects 
  * - Given a stack and an object:
  * @code
@@ -231,6 +237,7 @@ extern "C"
  * free_stacked_refcnt(obj1);
  * free_refcnt_stack(st);
  * @endcode
+ *
  * @test Copy stack of refcounted objects
  * - Given a stack and an object:
  * @code
@@ -268,6 +275,7 @@ extern "C"
  * free_refcnt_stack(st1);
  * free_refcnt_stack(st);
  * @endcode
+ *
  * @test Clear stack of refcounted objects
  * - Given a stack and an object:
  * @code
