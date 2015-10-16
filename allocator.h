@@ -401,10 +401,10 @@ extern "C"
  * }
  * @endcode
  * @test Allocate and free
- * `simple_array *prev = NULL;`
  * | Varying                  | From|To |
  * |--------------------------|-----|---|
  * | @testvar{unsigned,size,u}|`0`  |`4`|
+ * `simple_array *prev = NULL;`
  * - Given an allocated array of a given size
  * @code
  * simple_array *arr = new_simple_array(size);
@@ -421,9 +421,6 @@ extern "C"
  *   + And the elements are finalized: `for(j = 0; j < size; j++)  ASSERT_UINT_EQ(arr->elts[j], STATE_FINALIZED);`
  * - Cleanup `prev = arr;`
  * @test Allocate, free and reallocate
- * | Varying                  | From|To |
- * |--------------------------|-----|---|
- * | @testvar{unsigned,size,u}|`0`  |`4`|
  * - Given an allocated array of a given size
  * @code
  * simple_array *arr = new_simple_array(size);
@@ -433,10 +430,11 @@ extern "C"
  * - And when a new array of the same size is allocated `arr1 = new_simple_array(size);`
  * - Then the memory is shared `ASSERT_PTR_EQ(arr, arr1);`
  * - Cleanup: `free_simple_array(arr1);`
- * @test Copy
+ * .
  * | Varying                  | From|To |
  * |--------------------------|-----|---|
- * | @testvar{unsigned,size,u}|`0`  |`5`|
+ * | @testvar{unsigned,size,u}|`0`  |`4`|
+ * @test Copy
  * - Given an array:
  * @code
  * simple_array *arr = new_simple_array(size);
@@ -452,6 +450,10 @@ extern "C"
  * - When the copy is freed `free_simple_array(arr1);`
  * - Then the original is untouched `ASSERT_UINT_EQ(arr->tag, STATE_INITIALIZED);`
  * - Cleanup: `free_simple_array(arr);`
+ * .
+ * | Varying                  | From|To |
+ * |--------------------------|-----|---|
+ * | @testvar{unsigned,size,u}|`0`  |`5`|
  * @test Resize Null
  * - When a NULL pointer to an array is resized 
  * @code
@@ -513,10 +515,10 @@ extern "C"
  *                      {arr->elts[i] = STATE_FINALIZED; });
  * @endcode
  * @test Allocate and free (log scale)
- * `simple_log_array *prev = NULL;`
  * | Varying                  | From|To |
  * |--------------------------|-----|---|
  * |@testvar{unsigned,order,u}|`0`  |`4`|
+ * `simple_log_array *prev = NULL;`
  * - Given an allocated array of a certain size
  *   `simple_log_array *arr = new_simple_log_array(1u << order);`
  * - Verify it is allocated `ASSERT_PTR_NEQ(arr, NULL);`
@@ -528,9 +530,6 @@ extern "C"
      + Then it is finalized `ASSERT_UINT_EQ(arr->tag, STATE_FINALIZED);`
  * - Cleanup `prev = arr;`
  * @test Allocate, free and allocate slightly lesser
- * | Varying                   | From|To |
- * |---------------------------|-----|---|
- * | @testvar{unsigned,order,u}|`2`  |`3`|
  * - Given an allocated array of a certain size
  * @code
  * simple_log_array *arr = new_simple_log_array(1u << order);
@@ -541,6 +540,10 @@ extern "C"
  *   `arr1 = new_simple_log_array((1u << order) - 1);`
  * - Then it shares memory with the first array `ASSERT_PTR_EQ(arr, arr1);`
  * - Cleanup `free_simple_log_array(arr1);`
+ * .
+ * | Varying                   | From|To |
+ * |---------------------------|-----|---|
+ * | @testvar{unsigned,order,u}|`2`  |`3`|
  * @test Make slightly larger
  * - Given an allocated array of a certain size
  * `simple_log_array *arr = new_simple_log_array(9);`
@@ -1003,12 +1006,12 @@ static inline unsigned log2_order(unsigned x)
  * `5`                     | `2`
  * `65536`                 | `32768`
  * @test Alloc and free a scaled-linear array
- * @code
- * simple_linear2_array *prev = NULL;
- * @endcode
  * Varying                   | From | To
  * --------------------------|------|-----
  * @testvar{unsigned,size,u} | `0`  |`4`
+ * @code
+ * simple_linear2_array *prev = NULL;
+ * @endcode
  * - Given a fresh array:
  *   `simple_linear2_array *arr = new_simple_linear2_array(size * 2);`
  * - Verify that it is allocated
@@ -1024,9 +1027,6 @@ static inline unsigned log2_order(unsigned x)
  *    + Verify that it is finalized: `ASSERT_UINT_EQ(arr->tag, STATE_FINALIZED);`
  * - Cleanup: `prev = arr;`
  * @test Alloc, free and realloc a scaled-linear array
- * Varying                   | From | To
- * --------------------------|------|-----
- * @testvar{unsigned,size,u} | `0`  |`3`
  * - Given a fresh array:
  * @code
  * simple_linear2_array *arr = new_simple_linear2_array(size * 2);
@@ -1037,6 +1037,10 @@ static inline unsigned log2_order(unsigned x)
  *   `arr1 = new_simple_linear2_array(size * 2 + 1);`
  * - Then the memory is reused: `ASSERT_PTR_EQ(arr, arr1);`
  * - Cleanup: `free_simple_linear2_array(arr1);`
+ * .
+ * Varying                   | From | To
+ * --------------------------|------|-----
+ * @testvar{unsigned,size,u} | `0`  |`3`
  * @test Resize a scaled-linear to a larger size
  * - Given an allocated scaled linear array:
  * @code

@@ -8,7 +8,7 @@
   <xsl:template match="compounddef[@kind = 'file']">
     #include "assertions.h"
     <xsl:variable name="testbg" select="detaileddescription/para/xrefsect[xreftitle[string() = 'Test']]//para[starts-with(normalize-space(), 'Background:')]" />
-    <xsl:apply-templates select="$testbg//programlisting|$testbg//computeroutput" />
+    <xsl:apply-templates select="$testbg/programlisting|$testbg/computeroutput" />
     #include "<xsl:value-of select="//compounddef[@kind = 'file']/compoundname" />"
     <xsl:apply-templates select="innerclass" />
     <xsl:apply-templates select="sectiondef" />
@@ -32,7 +32,7 @@
 
   <xsl:template match="compounddef">
     <xsl:variable name="testbg" select="detaileddescription/para/xrefsect[xreftitle[string() = 'Test']]//para[starts-with(normalize-space(), 'Background:')]" />    
-    <xsl:apply-templates select="$testbg//programlisting|$testbg//computeroutput" />
+    <xsl:apply-templates select="$testbg/programlisting|$testbg/computeroutput" />
     <xsl:apply-templates select="innerclass" />    
     <xsl:apply-templates select="sectiondef" />
   </xsl:template>
@@ -49,7 +49,7 @@
     <xsl:variable name="tests" select="detaileddescription/para/xrefsect[xreftitle[string() = 'Test']]" />
     <xsl:if test="$tests">
       <xsl:variable name="testbg" select="$tests//para[starts-with(normalize-space(), 'Background:')]" />
-      <xsl:apply-templates select="$testbg//programlisting|$testbg//computeroutput" />
+      <xsl:apply-templates select="$testbg/programlisting|$testbg/computeroutput" />
       static void test_<xsl:number level="any" count="memberdef" />(void) {
       BEGIN_TESTCASE("<xsl:value-of select="name"/>");
       <xsl:apply-templates select="$tests/xrefdescription/para" />
@@ -63,14 +63,16 @@
       <xsl:variable name="step">
         <xsl:choose>
           <xsl:when test="starts-with($tag, 'Clean')">CLEANUP</xsl:when>
-          <xsl:when test="starts-with($tag, 'Given ')">PREREQ</xsl:when>
+          <xsl:when test="starts-with($tag, 'Given ') or starts-with($tag, 'And given ')">PREREQ</xsl:when>
           <xsl:when test="starts-with($tag, 'When ') or starts-with($tag, 'And when ')">CONDITION</xsl:when>
           <xsl:when test="starts-with($tag, 'Then ') or starts-with($tag, 'And ') or starts-with($tag, 'But ') or starts-with($tag, 'Verify ')">ASSERTION</xsl:when>
           <xsl:otherwise>DESCRIPTION</xsl:otherwise>
           </xsl:choose>
       </xsl:variable>
+      <xsl:variable name="background" select="parent::xrefdescription/../../preceding-sibling::para[xrefsect[xreftitle[string() = 'Test'] and
+                                              xrefdescription/para[starts-with(normalize-space(), 'Background:')]]][1]/xrefsect/xrefdescription/para" />
       BEGIN_TESTSTEP_<xsl:value-of select="$step" />(<xsl:value-of select="count(ancestor::listitem)" />, "<xsl:value-of select="$tag" />");      
-      <xsl:for-each select="table">
+      <xsl:for-each select="table|$background/table">
         <xsl:choose>
           <xsl:when test="count(row) = 2">
             {
@@ -131,17 +133,18 @@
         </xsl:choose>
       </xsl:for-each>
       <xsl:apply-templates select="programlisting|computeroutput" />
-      <xsl:if test="orderedlist|itemizedlist">
+      <xsl:variable name="subtests" select="orderedlist|itemizedlist|$background/orderedlist|$background/itemizedlist" />
+      <xsl:if test="$subtests">
         {
         BEGIN_TESTSUBSTEP_<xsl:value-of select="$step"/>();
         {
-        <xsl:apply-templates select="(orderedlist|itemizedlist)/listitem/para" />
+        <xsl:apply-templates select="$subtests/listitem/para" />
         }
         }
       </xsl:if>
-      <xsl:for-each select="table">}}</xsl:for-each>
+      <xsl:for-each select="table|$background/table">}}</xsl:for-each>
       <xsl:choose>
-        <xsl:when test="orderedlist|itemizedlist">END_TESTSTEP_<xsl:value-of select="$step" />(<xsl:value-of select="count(ancestor::listitem)"/>);</xsl:when>
+        <xsl:when test="$subtests">END_TESTSTEP_<xsl:value-of select="$step" />(<xsl:value-of select="count(ancestor::listitem)"/>);</xsl:when>
         <xsl:otherwise>END_TESTSTEP_<xsl:value-of select="$step" />(0);</xsl:otherwise>
       </xsl:choose>
     </xsl:if>

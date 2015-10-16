@@ -166,7 +166,7 @@ static inline unsigned count_leading_zeroes(unsigned i)
 }
 #else
 /**
- * @return Number of leading zero bits in a 32-bit unsigned integer
+ * @return Number of leading zero bits in a 32-bit unsigned integer 
  * @test
  *  Verify that the number of leading zeroes is correct
  * `ASSERT_UINT_EQ(count_leading_zeroes(i), expected);`
