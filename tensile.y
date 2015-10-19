@@ -44,8 +44,8 @@
 %right TOK_THEN                        
 %nonassoc TOK_HOT TOK_COLD TOK_IDLE TOK_GREEDY
 %nonassoc TOK_ELSE
-%right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_GENERIC TOK_SELECT TOK_FREEZE TOK_WATCH
-%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_RETURN TOK_YIELD TOK_ERROR TOK_GOTO TOK_ASSERT TOK_EXPECT 
+%right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_TYPECASE TOK_POLL TOK_FREEZE TOK_WATCH
+%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_RETURN TOK_YIELD TOK_ERROR TOK_GOTO TOK_ASSERT TOK_NEED
 %right TOK_PUT TOK_PUT_ALL TOK_PUT_NEXT 
 %left '='
 %right '?'
@@ -225,8 +225,8 @@ noderef:        TOK_ID
                 ;
 
 varref:         TOK_ID
-        |       TOK_ID '.' TOK_ID  %prec '.'
-        |       TOK_ID '.' TOK_ID '.' TOK_ID %prec '.' 
+        |       '.' assockey
+        |       varref '.' assockey
                 ;
 
 hookref:        TOK_ID '.' TOK_ID  %prec '.'
@@ -237,14 +237,15 @@ expression: literal
         |       '[' exprlist0 ']'
         |       '[' assoclist ']' 
         |       '(' expression ')' 
-        |       varref
+        |       '.' assockey
         |       block
         |       anonymous_node
         |       TOK_ID '(' exprlist0 ')' 
         |       TOK_ME
         |       TOK_QUEUE
         |       TOK_REGEXP
-        |       expression '[' expression0 ']' 
+        |       expression '.' assockey                
+        |       expression '[' expression0 ']'
         |       '+' expression %prec TOK_UMINUS 
         |       '-' expression %prec TOK_UMINUS 
         |       '*' expression %prec TOK_UMINUS 
@@ -252,6 +253,7 @@ expression: literal
         |       TOK_TRACING expression
         |       '?' expression  %prec TOK_UMINUS
         |       '&' expression  %prec TOK_UMINUS
+        |       '~' pattern  %prec TOK_UMINUS                
         |       '!' expression
         |       TOK_PEEK expression
         |       expression '+' expression 
@@ -294,7 +296,7 @@ expression: literal
         |       TOK_YIELD expression
         |       TOK_ERROR expression
         |       TOK_ASSERT expression
-        |       TOK_EXPECT expression
+        |       TOK_NEED expression
         |       TOK_GOTO TOK_ID
         |       TOK_RETURN
         |       TOK_IF '(' expression ')' expression %prec TOK_IF
@@ -303,8 +305,8 @@ expression: literal
         |       TOK_FOREACH '(' foreach_spec ')' expression %prec TOK_FOREACH
         |       TOK_FREEZE '(' expression ')' expression %prec TOK_FREEZE
         |       TOK_SWITCH '(' expression ')' '{' alternatives '}'
-        |       TOK_SELECT '{' select_alternatives '}'
-        |       TOK_GENERIC '(' expression ')' '{' generic_alternatives '}'
+        |       TOK_POLL '{' select_alternatives '}'
+        |       TOK_TYPECASE '(' expression ')' '{' generic_alternatives '}'
         |       TOK_WATCH '(' expression TOK_RULE expression ')' expression %prec TOK_WATCH
         |       TOK_HOT expression
         |       TOK_COLD expression
@@ -314,6 +316,7 @@ expression: literal
                 ;
 
 anonymous_node: '@' noderef block
+        |       '@' noderef '(' exprlist0 ')'
         |       '@' TOK_FOR  '(' bindings ';' expression0 ';' bindings ')' expression %prec TOK_FOR
         |       '@' TOK_FOREACH '(' foreach_spec ')' expression %prec TOK_FOREACH
                 ;
@@ -420,11 +423,13 @@ pattern:        TOK_ID
         |       TOK_WILDCARD
         |       literal
         |       TOK_REGEXP
-        |       '(' expression ')'
-        |       TOK_ID TOK_ASSIGN pattern 
+        |       '(' pattern ')'
+        |       block                
+        |       TOK_ID TOK_ASSIGN pattern %prec '^'
         |       TOK_ID '(' patternlist0 ')' %prec '('
         |       '[' patternlist ']'
         |       '[' patternassoclist ']'
+        |       pattern '|' pattern                
         ;
 
 patternlist0: /*empty*/

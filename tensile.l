@@ -41,7 +41,6 @@ _ { return TOK_WILDCARD; }
 "?=" { return TOK_PUT_NEXT; }
 "*?" { return TOK_PEEK; }
 "::" { return TOK_ISTYPE; }
-":=" { return TOK_ASSIGN; }
 "++" { return TOK_APPEND; }
 "--" { return TOK_CHOP; }
 "**" { return TOK_INTERSPERSE; }
@@ -54,21 +53,21 @@ augment { return TOK_AUGMENT; }
 cold { return TOK_COLD; }
 div { return TOK_DIV; }
 else { return TOK_ELSE; }
+end { return TOK_END; }
 error { return TOK_ERROR; }
-expect { return TOK_EXPECT; }
 extern { return TOK_EXTERN; }
 false { return TOK_FALSE; }
 for { return TOK_FOR; }
 foreach { return TOK_FOREACH; }
 foreign { return TOK_FOREIGN; }
 freeze { return TOK_FREEZE; }
-generic { return TOK_GENERIC; }
 goto { return TOK_GOTO; }
 greedy { return TOK_GREEDY; }
 hook { return TOK_HOOK; }
 hot { return TOK_HOT; }
 idle { return TOK_IDLE; }
 if { return TOK_IF; }
+is { return TOK_ASSIGN; }
 import { return TOK_IMPORT; }
 include { return TOK_INCLUDE; }
 kill { return TOK_KILL; }
@@ -76,18 +75,20 @@ local { return TOK_LOCAL; }
 me { return TOK_ME; }
 mod { return TOK_MOD; }
 module { return TOK_MODULE; }
+need { return TOK_NEED; }
 null { yylval->value = NULL_VALUE;  return TOK_NULL; }
 partition { return TOK_PARTITION; }
+poll { return TOK_POLL; }
 pragma { return TOK_PRAGMA; }
 prototype { return TOK_PROTOTYPE; }
 resume { return TOK_RESUME; }
 return { return TOK_RETURN; }
-select { return TOK_SELECT; }
 suspend { return TOK_SUSPEND; }
 switch { return TOK_SWITCH; }
 then { return TOK_THEN; }
 tracing { return TOK_TRACING; }
 true { return TOK_TRUE; }
+typecase { return TOK_TYPECASE; }
 watch { return TOK_WATCH; }
 while { return TOK_WHILE; }
 yield { return TOK_YIELD; }
@@ -113,7 +114,7 @@ yield { return TOK_YIELD; }
 
 \"([^\"\\]+|{ESCAPE})*\" {
     return TOK_STRING; }
-\<\#([^#]+|\#[^>])*\#\> {
+\{\{([^}]+|\}[^}])*\}\} {
     return TOK_STRING;
  }
 [[:alpha:]_][[:alnum:]_]* { 
