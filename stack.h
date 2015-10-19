@@ -153,7 +153,7 @@ extern "C"
  * - Given a new stack
  * @code
  * unsigned sz = ARBITRARY(unsigned, 1, 16);
- * unsigned n = ARBITRARY(unsigned, 1, (int)sz);
+ * unsigned n = ARBITRARY(unsigned, 1, sz);
  * simple_stack *stk = new_simple_stack(sz);
  * unsigned i;
  * @endcode

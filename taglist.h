@@ -20,6 +20,10 @@
  * @brief general-purpose tagged lists
  *
  * @author Artem V. Andreev <artem@AA5779.spb.edu>
+ * @test Background:
+ * @code
+ * #define IMPLEMENT_TAGLIST
+ * @endcode
  */
 #ifndef TAGLIST_H
 #define TAGLIST_H 1
@@ -37,6 +41,24 @@ extern "C"
 
 #include "allocator.h"
 
+/**
+ * Declare a tagged list type
+ * @test Background:
+ * @code
+ * enum {
+ *    STATE_INITIALIZED = 0xb1ff,
+ *    STATE_CLONED = 0x20000000,
+ *    STATE_FINALIZED = 0xdead
+ * };
+ * DECLARE_TAGLIST_TYPE(simple_taglist, unsigned);
+ * DECLARE_TAGLIST_OPS(simple_taglist, unsigned);
+ *
+ * DEFINE_TAGLIST_OPS(simple_taglist, unsigned, 16, list, i,
+ * {list->elts[i].value = STATE_INITIALIZED; },
+ * {NEW(list)->elts[i].value = OLD(list)->elts[i].value | STATE_CLONED;},
+ * {list->elts[i].value = STATE_FINALIZED; }, 4);
+ * @endcode
+ */
 #define DECLARE_TAGLIST_TYPE(_type, _valtype)   \
     DECLARE_ARRAY_TYPE(_type,,                  \
                        struct {                 \
@@ -46,6 +68,170 @@ extern "C"
 
 #define NULL_TAG (0u)
 
+/**
+ * Declare operations on a tagged list:
+ * - `_valtype *lookup_<_type>(_type **, unsigned, bool);`
+ * - `_valtype *add_<_type>(_type **, unsigned tag);`
+ * - `void delete_<_type>(_type *, unsigned, bool);`
+ *
+ * @test Allocate and free
+ * - Given a taglist:
+ * @code
+ * unsigned sz = ARBITRARY(unsigned, 1, 16);
+ * simple_taglist *list = new_simple_taglist(sz);
+ * unsigned i;
+ * @endcode
+ * - Verify it is allocated:
+ *   `ASSERT_PTR_NEQ(list, NULL);`
+ * - Verify that its size is correct:
+ *   `ASSERT_UINT_EQ(list->nelts, sz);`
+ * - Verify that the elements are initialized:
+ * @code
+ * for (i = 0; i < sz; i++)
+ * {
+ *    ASSERT_UINT_EQ(list->elts[i].tag, NULL_TAG);
+ *    ASSERT_UINT_EQ(list->elts[i].value, STATE_INITIALIZED);
+ *  }
+ * @endcode
+ * - When it is freed:
+ *  `free_simple_taglist(list);`
+ * - Then the elements are finalized:
+ * @code
+ * for (i = 0; i < sz; i++)
+ * {
+ *    ASSERT_UINT_EQ(list->elts[i].tag, NULL_TAG);
+ *    ASSERT_UINT_EQ(list->elts[i].value, STATE_FINALIZED);
+ * }
+ * @endcode
+ *
+ * @test Add and lookup
+ * - Given a taglist:
+ * @code
+ * simple_taglist *list = new_simple_taglist(1);
+ * simple_taglist *saved = list;
+ * unsigned *found;
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xffff);
+ * unsigned theval = ARBITRARY(unsigned, 1, 0xffff);
+ * @endcode
+ * - When a tag is added:
+ *   `*add_simple_taglist(&list, thetag) = theval;`
+ * - Then the taglist is not reallocated:
+ *   `ASSERT_PTR_EQ(list, saved);`
+ * - When the tag is looked up:
+ *   `found = lookup_simple_taglist(&list, thetag, false);`
+ * - Then it is found:
+ *   `ASSERT_PTR_NEQ(found, NULL);`
+ * - And it has the correct value:
+ *   `ASSERT_UINT_EQ(*found, theval);`
+ * - Cleanup: `free_simple_taglist(list);`
+ *
+ * @test Do Lookup
+ * - Given a queue:
+ * @code
+ * unsigned sz = ARBITRARY(unsigned, 3, 16);
+ * unsigned thetag1 = ARBITRARY(unsigned, 1, 0xffff);
+ * unsigned thetag2 = ARBITRARY(unsigned, thetag1 + 1, 0x10000);
+ * unsigned thetag3 = ARBITRARY(unsigned, thetag2 + 1, 0x10001);
+ * unsigned thetag4 = ARBITRARY(unsigned, thetag3 + 1, 0x10002);
+ * unsigned theval1 = ARBITRARY(unsigned, 1, 0xffff);
+ * unsigned theval2 = ARBITRARY(unsigned, 1, 0xffff);
+ * unsigned theval3 = ARBITRARY(unsigned, 1, 0xffff);
+ * simple_taglist *list = new_simple_taglist(sz);
+ * unsigned *found;
+ * @endcode
+ * - And given several items with different tags are added:
+ * @code
+ * *add_simple_taglist(&list, thetag1) = theval1;
+ * *add_simple_taglist(&list, thetag2) = theval2;
+ * *add_simple_taglist(&list, thetag3) = theval3; 
+ * @endcode
+ * - When looking up each added tag:
+ *   @testvar{unsigned,xtag,u} | @testvar{unsigned,xvalue,u}
+ *   --------------------------|----------------------------
+ *   `thetag1`                 |`theval1`
+ *   `thetag2`                 |`theval2`
+ *   `thetag3`                 |`theval3`
+ *   `found = lookup_simple_taglist(&list, xtag, false);`
+ *   + Then it is found: `ASSERT_PTR_NEQ(found, NULL);`
+ *   + And the value is correct: `ASSERT_UINT_EQ(*found, xvalue);`
+ * - When looking up a tag that was not added:
+ *   `found = lookup_simple_taglist(&list, thetag4, false);`
+ * - Then it is not found: `ASSERT_PTR_EQ(found, NULL);` 
+ * - Cleanup: `free_simple_taglist(list);`
+ *
+ * @test Lookup Multiple
+ * - Given a taglist:
+ * @code
+ * unsigned sz = ARBITRARY(unsigned, 3, 16);
+ * unsigned thetag1 = ARBITRARY(unsigned, 1, 0xffff);
+ * unsigned thetag2 = ARBITRARY(unsigned, thetag1 + 1, 0x10000);
+ * unsigned theval1 = ARBITRARY(unsigned, 1, 0xffff);
+ * unsigned theval2 = ARBITRARY(unsigned, 1, 0xffff);
+ * unsigned theval3 = ARBITRARY(unsigned, theval1 + 1, 0x10000);
+ * simple_taglist *list = new_simple_taglist(sz);
+ * unsigned *found;
+ * @endcode
+ * - And given several items with repeating tags are added:
+ * @code
+ * *add_simple_taglist(&list, thetag1) = theval1;
+ * *add_simple_taglist(&list, thetag2) = theval2;
+ * *add_simple_taglist(&list, thetag1) = theval3;
+ * @endcode
+ * - When a repeating tag is looked up:
+ *   `found = lookup_simple_taglist(&list, thetag1, false);`
+ * - Then it is found: `ASSERT_PTR_NEQ(found, NULL);`
+ * - And the value is the first added value: `ASSERT_UINT_EQ(*found, theval1);`
+ * - Cleanup: `free_simple_taglist(list);`
+ *
+ * @test Add and delete
+ * - Given a taglist:
+ * @code
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xffff);
+ * simple_taglist *list = new_simple_taglist(1);
+ * unsigned *found;
+ * @endcode
+ * - And given an element with a new tag is added:
+ * @code
+ * found = lookup_simple_taglist(&list, thetag, true);
+ * ASSERT_PTR_NEQ(found, NULL);
+ * @endcode
+ * - When the tag is deleted:
+ *   `delete_simple_taglist(list, thetag, false);`
+ * - And when it is looked up:
+ *   `found = lookup_simple_taglist(&list, thetag, false);`
+ * - Then it is not found:
+ *   `ASSERT_PTR_EQ(found, NULL);`
+ * - Cleanup: `free_simple_taglist(list);`
+ *
+ * @test Add, delete and add the same:
+ * - Given a taglist:
+ * @code
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xffff);
+ * unsigned thetag2 = ARBITRARY(unsigned, thetag + 1, 0x10000);
+ * unsigned theval = ARBITRARY(unsigned, 1, 0xffff);
+ * simple_taglist *list = new_simple_taglist(1);
+ * simple_taglist *saved = list;
+ * unsigned *found;
+ * unsigned *added;
+ * @endcode
+ * - And given an element with a tag is added:
+ * @code
+ * found = lookup_simple_taglist(&list, thetag, true);
+ * ASSERT_PTR_NEQ(found, NULL);
+ * *found = theval;
+ * @endcode
+ * - When it is deleted:
+ *   `delete_simple_taglist(list, thetag, false);`
+ * - And when another tag is added:
+ *   `added = add_simple_taglist(&list, thetag2);`
+ * - Then the taglist is not reallocated:
+ *   `ASSERT_PTR_EQ(list, saved);`
+ * - And the element is at the same location as it was after the first adding
+ *   `ASSERT_PTR_EQ(found, added);`
+ * - And the element is re-initialized:
+ *   `ASSERT_UINT_EQ(*added, STATE_INITIALIZED);`
+ * - Cleanup: `free_simple_taglist(list);`
+ */
 #define DECLARE_TAGLIST_OPS(_type, _valtype)                            \
     DECLARE_ARRAY_ALLOCATOR(_type);                                     \
                                                                         \
@@ -102,7 +288,7 @@ extern "C"
     }                                                                   \
     struct fake
 
-#if defined(IMPLEMENT_TAGLIST)
+#if defined(IMPLEMENT_TAGLIST) || defined(__DOXYGEN__)
 
 #define DEFINE_TAGLIST_OPS(_type, _valtype, _maxsize, _var, _idxvar,    \
                            _inite, _clonee, _finie, _grow)              \

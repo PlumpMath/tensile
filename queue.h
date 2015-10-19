@@ -201,7 +201,7 @@ extern "C"
  * - When an element is dequeued:
  *    `x = dequeue_simple_queue(q);`
  * - Then it is an element that was last enqueued at front:
- *   `ASSERT_UINT_EQ(x, 3);`
+ *   `ASSERT_UINT_EQ(x, thetag3);`
  * - Cleanup: `free_simple_queue(q);`
  *
  * @test Background:
@@ -247,11 +247,11 @@ extern "C"
  * - When another element is dequeued
  *   `x = dequeue_simple_queue(q);`
  * - Then it is the second one enqueued:
- *   `ASSERT_UINT_EQ(x, 2);`
+ *   `ASSERT_UINT_EQ(x, thetag2);`
  * - When yet another element is dequeued:
  *   `x = dequeue_simple_queue(q);`
  * - Then it is the last element enqueued:
- *   `ASSERT_UINT_EQ(x, 3);`
+ *   `ASSERT_UINT_EQ(x, thetag3);`
  * - Cleanup: `free_simple_queue(q);`
  * 
  * @test Enqueue at the front and grow:
@@ -332,6 +332,120 @@ extern "C"
 #define trivial_dequeue(_x) (*(_x))
 #define trivial_enqueue(_x, _y) ((void)(*(_x) = *(_y)))
 
+/**
+ * Declare operations for queues of refcounted objects
+ *
+ * @test Background:
+ * @code
+ * typedef struct queued_refcnt {
+ *     unsigned refcnt;
+ *     unsigned value;
+ * } queued_refcnt;
+ * 
+ * DECLARE_REFCNT_ALLOCATOR(queued_refcnt, (unsigned val));
+ * DECLARE_QUEUE_TYPE(refcnt_queue, queued_refcnt *);
+ * DECLARE_QUEUE_REFCNT_OPS(refcnt_queue, queued_refcnt);
+ * 
+ * DEFINE_REFCNT_ALLOCATOR(queued_refcnt, (unsigned val), obj,
+ *                         { obj->value = val;},
+ *                         { NEW(obj)->value = OLD(obj)->value + 1; },
+ *                         { obj->value = 0; });
+ * DEFINE_QUEUE_REFCNT_OPS(refcnt_queue, queued_refcnt, linear, 8, 4);
+ * @endcode
+ *
+ * @test Enqueue and dequeue refcounted
+ * - Given a refcounted objec:
+ * @code
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xffff);
+ * queued_refcnt *obj = new_queued_refcnt(thetag);
+ * @endcode
+ * - Ang given a queue:
+ * @code
+ * unsigned sz = ARBITRARY(unsigned, 2, 16);
+ * refcnt_queue *q = new_refcnt_queue(sz);
+ * queued_refcnt *obj1, *obj2;
+ * @endcode
+ * - When the object is enqueued:
+ *   `enqueue_refcnt_queue(&q, obj);`
+ * - And when it is enqueued also at the front:
+ *   `enqueue_front_refcnt_queue(&q, obj);`
+ * - Then the refcounter is adjusted properly:
+ *   `ASSERT_UINT_EQ(obj->refcnt, 3);`
+ * - When an object is dequeued:
+ *   `obj1 = dequeue_refcnt_queue(q);`
+ * - Then it's the same object that was enqueued:
+ *   `ASSERT_PTR_EQ(obj, obj1);`
+ * - And when another object is dequeued from the back:
+ *   `obj2 = dequeue_back_refcnt_queue(q);`
+ * - Then it's still the same object:
+ *   `ASSERT_PTR_EQ(obj1, obj2);`
+ * - And the reference counter is correct:
+ *   `ASSERT_UINT_EQ(obj1->refcnt, 3);`
+ * - Cleanup:
+ * @code
+ * free_queued_refcnt(obj);
+ * free_queued_refcnt(obj1);
+ * free_queued_refcnt(obj2);    
+ * free_refcnt_queue(q);
+ * @endcode
+ *
+ * @test Copy refcounted:
+ * - Given a queue:
+ * @code
+ * unsigned sz = ARBITRARY(unsigned, 2, 16);
+ * refcnt_queue *q = new_refcnt_queue(2);
+ * refcnt_queue *q1;
+ * @endcode
+ * - And given an object:
+ * @code
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xffff);
+ * queued_refcnt *obj = new_queued_refcnt(thetag);
+ * unsigned i;
+ * @endcode
+ * - When the queue is filled with references to the object:
+ *   `for (i = 0; i < sz; i++) enqueue_refcnt_queue(&q, obj);`
+ * - And when the original reference is released:
+ *   `free_queued_refcnt(obj);`
+ * - And when the queue is copied:
+ *   `q1 = copy_refcnt_queue(q);`
+ * - Then the copy does not share memory with the original:
+ *   `ASSERT_PTR_NEQ(q1, q);`
+ * - And the copy queue is filled:
+ *   `ASSERT_UINT_EQ(q1->top, sz);`
+ * - And the reference counter of the object reflects all the references:
+ *   `ASSERT_UINT_EQ(obj->refcnt, 2 * sz);`
+ * - And the object tag is intact:
+ *    `ASSERT_UINT_EQ(obj->value, thetag);`
+ * - Cleanup:
+ * @code
+ * free_refcnt_queue(q1);
+ * free_refcnt_queue(q);
+ * @endcode
+ *
+ * @test Clear refcounted
+ * - Given a queue:
+ * @code
+ * unsigned sz = ARBITRARY(unsigned, 2, 16);
+ * refcnt_queue *q = new_refcnt_queue(sz);
+ * @endcode
+ * - And given an object:
+ * @code
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xffff);
+ * queued_refcnt *obj = new_queued_refcnt(thetag);
+ * unsigned i;
+ * @endcode
+ * - When the queue is filled with references to the object:
+ * `for (i = 0; i < sz; i++) enqueue_refcnt_queue(&q, obj);`
+ * - And when the queue is cleared:
+ *   `clear_refcnt_queue(q);`
+ * - Then the refcounter is 1:
+ *   `ASSERT_UINT_EQ(obj->refcnt, 1);`
+ * - When the queue is freed:
+ *   `free_refcnt_queue(q);`
+ * - Then the object is not freed:
+ *   `ASSERT_UINT_EQ(obj->refcnt, 1);`
+ * - Cleanup: `free_queued_refcnt(obj);`
+ */
 #define DECLARE_QUEUE_REFCNT_OPS(_type, _eltype)            \
     DECLARE_QUEUE_OPS(_type, _eltype *, trivial_dequeue)
     

@@ -190,7 +190,7 @@ __ASSERT_CMP_INLINE(bits_neq, unsigned long long, "%llx", _arg1 != _arg2);
 
 
 #define ARBITRARY(_type, _min, _max) \
-    (_type)(rand() % ((_max) - (_min) + 1) + (_min))
+    ((_type)rand() % ((_max) - (_min) + 1) + (_min))
     
 #define SET_RANDOM_SEED()                               \
     do {                                                \
