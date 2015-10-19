@@ -231,6 +231,36 @@ extern "C"
  * - And the element is re-initialized:
  *   `ASSERT_UINT_EQ(*added, STATE_INITIALIZED);`
  * - Cleanup: `free_simple_taglist(list);`
+ * 
+ * @test Delete a duplicate entry unhides the next added entry
+ * - Given a taglist:
+ * @code 
+ * unsigned thetag  = ARBITRARY(unsigned, 1, 0xffff);
+ * unsigned theval1 = ARBITRARY(unsigned, 1, 0xffff);
+ * unsigned theval2 = ARBITRARY(unsigned, theval1 + 1, 0x10000);
+ * simple_taglist *list = new_simple_taglist(2);
+ * unsigned *found;
+ * @endcode
+ * - And given an entry added to it:
+ * @code
+ * found = lookup_simple_taglist(&list, thetag, true);
+ * *found = theval1;
+ * @endcode
+ * - And given another entry with the same tag is added to the end:
+ * @code
+ * found = add_simple_taglist(&list, thetag);
+ * *found = theval2;    
+ * @endcode
+ * - When the tag is looked up:
+ * `found = lookup_simple_taglist(&list, thetag, false);`
+ * - Then it is found: `ASSERT_PTR_NEQ(found, NULL);`
+ * - And the first value is returned: `ASSERT_UINT_EQ(*found, theval1);`
+ * - When it is deleted: `delete_simple_taglist(list, thetag, false);`
+ * - And when it is loooked up again:
+ *   `found = lookup_simple_taglist(&list, thetag, false);`
+ * - Then it is still found: `ASSERT_PTR_NEQ(found, NULL);`
+ * - And the value is the second one: `ASSERT_UINT_EQ(*found, theval2);`
+ * - Cleanup: `free_simple_taglist(list);`
  */
 #define DECLARE_TAGLIST_OPS(_type, _valtype)                            \
     DECLARE_ARRAY_ALLOCATOR(_type);                                     \

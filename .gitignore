@@ -36,3 +36,4 @@ TAGS
 core
 core.*
 vgcore.*
+*.gcov

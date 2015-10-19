@@ -44,6 +44,8 @@ tests/%.c : doc/xml/%.xml extract_tests.xsl
 	$(EXTRACT_TESTS) $< >$@
 
 tests/% : CPPFLAGS += -I.
+tests/% : CFLAGS += --coverage
+tests/% : LDFLAGS += --coverage
 
 ifneq ($(MAKECMDGOALS),clean)
 include $(C_SOURCES:.c=.d)
