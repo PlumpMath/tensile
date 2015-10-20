@@ -8,7 +8,7 @@ DOXYGEN = doxygen
 ETAGS = ctags-exuberant -e -R --exclude='doc/*' --exclude='tests/*'
 XSLTPROC = xsltproc
 
-CFLAGS = -ggdb3 -fstack-protector -W -Wall -Werror -Wmissing-declarations -Wformat=2 -Winit-self -Wuninitialized \
+CFLAGS = -gdwarf-4 -g3 -fstack-protector -W -Wall -Werror -Wmissing-declarations -Wformat=2 -Winit-self -Wuninitialized \
 	-Wsuggest-attribute=pure -Wsuggest-attribute=const -Wconversion -Wstack-protector -Wpointer-arith -Wwrite-strings \
 	-Wmissing-format-attribute
 CPPFLAGS = -I.
@@ -45,7 +45,9 @@ tests/%.c : doc/xml/%.xml extract_tests.xsl
 
 tests/% : CPPFLAGS += -I.
 tests/% : CFLAGS += --coverage
-tests/% : LDFLAGS += --coverage
+
+tests/% : tests/%.o
+	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS)
 
 ifneq ($(MAKECMDGOALS),clean)
 include $(C_SOURCES:.c=.d)

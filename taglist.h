@@ -261,6 +261,48 @@ extern "C"
  * - Then it is still found: `ASSERT_PTR_NEQ(found, NULL);`
  * - And the value is the second one: `ASSERT_UINT_EQ(*found, theval2);`
  * - Cleanup: `free_simple_taglist(list);`
+ *
+ * @test Add duplicate and Delete All
+ * - Given a taglist:
+ * @code
+ * unsigned thetag1  = ARBITRARY(unsigned, 1, 0xffff);
+ * unsigned thetag2  = ARBITRARY(unsigned, 1, 0xffff);
+ * unsigned theval1 = ARBITRARY(unsigned, 1, 0xffff);
+ * unsigned theval2 = ARBITRARY(unsigned, theval1 + 1, 0x10000);
+ * unsigned theval3 = ARBITRARY(unsigned, theval2 + 1, 0x10001);
+ * simple_taglist *list = new_simple_taglist(3);
+ * unsigned *found;
+ * @endcode
+ * - And given an element is added to the queue:
+ * @code
+ * found = lookup_simple_taglist(&list, thetag1, true);
+ * *found = theval1;
+ * @endcode
+ * - And given another element with a different tag is added:
+ * @code
+ * found = add_simple_taglist(&list, thetag2);
+ * *found = theval2;
+ * @endcode
+ * - And given the third element with the same tag as the first one is
+ *   added at the end:
+ * @code
+ * found = add_simple_taglist(&list, thetag1);
+ * *found = theval3; 
+ * @endcode
+ * - When all the elements with tag 1 are deleted:
+ *   `delete_simple_taglist(list, thetag1, true);`
+ * - Then no element is found by the first tag:
+ * @code
+ * found = lookup_simple_taglist(&list, thetag1, false);
+ * ASSERT_PTR_EQ(found, NULL);
+ * @endcode
+ * - And the element with the second tag is untouched:
+ * @code
+ * found = lookup_simple_taglist(&list, thetag2, false); 
+ * ASSERT_PTR_NEQ(found, NULL);
+ * ASSERT_UINT_EQ(*found, theval2);    
+ * @endcode
+ * - Cleanup: `free_simple_taglist(list);`
  */
 #define DECLARE_TAGLIST_OPS(_type, _valtype)                            \
     DECLARE_ARRAY_ALLOCATOR(_type);                                     \

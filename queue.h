@@ -148,7 +148,7 @@ extern "C"
  *   `ASSERT_UINT_EQ(q->bottom, 1);`
  * - And the dequeued element is the first one that was enqueued:
  *   `ASSERT_UINT_EQ(x, thetag1);`
- * - Cleanup: free_simple_queue(q);
+ * - Cleanup: `free_simple_queue(q);`
  *
  * @test Enqueue and dequeue from the back
  * - When two elements are enqueued:
@@ -197,7 +197,7 @@ extern "C"
  * - Then the bottom pointer is at start:
  *   `ASSERT_UINT_EQ(q->bottom, 0);`
  * - And the top pointer is two elements above:
- *   `ASSERT_UINT_EQ(q->top, 2);
+ *   `ASSERT_UINT_EQ(q->top, 2);`
  * - When an element is dequeued:
  *    `x = dequeue_simple_queue(q);`
  * - Then it is an element that was last enqueued at front:
@@ -214,12 +214,13 @@ extern "C"
  * @endcode
  *
  * @test Enqueue with grow
- * - When two elements are enqeed:
+ * - When two elements are enqueued:
  * @code
  *     unsigned x;
  *     unsigned thetag3 = ARBITRARY(unsigned, 1, 0xffff);
  *     enqueue_simple_queue(&q, thetag1);
  *     enqueue_simple_queue(&q, thetag2);
+ * fprintf(stderr, "-----> %p\\n", q);
  * @endcode
  * - Then the top pointer is correct:
  *   `ASSERT_UINT_EQ(q->top, 2);`
@@ -252,7 +253,7 @@ extern "C"
  *   `x = dequeue_simple_queue(q);`
  * - Then it is the last element enqueued:
  *   `ASSERT_UINT_EQ(x, thetag3);`
- * - Cleanup: `free_simple_queue(q);`
+ * - Cleanup: `fprintf(stderr, "----- %p\n", q); free_simple_queue(q);`
  * 
  * @test Enqueue at the front and grow:
  * - When two elements are enqueued at the front:

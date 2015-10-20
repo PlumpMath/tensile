@@ -449,7 +449,7 @@ extern "C"
  * .
  * | Varying                  | From|To |
  * |--------------------------|-----|---|
- * | @testvar{unsigned,size,u}|`0`  |`4`|
+ * | @testvar{unsigned,size,u}|`0`  |`3`|
  *
  * @test Copy
  * - Given an array:
@@ -470,7 +470,7 @@ extern "C"
  * .
  * | Varying                  | From|To |
  * |--------------------------|-----|---|
- * | @testvar{unsigned,size,u}|`0`  |`5`|
+ * | @testvar{unsigned,size,u}|`0`  |`4`|
  *
  * @test Resize Null
  * - When a NULL pointer to an array is resized 
@@ -487,7 +487,7 @@ extern "C"
  * @test Verify that resizing to a lesser size works
  * Varying                  | From | To
  * -------------------------|------|----
- * @testvar{unsigned,size,u}| `3`  | `5`
+ * @testvar{unsigned,size,u}| `3`  | `4`
  * @code
  * test_resize_smaller_n(size);
  * @endcode
@@ -495,7 +495,7 @@ extern "C"
  * @test Verify that resizing to a larger size works
  * Varying                  | From | To
  * -------------------------|------|----
- * @testvar{unsigned,size,u}| `2`  | `4`
+ * @testvar{unsigned,size,u}| `2`  | `3`
  * @code
  * test_resize_larger_n(size);
  * @endcode
@@ -540,7 +540,7 @@ extern "C"
  * @test Allocate and free (log scale)
  * | Varying                  | From|To |
  * |--------------------------|-----|---|
- * |@testvar{unsigned,order,u}|`0`  |`4`|
+ * |@testvar{unsigned,order,u}|`0`  |`3`|
  * `simple_log_array *prev = NULL;`
  * - Given an allocated array of a certain size
  *   `simple_log_array *arr = new_simple_log_array(1u << order);`
@@ -641,6 +641,7 @@ extern "C"
  *   `ASSERT_UINT_EQ(rt->nelts, sz);`
  * - Verify that the refcounter is 1
  *   `ASSERT_UINT_EQ(rt->refcnt, 1);`
+ * - Cleanup: `free_refcnt_array(rt);`
  *
  * @test 
  * Allocate, use and free refcounted array
