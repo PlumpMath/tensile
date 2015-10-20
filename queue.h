@@ -220,7 +220,6 @@ extern "C"
  *     unsigned thetag3 = ARBITRARY(unsigned, 1, 0xffff);
  *     enqueue_simple_queue(&q, thetag1);
  *     enqueue_simple_queue(&q, thetag2);
- * fprintf(stderr, "-----> %p\\n", q);
  * @endcode
  * - Then the top pointer is correct:
  *   `ASSERT_UINT_EQ(q->top, 2);`
@@ -253,7 +252,7 @@ extern "C"
  *   `x = dequeue_simple_queue(q);`
  * - Then it is the last element enqueued:
  *   `ASSERT_UINT_EQ(x, thetag3);`
- * - Cleanup: `fprintf(stderr, "----- %p\n", q); free_simple_queue(q);`
+ * - Cleanup: `free_simple_queue(q);`
  * 
  * @test Enqueue at the front and grow:
  * - When two elements are enqueued at the front:
@@ -274,7 +273,7 @@ extern "C"
  *    ASSERT_UINT_EQ(q->elts[4], thetag2);
  *    ASSERT_UINT_EQ(q->elts[5], thetag1);
  * @endcode
- * - Cleanup: free_simple_queue(q);
+ * - Cleanup: `free_simple_queue(q);`
  *
  * @test Background: none
  *

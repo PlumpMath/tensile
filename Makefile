@@ -55,7 +55,7 @@ include $(patsubst %,tests/%.d,$(TESTS))
 endif
 
 .PHONY : check
-check : doc $(addprefix tests/,$(TESTS))
+check : $(addprefix tests/,$(TESTS))
 	@set -e; \
 	for t in $(filter tests/%,$^); do \
 		$(CHECK_TOOL) ./$$t;		\

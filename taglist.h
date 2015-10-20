@@ -316,6 +316,46 @@ extern "C"
     ATTR_NONNULL_1ST                                                    \
     extern void delete_##_type(_type *list, unsigned tag, bool all)
 
+/**
+ * Iterate over all elements with a given tag in the taglist
+ *
+ * @test Add duplicate and then iterate
+ * - Given a taglist:
+ * @code
+ *   unsigned sz = ARBITRARY(unsigned, 1, 16);
+ *   unsigned thetag1 = ARBITRARY(unsigned, 1, 0xffff);
+ *   unsigned thetag2 = ARBITRARY(unsigned, thetag1 + 1, 0x10000);
+ *   unsigned theval1 = ARBITRARY(unsigned, 1, 0xffff);
+ *   unsigned theval2 = ARBITRARY(unsigned, theval1 + 1, 0x10000);
+ *   unsigned theval3 = ARBITRARY(unsigned, theval2 + 1, 0x10001);
+ *   simple_taglist *list = new_simple_taglist(sz);
+ *   unsigned *found;
+ *   unsigned count = 0;
+ *   unsigned sum = 0;
+ * @endcode
+ * - And given several tags are added to it:
+ * @code
+ *   found = lookup_simple_taglist(&list, thetag1, true);
+ *   *found = theval1;
+ *   found = add_simple_taglist(&list, thetag2);
+ *   *found = theval2;        
+ *   found = add_simple_taglist(&list, thetag1);
+ *   *found = theval3;
+ * @endcode
+ * - When after the list is iterared:
+ * @code
+ *   FOREACH_TAGGED(list, thetag1, i, 
+ *                  {
+ *                      count++;
+ *                      sum += list->elts[i].value;
+ *                  });
+ * @endcode
+ * - Then the count of processed elements is 2:
+ *   `ASSERT_UINT_EQ(count, 2);`
+ * - And the sum of processed elements is correct:
+ *   `ASSERT_UINT_EQ(sum, theval1 + theval3);`
+ * - Cleanup: `free_simple_taglist(list);`
+ */
 #define FOREACH_TAGGED(_list, _tag, _idxvar, _body)             \
     do {                                                        \
         unsigned __tag = (_tag);                                \
@@ -329,6 +369,132 @@ extern "C"
         }                                                       \
     } while(0)
 
+/**
+ * Declare operations over tagged lists of refcounted objects
+ * - `_valtype *get_<_type>(_type *, unsigned)`
+ * - `_valtype *put_<_type>(_type **, unsigned, _valtype *)`
+ * - `void replace_<_type>(_type **, unsigned, _valtype *)`
+ *
+ * @test Background:
+ * @code
+ * typedef struct tagged_refcnt {
+ *     unsigned refcnt;
+ *     unsigned value;
+ * } tagged_refcnt;
+ * 
+ * DECLARE_REFCNT_ALLOCATOR(tagged_refcnt, (unsigned val));
+ * DECLARE_TAGLIST_TYPE(refcnt_taglist, tagged_refcnt *);
+ * DECLARE_TAGLIST_REFCNT_OPS(refcnt_taglist, tagged_refcnt);
+ * 
+ * DEFINE_REFCNT_ALLOCATOR(tagged_refcnt, (unsigned val),
+ *                         obj, { obj->value = val; }, {},
+ *                         { obj->value = 0xdeadbeef; });
+ * DEFINE_TAGLIST_REFCNT_OPS(refcnt_taglist, tagged_refcnt, 16, 1);
+ * @endcode
+ * 
+ * @test Get from empty
+ * - Given an empty taglist:
+ * @code 
+ * unsigned sz = ARBITRARY(unsigned, 1, 16);
+ * unsigned tag = ARBITRARY(unsigned, 1, UINT_MAX);
+ * refcnt_taglist *list = new_refcnt_taglist(sz);
+ * @endcode
+ * - Verify that nothing can be retrieved from it:
+ *   `ASSERT_PTR_EQ(get_refcnt_taglist(list, tag), NULL);`
+ * - Cleanup: `free_refcnt_taglist(list);`
+ *
+ * @test Put and get
+ * - Given a refcounted object:
+ * @code
+ * tagged_refcnt *obj = new_tagged_refcnt(ARBITRARY(unsigned, 1, 0xffff));
+ * tagged_refcnt *got;
+ * @endcode
+ * - And given a tagged list:
+ * @code
+ * unsigned sz = ARBITRARY(unsigned, 1, 16);
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xffff);
+ * refcnt_taglist *list = new_refcnt_taglist(sz);
+ * @endcode
+ * - When an object is put into an empty list:
+ *   `got = put_refcnt_taglist(&list, thetag, obj);`
+ * - Then the old value is null:
+ *   `ASSERT_PTR_EQ(got, NULL);`
+ * - And the object's refcounter is incremented:
+ *   `ASSERT_UINT_EQ(obj->refcnt, 2);`
+ * - When an object is got by the tag:
+ *    `got = get_refcnt_taglist(list, thetag);`
+ * - Then it is the same object as was put:  
+ *   `ASSERT_PTR_EQ(got, obj);`
+ * - And the reference counter is incremented:
+ *   `ASSERT_UINT_EQ(obj->refcnt, 3);`
+ * - When the obtained reference is released:
+ *   `free_tagged_refcnt(got);`
+ * - And when the list is freed:
+ *  `free_refcnt_taglist(list);`
+ * - Then the object has a reference count of 1:
+ *    `ASSERT_UINT_EQ(obj->refcnt, 1);`
+ * - Cleanup: `free_tagged_refcnt(obj);`
+ *
+ * @test Replace
+ * - Given two refcounted objects:
+ * @code
+ * tagged_refcnt *obj = new_tagged_refcnt(ARBITRARY(unsigned, 1, 0xffff));
+ * tagged_refcnt *obj1 = new_tagged_refcnt(ARBITRARY(unsigned, 1, 0xffff));
+ * tagged_refcnt *got;
+ * @endcode
+ * - And given a tagged list:
+ * @code
+ * unsigned sz = ARBITRARY(unsigned, 1, 16);
+ * refcnt_taglist *list = new_refcnt_taglist(sz);
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xffff);
+ * @endcode
+ * - When an object replaces nothing:
+ *   `replace_refcnt_taglist(&list, thetag, obj);`
+ * - And when another object replaces it:   
+ *   `replace_refcnt_taglist(&list, thetag, obj1);`
+ * - Then the first object has single reference:
+ *   `ASSERT_UINT_EQ(obj->refcnt, 1);`
+ * - When an object is got by the tag:
+ *   `got = get_refcnt_taglist(list, thetag);`
+ * - Then it is the second object:
+ *   `ASSERT_PTR_EQ(got, obj1);`
+ * - Cleanup:
+ * @code
+ * free_tagged_refcnt(got);    
+ * free_tagged_refcnt(obj1);    
+ * free_refcnt_taglist(list);
+ * free_tagged_refcnt(obj);
+ * @endcode
+ *
+ * @test Copy refcounted
+ * - Given a refcounted object:
+ * `tagged_refcnt *obj = new_tagged_refcnt(ARBITRARY(unsigned, 1, 0xffff));`
+ * - And given a tagged list:
+ * @code
+ * unsigned sz = ARBITRARY(unsigned, 1, 16);
+ * refcnt_taglist *list = new_refcnt_taglist(sz);
+ * refcnt_taglist *copy;
+ * unsigned thetag = ARBITRARY(unsigned, 1, 0xffff);
+ * @endcode
+ * - When an object is put into the list:
+ *   `replace_refcnt_taglist(&list, thetag, obj);`
+ * - And when the list is copied:
+ *   `copy = copy_refcnt_taglist(list);`
+ * - Then the copy is successful:
+ *   `ASSERT_PTR_NEQ(copy, NULL);`
+ * - And the number of elements in the copy is the same as in the original:
+ *   `ASSERT_UINT_EQ(copy->nelts, list->nelts);`
+ * - And the object in the copy is the same as was put into the original:
+ *   `ASSERT_PTR_EQ(copy->elts[0].value, obj);`
+ * - And the reference counter is updated properly:
+ *   `ASSERT_UINT_EQ(obj->refcnt, 3);`
+ * - Cleanup:
+ * @code
+ * free_refcnt_taglist(list);
+ * free_refcnt_taglist(copy);
+ * free_tagged_refcnt(obj);
+ * @endcode
+ */
 #define DECLARE_TAGLIST_REFCNT_OPS(_type, _valtype)                     \
     DECLARE_TAGLIST_OPS(_type, _valtype *);                             \
                                                                         \
