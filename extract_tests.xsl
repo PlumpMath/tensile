@@ -138,7 +138,8 @@
         {
         BEGIN_TESTSUBSTEP_<xsl:value-of select="$step"/>();
         {
-        <xsl:apply-templates select="$subtests/listitem/para" />
+        <xsl:apply-templates select="$subtests/listitem/para[not(starts-with(normalize-space(), 'Clean'))]" />
+        <xsl:apply-templates select="$subtests/listitem/para[starts-with(normalize-space(), 'Clean')]" />        
         }
         }
       </xsl:if>

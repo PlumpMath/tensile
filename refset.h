@@ -39,6 +39,7 @@ extern "C"
 #endif
 
 #include <stdbool.h>
+#include <stdarg.h>
 #include "allocator.h"
 
 
@@ -65,10 +66,13 @@ extern "C"
  * DECLARE_REFCNT_ALLOCATOR(simple_ref, (unsigned val));
  * DECLARE_REFSET_TYPE(simple_refset, simple_ref);
  * DECLARE_REFSET_OPS(simple_refset, simple_ref);
+ * DEFINE_REFCNT_ALLOCATOR(simple_ref, (unsigned val),
+ *                         obj, { obj->value = val; },
+ *                         {}, {});
  * DEFINE_REFSET_OPS(simple_refset, simple_ref, 16, 4);
  * @endcode
  *
- * @test Not in empty refset
+ * @test Background:
  * - Given an empty refset:
  * @code
  * unsigned sz = ARBITRARY(unsigned, 0, 16);
@@ -76,12 +80,187 @@ extern "C"
  * @endcode
  * - And given any ref object:
  *   `simple_ref *obj = new_simple_ref(ARBITRARY(unsigned, 0, 0xffff));`
+ *
+ * @test Not in empty refset
  * - Verify that the set does not contain the object:
  *   `ASSERT(!is_in_simple_refset(refset, obj));`
  * - Cleanup:
  * @code
  * free_simple_refset(refset);
  * free_simple_ref(obj);
+ * @endcode
+ *
+ * @test Include and check
+ * - When the object is included:
+ *   `include_simple_refset(&refset, obj);`
+ * - Then it is in the set:
+ *   `ASSERT(is_in_simple_refset(refset, obj));`
+ * - And the reference counter is incremented:
+ *   `ASSERT_UINT_EQ(obj->refcnt, 2);`
+ * - Cleanup:
+ * @code
+ * free_simple_refset(refset);
+ * free_simple_ref(obj);
+ * @endcode
+ *
+ * @test Include multiple and check
+ * - And given another ref object:
+ *   `simple_ref *obj2 = new_simple_ref(ARBITRARY(unsigned, 0, 0xffff));`
+ * - When the two objects are added:
+ *   `include_simple_refset_list(&refset, obj, obj2, NULL);`
+ * - Then they both are in the set:
+ *   `ASSERT(is_in_simple_refset(refset, obj));`
+ *   `ASSERT(is_in_simple_refset(refset,obj2));`
+ * - And they both have their reference counters incremented:
+ *   `ASSERT_UINT_EQ(obj->refcnt, 2);`
+ *   `ASSERT_UINT_EQ(obj2->refcnt, 2);`
+ * - And the estimated size of refset is correct:
+ *   `ASSERT_UINT_EQ(count_simple_refset(refset), 2);`
+ * - Cleanup:
+ * @code
+ * free_simple_refset(refset);
+ * free_simple_ref(obj);
+ * free_simple_ref(obj2);
+ * @endcode
+ *
+ * @test Equality is Identity
+ * - And given another ref object which is the copy of the first:
+ *   `simple_ref *obj2 = copy_simple_ref(obj);` 
+ * - When the first object is included:
+ *   `include_simple_refset(&refset, obj);`
+ * - Then the second one is not in the set:
+ *   `ASSERT(!is_in_simple_refset(refset, obj2));`
+ * - Cleanup:
+ * @code
+ * free_simple_refset(refset);
+ * free_simple_ref(obj);
+ * free_simple_ref(obj2);
+ * @endcode
+ *
+ * @test Exclude from empty
+ * - Verify that excluding the object has no effect:
+ *   `ASSERT(!exclude_simple_refset(refset, obj));`
+ * - Cleanup:
+ * @code
+ * free_simple_refset(refset);
+ * free_simple_ref(obj);
+ * @endcode
+ *
+ * @test Include and exclude
+ * - When the object is included:
+ *   `include_simple_refset(&refset, obj);`
+ * - Then it can be excluded:
+ *   `ASSERT(exclude_simple_refset(refset, obj));`
+ * - And it is not in the set afterwards:
+ *   `ASSERT(!is_in_simple_refset(refset, obj));`
+ * - And it has single reference:
+ *   `ASSERT_UINT_EQ(obj->refcnt, 1);`
+ * - And the second exclude has no effect:
+ *   `ASSERT(!exclude_simple_refset(refset, obj));`
+ * - And the object still has a reference:
+ *   `ASSERT_UINT_EQ(obj->refcnt, 1);`
+ * - Cleanup:
+ * @code
+ * free_simple_refset(refset);
+ * free_simple_ref(obj);
+ * @endcode
+ *
+ * @test Include and clear
+ * - Given the object is included:
+ *   `include_simple_refset(&refset, obj);`
+ * - When the refset is cleared:
+ *   `clear_simple_refset(refset);`
+ * - Then the object is no more in the refset:
+ *   `ASSERT(!is_in_simple_refset(refset, obj));`
+ * - And the size of the refset is zero:
+ *   `ASSERT_UINT_EQ(count_simple_refset(refset), 0);`
+ * - And the object has a single reference:
+ *   `ASSERT_UINT_EQ(obj->refcnt, 1);`
+ * - Cleanup:
+ * @code
+ * free_simple_ref(obj);
+ * free_simple_refset(refset);
+ * @endcode
+ *
+ * @test Include multiple and clear
+ * - Given another object:
+ *   `simple_ref *obj2 = new_simple_ref(ARBITRARY(unsigned, 0, 0xffff));`
+ * - And given they both are included:
+ *   `include_simple_refset_list(&refset, obj, obj2, NULL);`
+ * - When the refset is cleared:
+ *   `clear_simple_refset(refset);`
+ * - Then the size of the refset is zero:
+ *   `ASSERT_UINT_EQ(count_simple_refset(refset), 0);`
+ * - And the objects has a single reference:
+ *   `ASSERT_UINT_EQ(obj->refcnt, 1);`
+ *   `ASSERT_UINT_EQ(obj2->refcnt, 1);`
+ * - Cleanup:
+ * @code
+ * free_simple_ref(obj2);
+ * free_simple_ref(obj);
+ * free_simple_refset(refset);
+ * @endcode
+ * 
+ * @test Include multiple and iterate
+ * - Background:
+ * @code
+ * static bool test_iter(simple_ref *r, void *arg)
+ * {
+ *    return r != arg;
+ * }
+ * @endcode
+ * - 
+ *
+ * @test Background:
+ * - Given an empty refset with a single reserved element:
+ * @code
+ * simple_refset *refset = new_simple_refset(1);
+ * simple_refset *saved = refset;
+ * @endcode
+ *
+ * @test Include grow
+ * - Given three objects:
+ * @code
+ * simple_ref *obj = new_simple_ref(ARBITRARY(unsigned, 0, 0xffff));
+ * simple_ref *obj2 = new_simple_ref(ARBITRARY(unsigned, 0, 0xffff));
+ * simple_ref *obj3 = new_simple_ref(ARBITRARY(unsigned, 0, 0xffff));
+ * @endcode
+ * - When the first object is added:
+ *   `include_simple_refset(&refset, obj);`
+ * - Then the refset is not reallocated:
+ *   `ASSERT_PTR_EQ(refset, saved);`
+ * - When the second object is added:
+ *  `include_simple_refset(&refset, obj2);`
+ * - Then the refset is reallocated:
+ *   `ASSERT_PTR_NEQ(refset, saved);`
+ * - When the third object is added:
+ *  `saved = refset; include_simple_refset(&refset, obj3);`
+ * - Then the refset is not reallocated:
+ *   `ASSERT_PTR_EQ(refset, saved);`
+ * - Cleanup:
+ * @code
+ * free_simple_ref(obj);
+ * free_simple_ref(obj2);
+ * free_simple_ref(obj3);
+ * free_simple_refset(refset);
+ * @endcode
+ *
+ * @test Include same No grow
+ * - Given an objects:
+ * @code
+ * simple_ref *obj = new_simple_ref(ARBITRARY(unsigned, 0, 0xffff));
+ * @endcode
+ * - When the same object is included twice:
+ * @code
+ * include_simple_refset(&refset, obj);
+ * include_simple_refset(&refset, obj);
+ * @endcode
+ * - Then the refset is not reallocated:
+ *   `ASSERT_PTR_EQ(refset, saved);`
+ * - Cleanup:
+ * @code
+ * free_simple_ref(obj);
+ * free_simple_refset(refset);
  * @endcode
  */
 #define DECLARE_REFSET_OPS(_type, _reftype)                             \
@@ -90,8 +269,18 @@ extern "C"
     ATTR_WARN_UNUSED_RESULT ATTR_PURE                                   \
     extern bool is_in_##_type(const _type *set, const _reftype *obj);   \
     extern void include_##_type(_type **set, _reftype *obj);            \
+                                                                        \
+    ATTR_SENTINEL                                                       \
+    extern void include_##_type##_list(_type **set, ...);               \
     extern bool exclude_##_type(_type *set, const _reftype *obj);       \
+                                                                        \
+    ATTR_WARN_UNUSED_RESULT ATTR_PURE                                   \
     extern unsigned count_##_type(const _type *set);                    \
+                                                                        \
+    ATTR_NONNULL_ARGS((2))                                              \
+    extern void filter_##_type(_type *set,                              \
+                               bool (*func)(const _reftype *, void *),  \
+                               void *extra);                            \
                                                                         \
     ATTR_NONNULL_ARGS((2))                                              \
     extern bool foreach_##_type(const _type *set,                       \
@@ -129,7 +318,7 @@ extern "C"
     void include_##_type(_type **set, _reftype *obj)                    \
     {                                                                   \
         unsigned i;                                                     \
-        if (is_in_##type(*set, obj) || obj == NULL)                     \
+        if (is_in_##_type(*set, obj) || obj == NULL)                    \
             return;                                                     \
         if (*set == NULL)                                               \
         {                                                               \
@@ -146,8 +335,20 @@ extern "C"
                 return;                                                 \
             }                                                           \
         }                                                               \
-        *set = resize_##_type((*set)->nelts + 1 + (_grow));             \
+        *set = resize_##_type(*set, (*set)->nelts + 1 + (_grow));       \
         (*set)->elts[i] = use_##_reftype(obj);                          \
+    }                                                                   \
+                                                                        \
+    void include_##_type##_list(_type **set, ...)                       \
+    {                                                                   \
+        va_list args;                                                   \
+        _reftype *next;                                                 \
+                                                                        \
+        va_start(args, set);                                            \
+        while ((next = va_arg(args, _reftype *)) != NULL)               \
+        {                                                               \
+            include_##_type(set, next);                                 \
+        }                                                               \
     }                                                                   \
                                                                         \
     bool exclude_##_type(_type *set, const _reftype *obj)               \
@@ -183,6 +384,27 @@ extern "C"
                 result++;                                               \
         }                                                               \
         return result;                                                  \
+    }                                                                   \
+                                                                        \
+    void filter_##_type(_type *set,                                     \
+                        bool (*func)(const _reftype *, void *),         \
+                        void *extra)                                    \
+    {                                                                   \
+        unsigned i;                                                     \
+                                                                        \
+        if (set == NULL)                                                \
+            return;                                                \
+        for (i = 0; i < set->nelts; i++)                                \
+        {                                                               \
+            if (set->elts[i] != NULL)                                   \
+            {                                                           \
+                if (!func(set->elts[i], extra))                         \
+                {                                                       \
+                    free_##_reftype(set->elts[i]);                      \
+                    set->elts[i] = NULL;                                \
+                }                                                       \
+            }                                                           \
+        }                                                               \
     }                                                                   \
                                                                         \
     bool foreach_##_type(const _type *set,                              \
