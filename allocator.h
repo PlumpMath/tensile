@@ -182,10 +182,10 @@ extern "C"
  * - Cleanup `free_small_type(sm1);`
  */
 #define DECLARE_TYPE_ALLOCATOR(_type, _args)                            \
-    extern _type *new_##_type _args                                     \
+    GENERATED_DECL _type *new_##_type _args                             \
     ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL;                       \
-    extern void free_##_type(_type *_obj);                              \
-    extern _type *copy_##_type(const _type *_oldobj)                    \
+    GENERATED_DECL void free_##_type(_type *_obj);                      \
+    GENERATED_DECL _type *copy_##_type(const _type *_oldobj)            \
         ATTR_NONNULL ATTR_RETURNS_NONNULL
 
 
@@ -336,8 +336,8 @@ extern "C"
  * free_simple_type2(st2);   
  * @endcode
  */
-#define DECLARE_TYPE_PREALLOC(_type)                    \
-    extern void preallocate_##_type##s(unsigned size)
+#define DECLARE_TYPE_PREALLOC(_type)                            \
+    GENERATED_DECL void preallocate_##_type##s(unsigned size)
 
 
 /** @cond DEV */ 
@@ -345,7 +345,7 @@ extern "C"
  * Generate declarations for specific array-handling functions
  */
 #define DECLARE_ARRAY_ALLOC_COMMON(_type)                               \
-    extern _type *resize_##_type(_type *arr, unsigned newn)             \
+    GENERATED_DECL _type *resize_##_type(_type *arr, unsigned newn)     \
         ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT;                   \
                                                                         \
     ATTR_NONNULL_1ST ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT       \
@@ -755,14 +755,14 @@ typedef struct freelist_t {
         return _var;                                                    \
     }                                                                   \
                                                                         \
-    _type *new_##_type _args                                            \
+    GENERATED_DEF _type *new_##_type _args                              \
     {                                                                   \
         _type *_var = alloc_##_type();                                  \
         _init;                                                          \
         return _var;                                                    \
     }                                                                   \
                                                                         \
-    _type *copy_##_type(const _type *OLD(_var))                         \
+    GENERATED_DEF _type *copy_##_type(const _type *OLD(_var))           \
     {                                                                   \
         _type *NEW(_var) = alloc_##_type();                             \
                                                                         \
@@ -790,14 +790,14 @@ typedef struct freelist_t {
  */
 #define DEFINE_TYPE_ALLOCATOR(_type, _args, _var, _init, _clone, _fini) \
     DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var, _init, _clone,         \
-                             void free_##_type, _fini)
+                             GENERATED_DEF void free_##_type, _fini)
 
 /** @cond DEV */
 /**
  * Generates a reference-counting `free` function
  */
 #define DEFINE_REFCNT_FREE(_type, _var)                                 \
-    void free_##_type(_type *_var)                                      \
+    GENERATED_DEF void free_##_type(_type *_var)                        \
     {                                                                   \
         if (!_var) return;                                              \
         assert(_var->refcnt != 0);                                      \
@@ -824,7 +824,7 @@ typedef struct freelist_t {
  * DECLARE_TYPE_PREALLOC()
  */
 #define DEFINE_TYPE_PREALLOC(_type)                                     \
-    void preallocate_##_type##s(unsigned size)                          \
+    GENERATED_DEF void preallocate_##_type##s(unsigned size)            \
     {                                                                   \
         unsigned i;                                                     \
         _type *objs = malloc(size * sizeof(*objs));                     \
@@ -869,7 +869,7 @@ typedef struct freelist_t {
       return _var;                                                      \
   }                                                                     \
                                                                         \
-  _type *new_##_type(unsigned _n)                                       \
+  GENERATED_DEF _type *new_##_type(unsigned _n)                         \
   {                                                                     \
       _type *_var = alloc_##_type(_n);                                  \
       unsigned _idxvar;                                                 \
@@ -882,7 +882,7 @@ typedef struct freelist_t {
       return _var;                                                      \
   }                                                                     \
                                                                         \
-  _type *copy_##_type(const _type *OLD(_var))                           \
+  GENERATED_DEF _type *copy_##_type(const _type *OLD(_var))             \
   {                                                                     \
       _type *NEW(_var) = alloc_##_type(OLD(_var)->nelts);               \
       unsigned _idxvar;                                                 \
@@ -912,7 +912,7 @@ typedef struct freelist_t {
       }                                                                 \
   }                                                                     \
                                                                         \
-  _type *resize_##_type(_type *_var, unsigned _newn)                    \
+  GENERATED_DEF _type *resize_##_type(_type *_var, unsigned _newn)      \
   {                                                                     \
     unsigned _idxvar;                                                   \
                                                                         \
@@ -1123,7 +1123,8 @@ static inline unsigned log2_order(unsigned x)
                               _initc, _inite,                           \
                               _clonec, _clonee,                         \
                               _adjustc, _adjuste, _resizec,             \
-                              void free_##_type, _finic, _finie)
+                              GENERATED_DEF void free_##_type,          \
+                              _finic, _finie)
 
 #define DEFINE_REFCNT_ARRAY_ALLOCATOR(_type, _scale, _maxsize, _var,    \
                                       _idxvar,                          \

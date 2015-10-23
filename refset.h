@@ -206,10 +206,68 @@ extern "C"
  * @code
  * static bool test_iter(simple_ref *r, void *arg)
  * {
+ *    ASSERT_PTR_NEQ(r, NULL);
  *    return r != arg;
  * }
  * @endcode
- * - 
+ * - Given another object:
+ *   `simple_ref *obj2 = new_simple_ref(ARBITRARY(unsigned, 0, 0xffff));`
+ * - And given they both are included:
+ *   `include_simple_refset_list(&refset, obj, obj2, NULL);`
+ * - And given the third object:
+ *  `simple_ref *obj3 = new_simple_ref(ARBITRARY(unsigned, 0, 0xffff));`
+ * - Then the iteration process may end early:
+ *   `ASSERT(!foreach_simple_refset(refset, test_iter, obj2));` 
+ * - And the iteration process may pass through the whole set:
+ *   `ASSERT(foreach_simple_refset(refset, test_iter, obj3));`
+ * - But missing elements in refset are never processed: 
+ *   `ASSERT(foreach_simple_refset(refset, test_iter, NULL));`
+ * - Cleanup:
+ * @code
+ * free_simple_ref(obj);
+ * free_simple_ref(obj3);
+ * free_simple_ref(obj2);
+ * free_simple_refset(refset);
+ * @endcode
+ *
+ * @test Filter 
+ * - Background:
+ * @code
+ * static bool test_filter(const simple_ref *r, void *arg)
+ * {
+ *    ASSERT_PTR_NEQ(r, NULL);
+ *    return r == arg;
+ * }
+ * @endcode
+ * - Given another object:
+ *   `simple_ref *obj2 = new_simple_ref(ARBITRARY(unsigned, 0, 0xffff));`
+ * - And given the third object:
+ *  `simple_ref *obj3 = new_simple_ref(ARBITRARY(unsigned, 0, 0xffff));`
+ * - And given they both are included:
+ *   `include_simple_refset_list(&refset, obj, obj2, NULL);`
+ * - When the set is filtered:
+ *   `filter_simple_refset(refset, test_filter, obj2);`
+ * - Then the filtered object is not in the set:
+ *   `ASSERT(!is_in_simple_refset(refset, obj2));`
+ * - And the number of elements in the set decreases:
+ *   `ASSERT_UINT_EQ(count_simple_refset(refset), 1);`
+ * - When the set is filtered for an object that's not there:
+ *   `filter_simple_refset(refset, test_filter, obj3);`
+ * - Then the filtered object is not in the set:
+ *   `ASSERT(!is_in_simple_refset(refset, obj3));`
+ * - And  other objects are in the set:
+ *   `ASSERT(is_in_simple_refset(refset, obj));`
+ * - And the number of elements in the set is the same:
+ *   `ASSERT_UINT_EQ(count_simple_refset(refset), 1);`
+ * - But a null element is never filtered:
+ *   `filter_simple_refset(refset, test_filter, NULL);`
+ * - Cleanup:
+ * @code
+ * free_simple_ref(obj3);
+ * free_simple_ref(obj);
+ * free_simple_ref(obj2);
+ * free_simple_refset(refset);
+ * @endcode
  *
  * @test Background:
  * - Given an empty refset with a single reserved element:
@@ -268,9 +326,20 @@ extern "C"
                                                                         \
     ATTR_WARN_UNUSED_RESULT ATTR_PURE                                   \
     extern bool is_in_##_type(const _type *set, const _reftype *obj);   \
-    extern void include_##_type(_type **set, _reftype *obj);            \
                                                                         \
-    ATTR_SENTINEL                                                       \
+    ATTR_NONNULL                                                        \
+    extern void include_unique_##_type(_type **set, _reftype *obj);     \
+                                                                        \
+    ATTR_NONNULL_1ST                                                    \
+    static inline void include_##_type(_type **set, _reftype *obj)      \
+    {                                                                   \
+        if (is_in_##_type(*set, obj) || obj == NULL)                    \
+            return;                                                     \
+                                                                        \
+        include_unique_##_type(set, obj);                               \
+    }                                                                   \
+                                                                        \
+    ATTR_NONNULL_1ST ATTR_SENTINEL                                      \
     extern void include_##_type##_list(_type **set, ...);               \
     extern bool exclude_##_type(_type *set, const _reftype *obj);       \
                                                                         \
@@ -315,11 +384,10 @@ extern "C"
         return false;                                                   \
     }                                                                   \
                                                                         \
-    void include_##_type(_type **set, _reftype *obj)                    \
+    void include_unique_##_type(_type **set, _reftype *obj)             \
     {                                                                   \
         unsigned i;                                                     \
-        if (is_in_##_type(*set, obj) || obj == NULL)                    \
-            return;                                                     \
+                                                                        \
         if (*set == NULL)                                               \
         {                                                               \
             (*set) = new_##_type(1 + (_grow));                          \
@@ -334,6 +402,7 @@ extern "C"
                 (*set)->elts[i] = use_##_reftype(obj);                  \
                 return;                                                 \
             }                                                           \
+            assert((*set)->elts[i] != obj);                             \
         }                                                               \
         *set = resize_##_type(*set, (*set)->nelts + 1 + (_grow));       \
         (*set)->elts[i] = use_##_reftype(obj);                          \
@@ -393,12 +462,12 @@ extern "C"
         unsigned i;                                                     \
                                                                         \
         if (set == NULL)                                                \
-            return;                                                \
+            return;                                                     \
         for (i = 0; i < set->nelts; i++)                                \
         {                                                               \
             if (set->elts[i] != NULL)                                   \
             {                                                           \
-                if (!func(set->elts[i], extra))                         \
+                if (func(set->elts[i], extra))                          \
                 {                                                       \
                     free_##_reftype(set->elts[i]);                      \
                     set->elts[i] = NULL;                                \

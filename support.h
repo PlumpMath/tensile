@@ -195,6 +195,21 @@ static inline unsigned count_leading_zeroes(unsigned i)
 }
 #endif
 
+/**
+ * Scope for generated functions declarations.
+ * May be locally redefined e.g. to make generated functions static
+ *
+ * @sa GENERATED_DEF
+ */
+#define GENERATED_DECL extern
+/**
+ * Scope for generated functions definitons
+ * May be locally redefined e.g. to make generated functions static
+ *
+ * @sa GENERATED_DEF
+ */
+#define GENERATED_DEF
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
