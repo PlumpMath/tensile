@@ -27,6 +27,7 @@ _ { return TOK_WILDCARD; }
 [-+*/^!~(){}.@?,;<>:&|#] { return *yytext; }
 [][] { return *yytext; }
 "!~" { return TOK_NOT_MATCH; }
+"~~~" { return TOK_MATCH_BINDING_ALL; }
 "~~" { return TOK_MATCH_BINDING; }
 "==" { return TOK_EQ; }
 "<=" { return TOK_LE; }

@@ -172,7 +172,7 @@ extern "C"
 #define DECLARE_STACK_OPS(_type, _eltype,                           \
                           _popfunc, _pushfunc, _grow)               \
     DECLARE_ARRAY_ALLOCATOR(_type);                                 \
-    extern void clear_##_type(_type *stk) ATTR_NONNULL;             \
+    GENERATED_DECL void clear_##_type(_type *stk) ATTR_NONNULL;     \
                                                                     \
     ATTR_NONNULL                                                    \
     static inline _eltype pop_##_type(_type *stk)                   \
@@ -315,7 +315,7 @@ extern "C"
                            {}, _clonee, {}, {}, {},                     \
                            { clear_##_type(_var); }, {});               \
                                                                         \
-    void clear_##_type(_type *_var)                                     \
+    GENERATED_DEF void clear_##_type(_type *_var)                       \
     {                                                                   \
         unsigned _idxvar;                                               \
                                                                         \

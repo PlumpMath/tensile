@@ -49,7 +49,7 @@
 %right TOK_PUT TOK_PUT_ALL TOK_PUT_NEXT 
 %left '='
 %right '?'
-%nonassoc TOK_MATCH_BINDING
+%nonassoc TOK_MATCH_BINDING TOK_MATCH_BINDING_ALL
 %left '|' 
 %left '&'
 %nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH TOK_IN TOK_ISTYPE
@@ -315,11 +315,14 @@ expression: literal
         |       TOK_FOREIGN  TOK_ID '(' exprlist0 ')' TOK_STRING %prec TOK_FOREIGN
                 ;
 
-anonymous_node: '@' noderef block
+anonymous_node: '@' noderef block local_augments
         |       '@' noderef '(' exprlist0 ')'
         |       '@' TOK_FOR  '(' bindings ';' expression0 ';' bindings ')' expression %prec TOK_FOR
         |       '@' TOK_FOREACH '(' foreach_spec ')' expression %prec TOK_FOREACH
                 ;
+
+local_augments: /* empty */
+        |       local_augments TOK_AUGMENT TOK_ID block
 
 expression0:    /*empty*/
         |       expression

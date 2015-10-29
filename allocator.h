@@ -23,6 +23,7 @@
  * @test Background:
  * @code
  * #define IMPLEMENT_ALLOCATOR 1
+ * #define TRACK_ALLOCATOR 1
  * @endcode
  */
 #ifndef ALLOCATOR_H
@@ -84,6 +85,8 @@ extern "C"
  * - When it is destroyed `free_simple_type(st);`
  * - Then the free list is in proper state `ASSERT_PTR_EQ(freelist_simple_type, st);`
  * - And the object is finalized `ASSERT_UINT_EQ(st->tag, STATE_FINALIZED);`
+ * - And the allocated object count is zero:
+ *   `ASSERT_UINT_EQ(track_alloc_simple_type, 0);`
  *
  * @test Allocate, free and reallocate
  * - Given an allocated object
@@ -98,6 +101,8 @@ extern "C"
  * - Then the memory is reused `ASSERT_PTR_EQ(st, st1);`
  * - And the free list is in proper state `ASSERT_PTR_EQ(freelist_simple_type, NULL);`
  * - And the new object is initialized `ASSERT_UINT_EQ(st1->tag, thetag2);`
+ * - And the allocated object count is one: 
+ *   `ASSERT_UINT_EQ(track_alloc_simple_type, 1);`
  * - Clean up `free_simple_type(st1);`
  *
  * @test Allocate, free, reallocate and allocate another
@@ -114,10 +119,13 @@ extern "C"
  * - Then the memory is reused `ASSERT_PTR_EQ(st, st1);`
  * - When another object is allocated `st2 = new_simple_type(0);`
  * - Then the memory is not reused `ASSERT_PTR_NEQ(st2, st1);`
+ * - And the allocated object count is two: 
+ *   `ASSERT_UINT_EQ(track_alloc_simple_type, 2);`
  * - Clean up:
  * @code
  * free_simple_type(st1);
  * free_simple_type(st2);
+ * ASSERT_UINT_EQ(track_alloc_simple_type, 0);
  * @endcode
  *
  * @test Copy
@@ -132,10 +140,13 @@ extern "C"
  * - Then the memory is not shared `ASSERT_PTR_NEQ(st, st1);`
  * - And the contents is copied `ASSERT_PTR_EQ(st1->ptr, st->ptr);`
  * - And the copy hook is executed `ASSERT_UINT_EQ(st1->tag, thetag | STATE_CLONED);`
+ * - And the allocated object count is two:
+ *   `ASSERT_UINT_EQ(track_alloc_simple_type, 2);`
  * - Cleanup:
  * @code
  * free_simple_type(st);
  * free_simple_type(st1);
+ * ASSERT_UINT_EQ(track_alloc_simple_type, 0);
  * @endcode
  *
  * @test Deallocate and copy
@@ -154,6 +165,7 @@ extern "C"
  * @code
  * free_simple_type(st1);
  * free_simple_type(st2);
+ * ASSERT_UINT_EQ(track_alloc_simple_type, 0);
  * @endcode
  *
  * @test
@@ -219,6 +231,8 @@ extern "C"
  * - Then it is allocated `ASSERT_PTR_NEQ(rt, NULL);`
  * - And it is initialized `ASSERT_UINT_EQ(rt->tag, thetag);`
  * - And its ref counter is 1 `ASSERT_UINT_EQ(rt->refcnt, 1);`
+ * - And the allocated object count is one: 
+ *   `ASSERT_UINT_EQ(track_alloc_refcnt_type, 1);`
  * - Cleanup `free_refcnt_type(rt);`
  *
  * @test Allocate and free refcounted
@@ -229,6 +243,8 @@ extern "C"
  * @endcode
  * - When it is destroyed `free_refcnt_type(rt);`
  * - Then it is finalized `ASSERT_UINT_EQ(rt->tag, STATE_FINALIZED);`
+ * - And the allocated object count is zero:
+ *   `ASSERT_UINT_EQ(track_alloc_refcnt_type, 0);` 
  *
  * @test  Allocate, use and free refcounted
  * - Given a fresh refcounted object
@@ -277,10 +293,12 @@ extern "C"
  * @code
  * free_refcnt_type(rt1);
  * free_refcnt_type(rt);
+ * ASSERT_UINT_EQ(track_alloc_refcnt_type, 0);
  * @endcode
  */
 #define DECLARE_REFCNT_ALLOCATOR(_type, _args)                          \
     DECLARE_TYPE_ALLOCATOR(_type, _args);                               \
+                                                                        \
     static inline _type *use_##_type(_type *val)                        \
     {                                                                   \
         if (!val) return NULL;                                          \
@@ -334,6 +352,7 @@ extern "C"
  * free_simple_type2(st);
  * free_simple_type2(st1);
  * free_simple_type2(st2);   
+*  ASSERT_UINT_EQ(track_alloc_simple_type2, 0);
  * @endcode
  */
 #define DECLARE_TYPE_PREALLOC(_type)                            \
@@ -344,18 +363,20 @@ extern "C"
 /**
  * Generate declarations for specific array-handling functions
  */
-#define DECLARE_ARRAY_ALLOC_COMMON(_type)                               \
-    GENERATED_DECL _type *resize_##_type(_type *arr, unsigned newn)     \
+#define DECLARE_ARRAY_ALLOC_COMMON(_name, _eltype)                      \
+    GENERATED_DECL _type *resize_##_name(_type **arr,                   \
+                                       size_t *oldn, size_t newn)       \
         ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT;                   \
                                                                         \
     ATTR_NONNULL_1ST ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT       \
-    static inline _type *ensure_##_type##_size(_type *_arr,             \
-                                               unsigned req,            \
-                                               unsigned delta)          \
+    static inline _type *ensure_##_type##_size(_type **_arr,            \
+                                               size_t *oldn,            \
+                                               size_t req,              \
+                                               size_t delta)            \
     {                                                                   \
-        if (_arr->nelts >= req)                                         \
+        if (*oldn >= req)                                               \
             return  _arr;                                               \
-        return resize_##_type(_arr, req + delta);                       \
+        return resize_##_type(_arr, oldn, req + delta);                 \
     }                                                                   \
     struct fake
 /** @endcond */
@@ -391,11 +412,13 @@ extern "C"
  *     ASSERT_PTR_EQ(arr, arr1);
  *     ASSERT_UINT_EQ(arr->nelts, n - 1);
  *     ASSERT_BITS_EQ(arr->tag, STATE_INITIALIZED | STATE_RESIZED);
- *     for(j = 0; j < n - 1; j++)
+ *     for (j = 0; j < n - 1; j++)
  *         ASSERT_UINT_EQ(arr->elts[j], j);
  *     ASSERT_BITS_EQ(arr->elts[n - 1], STATE_FINALIZED);
  * 
  *     free_simple_array(arr);
+ *     for (j = 0; j <= 4; j++)
+ *         ASSERT_UINT_EQ(track_alloc_simple_array[j], 0);
  * }
  * 
  * static void test_resize_larger_n(unsigned n)
@@ -412,6 +435,8 @@ extern "C"
  *     ASSERT_UINT_EQ(arr1->elts[n], n);
  * 
  *     free_simple_array(arr1);
+ *     for (j = 0; j <= 4; j++)
+ *         ASSERT_UINT_EQ(track_alloc_simple_array[j], 0);
  * }
  * @endcode
  *
@@ -426,14 +451,23 @@ extern "C"
  * unsigned j;
  * @endcode
  * - Then it is allocated `ASSERT_PTR_NEQ(arr, NULL);`
- * - And the memory is not shared with an array of lesser size `ASSERT_PTR_NEQ(arr, prev);`
+ * - And the memory is not shared with an array of lesser size:
+ *   `ASSERT_PTR_NEQ(arr, prev);`
+ * - And the allocated object counter is 1:
+ *   `ASSERT_UINT_EQ(track_alloc_simple_array[size], 1);`
  * - And it is initialized `ASSERT_UINT_EQ(arr->tag, STATE_INITIALIZED);`
  * - And the number of elements is set correctly `ASSERT_UINT_EQ(arr->nelts, size);`
  * - And the elements are initialized `for (j = 0; j < size; j++) ASSERT_UINT_EQ(arr->elts[j], j);`
  * - When it is destroyed `free_simple_array(arr);`
  * - When the array is allocated through free-lists `if (size != 4)`
  *   + Then it is finalized `ASSERT_UINT_EQ(arr->tag, STATE_FINALIZED);`
- *   + And the elements are finalized: `for(j = 0; j < size; j++)  ASSERT_UINT_EQ(arr->elts[j], STATE_FINALIZED);`
+ *   + And the elements are finalized: 
+ *     @code
+ *     for(j = 0; j < size; j++)
+ *       ASSERT_UINT_EQ(arr->elts[j], STATE_FINALIZED);
+ *     @endcode
+ * - And the allocated object count is zero:
+ *   `ASSERT_UINT_EQ(track_alloc_simple_array[size], 0);`
  * - Cleanup `prev = arr;`
  *
  * @test Allocate, free and reallocate
@@ -445,7 +479,8 @@ extern "C"
  * - When it is freed `free_simple_array(arr);`
  * - And when a new array of the same size is allocated `arr1 = new_simple_array(size);`
  * - Then the memory is shared `ASSERT_PTR_EQ(arr, arr1);`
- * - Cleanup: `free_simple_array(arr1);`
+ * - Cleanup: `free_simple_array(arr1); `
+ *            `ASSERT_UINT_EQ(track_alloc_simple_array[size], 0);`
  * .
  * | Varying                  | From|To |
  * |--------------------------|-----|---|
@@ -690,22 +725,6 @@ extern "C"
  * free_refcnt_array(rt);
  * @endcode
  */
-#define DECLARE_REFCNT_ARRAY_ALLOCATOR(_type)           \
-    DECLARE_REFCNT_ALLOCATOR(_type, (unsigned n));      \
-    DECLARE_ARRAY_ALLOC_COMMON(_type)
-
-/**
- * Generate a declaration for an array usable with
- * DECLARE_ARRAY_ALLOCATOR() and DECLARE_REFCNT_ARRAY_ALLOCATOR()
- */
-#define DECLARE_ARRAY_TYPE(_name, _contents, _eltype)   \
-    typedef struct _name                                \
-    {                                                   \
-        unsigned nelts;                                 \
-        _contents                                       \
-        _eltype elts[];                                 \
-    } _name
-    
 
 #if defined(IMPLEMENT_ALLOCATOR) || defined(__DOXYGEN__)
 
@@ -730,6 +749,22 @@ typedef struct freelist_t {
  */
 #define NEW(_var) new_##_var
 
+#if TRACK_ALLOCATOR
+#define ALLOC_COUNTER(_name) static size_t track_alloc_##_name
+#define ALLOC_COUNTERS(_name, _size) ALLOC_COUNTER(_name)[_size]
+#define TRACK_ALLOC(_name) (track_alloc_##_name)++
+#define TRACK_ALLOC_IDX(_name, _idx) (track_alloc_##_name[_idx])++
+#define TRACK_FREE(_name) (track_alloc_##_name)--
+#define TRACK_FREE_IDX(_name, _idx) (track_alloc_##_name[_idx])--
+#else
+#define ALLOC_COUNTER(_name) struct fake
+#define ALLOC_COUNTERS(_name, _size) struct fake
+#define TRACK_ALLOC(_name) ((void)0)
+#define TRACK_ALLOC_IDX(_name, _idx) ((void)0)
+#define TRACK_FREE(_name) ((void)0)
+#define TRACK_FREE_IDX(_name, _idx) ((void)0)
+#endif
+
 /** @cond DEV */
 /**
  * Generates definitions for allocator functions declared per
@@ -738,6 +773,7 @@ typedef struct freelist_t {
  */
 #define DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var, _init, _clone,     \
                                  _destructor, _fini)                    \
+    ALLOC_COUNTER(_type);                                               \
     static freelist_t *freelist_##_type;                                \
                                                                         \
     ATTR_MALLOC ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL            \
@@ -746,12 +782,13 @@ typedef struct freelist_t {
         _type *_var;                                                    \
                                                                         \
         if (freelist_##_type == NULL)                                   \
-            _var = frlmalloc(sizeof(*_var));                               \
+            _var = frlmalloc(sizeof(*_var));                            \
         else                                                            \
         {                                                               \
             _var = (_type *)freelist_##_type;                           \
             freelist_##_type = freelist_##_type->chain;                 \
         }                                                               \
+        TRACK_ALLOC(_type);                                             \
         return _var;                                                    \
     }                                                                   \
                                                                         \
@@ -778,6 +815,7 @@ typedef struct freelist_t {
         _fini;                                                          \
         ((freelist_t *)_var)->chain = freelist_##_type;                 \
         freelist_##_type = (freelist_t *)_var;                          \
+        TRACK_FREE(_type);                                              \
     }                                                                   \
     struct fake
 
@@ -844,124 +882,136 @@ typedef struct freelist_t {
  * Generates definitions for allocator functions declared per
  * DECLARE_ARRAY_ALLOCATOR() and family
  */
-#define DEFINE_ARRAY_ALLOC_COMMON(_type, _scale, _maxsize, _var, _idxvar, \
-                                  _initc, _inite,                       \
-                                  _clonec, _clonee,                      \
-                                  _adjustc, _adjuste, _resizec,         \
-                                  _destructor, _finic, _finie)          \
-  static freelist_t *freelists_##_type[_maxsize];                       \
+#define DEFINE_ARRAY_ALLOC_COMMON(_type, _scale, _maxsize, _var,        \
+                                  _init, _clone, _resize, _fini)        \
+    ALLOC_COUNTERS(_type, _maxsize + 1);                                \
+    static freelist_t *freelists_##_type[_maxsize];                     \
                                                                         \
-  ATTR_MALLOC ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL              \
-  static _type *alloc_##_type(unsigned n)                               \
-  {                                                                     \
-      _type *_var;                                                      \
-      unsigned _sz = _scale##_order(n);                                 \
-                                                                        \
-      if (_sz >= _maxsize || freelists_##_type[_sz] == NULL)            \
-          _var = frlmalloc(sizeof (*_var) + _scale##_size(_sz) *        \
-                           sizeof(_var->elts[0]));                      \
-      else                                                              \
-      {                                                                 \
-          _var = (_type *)freelists_##_type[_sz];                       \
-          freelists_##_type[_sz] = freelists_##_type[_sz]->chain;       \
-      }                                                                 \
-      _var->nelts = n;                                                  \
-      return _var;                                                      \
-  }                                                                     \
-                                                                        \
-  GENERATED_DEF _type *new_##_type(unsigned _n)                         \
-  {                                                                     \
-      _type *_var = alloc_##_type(_n);                                  \
-      unsigned _idxvar;                                                 \
-                                                                        \
-      for (_idxvar = 0; _idxvar < _n; _idxvar++)                        \
-      {                                                                 \
-          _inite;                                                       \
-      }                                                                 \
-      _initc;                                                           \
-      return _var;                                                      \
-  }                                                                     \
-                                                                        \
-  GENERATED_DEF _type *copy_##_type(const _type *OLD(_var))             \
-  {                                                                     \
-      _type *NEW(_var) = alloc_##_type(OLD(_var)->nelts);               \
-      unsigned _idxvar;                                                 \
-                                                                        \
-      memcpy(NEW(_var), OLD(_var),                                      \
-             sizeof(_type) +                                            \
-             OLD(_var)->nelts * sizeof(OLD(_var)->elts[0]));            \
-      for (_idxvar = 0; _idxvar < OLD(_var)->nelts; _idxvar++)          \
-      {                                                                 \
-          _clonee;                                                      \
-      }                                                                 \
-      _clonec;                                                          \
-      return NEW(_var);                                                 \
-  }                                                                     \
-                                                                        \
-  ATTR_NONNULL                                                          \
-  static void dispose_##_type(_type *_var)                              \
-  {                                                                     \
-      unsigned _sz = _scale##_order(_var->nelts);                       \
-                                                                        \
-      if(_sz >= _maxsize)                                               \
-          free(_var);                                                   \
-      else                                                              \
-      {                                                                 \
-          ((freelist_t *)_var)->chain = freelists_##_type[_sz];         \
-          freelists_##_type[_sz] = (freelist_t *)_var;                  \
-      }                                                                 \
-  }                                                                     \
-                                                                        \
-  GENERATED_DEF _type *resize_##_type(_type *_var, unsigned _newn)      \
-  {                                                                     \
-    unsigned _idxvar;                                                   \
-                                                                        \
-    if (_var == NULL)                                                   \
-        return new_##_type(_newn);                                      \
-                                                                        \
-    for (_idxvar = _newn; _idxvar < _var->nelts; _idxvar++)             \
+    ATTR_MALLOC ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL            \
+    static _type *alloc_##_type(unsigned n)                             \
     {                                                                   \
-        _finie;                                                         \
+        _type *_var;                                                    \
+        unsigned _sz = _scale##_order(n);                               \
+                                                                        \
+        if (_sz >= _maxsize || freelists_##_type[_sz] == NULL)          \
+            _var = frlmalloc(sizeof (*_var) + _scale##_size(_sz) *      \
+                             sizeof(_var->elts[0]));                    \
+        else                                                            \
+        {                                                               \
+            _var = (_type *)freelists_##_type[_sz];                     \
+            freelists_##_type[_sz] = freelists_##_type[_sz]->chain;     \
+        }                                                               \
+        TRACK_ALLOC_IDX(_type, _sz > _maxsize ? _maxsize : _sz);        \
+        _var->nelts = n;                                                \
+        return _var;                                                    \
     }                                                                   \
                                                                         \
-    if (_scale##_order(_newn) > _scale##_order(_var->nelts))            \
+    GENERATED_DEF _type *new_##_type(unsigned _n)                       \
     {                                                                   \
-        const _type *OLD(_var) = _var;                                  \
-        _type *NEW(_var) = alloc_##_type(_newn);                        \
+        _type *_var = alloc_##_type(_n);                                \
+        unsigned _idxvar;                                               \
+                                                                        \
+        for (_idxvar = 0; _idxvar < _n; _idxvar++)                      \
+        {                                                               \
+            _inite;                                                     \
+        }                                                               \
+        _initc;                                                         \
+        return _var;                                                    \
+    }                                                                   \
+                                                                        \
+    GENERATED_DEF _type *copy_##_type(const _type *OLD(_var))           \
+    {                                                                   \
+        _type *NEW(_var) = alloc_##_type(OLD(_var)->nelts);             \
+        unsigned _idxvar;                                               \
                                                                         \
         memcpy(NEW(_var), OLD(_var),                                    \
                sizeof(_type) +                                          \
                OLD(_var)->nelts * sizeof(OLD(_var)->elts[0]));          \
-        for (_idxvar = 0; _idxvar < NEW(_var)->nelts; _idxvar++)        \
+        for (_idxvar = 0; _idxvar < OLD(_var)->nelts; _idxvar++)        \
         {                                                               \
-            _adjuste;                                                   \
+            _clonee;                                                    \
         }                                                               \
-        _adjustc;                                                       \
-        dispose_##_type(_var);                                          \
-        _var = NEW(_var);                                               \
+        _clonec;                                                        \
+        return NEW(_var);                                               \
     }                                                                   \
                                                                         \
-    for (_idxvar = _var->nelts; _idxvar < _newn; _idxvar++)             \
+    ATTR_NONNULL                                                        \
+    static void dispose_##_type(_type *_var)                            \
     {                                                                   \
-        _inite;                                                         \
+        unsigned _sz = _scale##_order(_var->nelts);                     \
+                                                                        \
+        if(_sz >= _maxsize)                                             \
+            free(_var);                                                 \
+        else                                                            \
+        {                                                               \
+            ((freelist_t *)_var)->chain = freelists_##_type[_sz];       \
+            freelists_##_type[_sz] = (freelist_t *)_var;                \
+        }                                                               \
+        TRACK_FREE_IDX(_type, _sz > _maxsize ? _maxsize : _sz);         \
     }                                                                   \
-    _var->nelts = _newn;                                                \
-    _resizec;                                                           \
-    return _var;                                                        \
-  }                                                                     \
                                                                         \
-  _destructor(_type *_var)                                              \
-  {                                                                     \
-      unsigned _idxvar;                                                 \
+    GENERATED_DEF _type *resize_##_type(_type *_var, unsigned _newn)    \
+    {                                                                   \
+        unsigned _idxvar;                                               \
+        unsigned old_order;                                             \
+        unsigned new_order;                                             \
                                                                         \
-      for (_idxvar = 0; _idxvar < _var->nelts; _idxvar++)               \
-      {                                                                 \
-          _finie;                                                       \
-      }                                                                 \
-      _finic;                                                           \
-      dispose_##_type(_var);                                            \
-  }                                                                     \
-  struct fake
+        if (_var == NULL)                                               \
+            return new_##_type(_newn);                                  \
+                                                                        \
+        old_order = _scale##_order(_var->nelts);                        \
+        new_order = _scale##_order(_newn);                              \
+                                                                        \
+        for (_idxvar = _newn; _idxvar < _var->nelts; _idxvar++)         \
+        {                                                               \
+            _finie;                                                     \
+        }                                                               \
+                                                                        \
+        if (new_order < old_order)                                      \
+        {                                                               \
+            TRACK_FREE_IDX(_type,                                       \
+                           old_order > _maxsize ? _maxsize : old_order); \
+            TRACK_ALLOC_IDX(_type,                                      \
+                            new_order > _maxsize ? _maxsize : new_order); \
+        }                                                               \
+        else if (new_order > old_order)                                 \
+        {                                                               \
+            const _type *OLD(_var) = _var;                              \
+            _type *NEW(_var) = alloc_##_type(_newn);                    \
+                                                                        \
+            memcpy(NEW(_var), OLD(_var),                                \
+                   sizeof(_type) +                                      \
+                   OLD(_var)->nelts * sizeof(OLD(_var)->elts[0]));      \
+            for (_idxvar = 0; _idxvar < NEW(_var)->nelts; _idxvar++)    \
+            {                                                           \
+                _adjuste;                                               \
+            }                                                           \
+            _adjustc;                                                   \
+            dispose_##_type(_var);                                      \
+            _var = NEW(_var);                                           \
+        }                                                               \
+                                                                        \
+        for (_idxvar = _var->nelts; _idxvar < _newn; _idxvar++)         \
+        {                                                               \
+            _inite;                                                     \
+        }                                                               \
+        _var->nelts = _newn;                                            \
+        _resizec;                                                       \
+        return _var;                                                    \
+    }                                                                   \
+                                                                        \
+    _destructor(_type *_var)                                            \
+    {                                                                   \
+        unsigned _idxvar;                                               \
+                                                                        \
+        for (_idxvar = 0; _idxvar < _var->nelts; _idxvar++)             \
+        {                                                               \
+            _finie;                                                     \
+        }                                                               \
+        _finic;                                                         \
+        dispose_##_type(_var);                                          \
+    }                                                                   \
+    struct fake
 /** @endcond */
 
 

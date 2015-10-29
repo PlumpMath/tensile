@@ -308,13 +308,13 @@ extern "C"
     DECLARE_ARRAY_ALLOCATOR(_type);                                     \
                                                                         \
     ATTR_NONNULL_1ST ATTR_WARN_UNUSED_RESULT                            \
-    extern _valtype *lookup_##_type(_type **list, unsigned tag, bool add); \
+    GENERATED_DECL _valtype *lookup_##_type(_type **list, unsigned tag, bool add); \
                                                                         \
     ATTR_NONNULL_1ST ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL       \
-    extern _valtype *add_##_type(_type **list, unsigned tag);           \
+    GENERATED_DECL _valtype *add_##_type(_type **list, unsigned tag);   \
                                                                         \
     ATTR_NONNULL_1ST                                                    \
-    extern void delete_##_type(_type *list, unsigned tag, bool all)
+    GENERATED_DECL void delete_##_type(_type *list, unsigned tag, bool all)
 
 /**
  * Iterate over all elements with a given tag in the taglist
@@ -537,7 +537,7 @@ extern "C"
                            {}, {}, {},                                  \
                            {}, _finie);                                 \
                                                                         \
-    _valtype *lookup_##_type(_type **list, unsigned tag, bool add)      \
+    GENERATED_DEF _valtype *lookup_##_type(_type **list, unsigned tag, bool add) \
     {                                                                   \
         unsigned i;                                                     \
                                                                         \
@@ -551,7 +551,7 @@ extern "C"
         return add_##_type(list, tag);                                  \
     }                                                                   \
                                                                         \
-    _valtype *add_##_type(_type **list, unsigned tag)                   \
+    GENERATED_DEF _valtype *add_##_type(_type **list, unsigned tag)     \
     {                                                                   \
         unsigned i;                                                     \
                                                                         \
@@ -568,7 +568,7 @@ extern "C"
         return &(*list)->elts[i].value;                                 \
     }                                                                   \
                                                                         \
-    void delete_##_type(_type *_var, unsigned tag, bool all)            \
+    GENERATED_DEF void delete_##_type(_type *_var, unsigned tag, bool all) \
     {                                                                   \
         unsigned _idxvar;                                               \
                                                                         \

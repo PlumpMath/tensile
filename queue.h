@@ -300,7 +300,7 @@ extern "C"
  *  */
 #define DECLARE_QUEUE_OPS(_type, _eltype, _deqfunc)                 \
     DECLARE_ARRAY_ALLOCATOR(_type);                                 \
-    extern void clear_##_type(_type *q) ATTR_NONNULL;               \
+    GENERATED_DECL void clear_##_type(_type *q) ATTR_NONNULL;       \
                                                                     \
     ATTR_NONNULL                                                    \
     static inline _eltype dequeue_##_type(_type *q)                 \
@@ -324,10 +324,10 @@ extern "C"
     }                                                               \
                                                                     \
     ATTR_NONNULL_1ST                                                \
-    extern void enqueue_##_type(_type **q, _eltype item);           \
+    GENERATED_DECL void enqueue_##_type(_type **q, _eltype item);   \
                                                                     \
     ATTR_NONNULL_1ST                                                \
-    extern void enqueue_front_##_type(_type **q, _eltype item)
+    GENERATED_DECL void enqueue_front_##_type(_type **q, _eltype item)
     
 #define trivial_dequeue(_x) (*(_x))
 #define trivial_enqueue(_x, _y) ((void)(*(_x) = *(_y)))
@@ -459,7 +459,7 @@ extern "C"
                            {}, _clonee, {}, {}, {},                     \
                            { clear_##_type(_var); }, {});               \
                                                                         \
-    void clear_##_type(_type *_var)                                     \
+    GENERATED_DEF void clear_##_type(_type *_var)                       \
     {                                                                   \
         unsigned _idxvar;                                               \
                                                                         \
@@ -471,7 +471,7 @@ extern "C"
         _var->bottom = _var->top = 0;                                   \
      }                                                                  \
                                                                         \
-    void enqueue_##_type(_type **q, _eltype item)                       \
+    GENERATED_DEF void enqueue_##_type(_type **q, _eltype item)         \
     {                                                                   \
         if ((*q)->top == (*q)->nelts)                                   \
         {                                                               \
@@ -490,7 +490,7 @@ extern "C"
         _enqfunc(&(*q)->elts[(*q)->top++], &item);                      \
     }                                                                   \
                                                                         \
-    void enqueue_front_##_type(_type **q, _eltype item)                 \
+    GENERATED_DEF void enqueue_front_##_type(_type **q, _eltype item)   \
     {                                                                   \
         if ((*q)->top == (*q)->bottom)                                  \
         {                                                               \
