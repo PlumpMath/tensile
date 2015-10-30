@@ -195,7 +195,13 @@ static inline size_t count_leading_zeroes(size_t i)
 }
 #endif
 
-#include "gen_extern.h"
+#define GENERATED_DECL_STATIC static
+#define GENERATED_DEF_STATIC  static
+#define GENERATED_DECL_STATIC_INLINE static
+#define GENERATED_DEF_STATIC_INLINE  static inline
+#define GENERATED_DECL_EXTERN extern
+#define GENERATED_DEF_EXTERN  
+
 
 /**
  * A stub for an arbitrary object-manipulating hook wherever one is needed

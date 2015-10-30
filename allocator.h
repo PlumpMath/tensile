@@ -193,11 +193,11 @@ extern "C"
  * - And the second object is initialized `ASSERT_INT_EQ(*sm1, (short)STATE_INITIALIZED);`
  * - Cleanup `free_small_type(sm1);`
  */
-#define DECLARE_TYPE_ALLOCATOR(_type, _args)                            \
-    GENERATED_DECL _type *new_##_type _args                             \
+#define DECLARE_TYPE_ALLOCATOR(_scope, _type, _args)                    \
+    GENERATED_DECL_##_scope _type *new_##_type _args                    \
     ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL;                       \
-    GENERATED_DECL void free_##_type(_type *_obj);                      \
-    GENERATED_DECL _type *copy_##_type(const _type *_oldobj)            \
+    GENERATED_DECL_##_scope void free_##_type(_type *_obj);             \
+    GENERATED_DECL_##_scope _type *copy_##_type(const _type *_oldobj)   \
         ATTR_NONNULL ATTR_RETURNS_NONNULL
 
 
@@ -296,8 +296,8 @@ extern "C"
  * ASSERT_UINT_EQ(track_alloc_refcnt_type, 0);
  * @endcode
  */
-#define DECLARE_REFCNT_ALLOCATOR(_type, _args)                          \
-    DECLARE_TYPE_ALLOCATOR(_type, _args);                               \
+#define DECLARE_REFCNT_ALLOCATOR(_scope, _type, _args)                  \
+    DECLARE_TYPE_ALLOCATOR(_scope, _type, _args);                       \
                                                                         \
     static inline _type *use_##_type(_type *val)                        \
     {                                                                   \
@@ -355,8 +355,8 @@ extern "C"
 *  ASSERT_UINT_EQ(track_alloc_simple_type2, 0);
  * @endcode
  */
-#define DECLARE_TYPE_PREALLOC(_type)                        \
-    GENERATED_DECL void preallocate_##_type##s(size_t size)
+#define DECLARE_TYPE_PREALLOC(_scope, _type)                            \
+    GENERATED_DECL_##_scope void preallocate_##_type##s(size_t size)
 
 /**
  * Generate declarations for free-list based array allocations 
@@ -616,15 +616,17 @@ extern "C"
  *   `ASSERT_UINT_EQ(arr1->nelts, sz + 1 + delta);`
  * - Cleanup: `free_simple_array(arr1);`
  */
-#define DECLARE_ARRAY_ALLOCATOR(_name, _type)                           \
-    GENERATED_DECL _type *new_##_name(size_t n);                        \
+#define DECLARE_ARRAY_ALLOCATOR(_scope, _name, _type)                   \
+    GENERATED_DECL_##_scope _type *new_##_name(size_t n);               \
     ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL;                       \
-    GENERATED_DECL void free_##_name(_type *_obj, size_t n);            \
-    GENERATED_DECL _type *copy_##_name(const _type *_oldobj, size_t n)  \
+    GENERATED_DECL_##_scope void free_##_name(_type *_obj, size_t n);   \
+    GENERATED_DECL_##_scope _type *copy_##_name(const _type *_oldobj,   \
+                                                size_t n)               \
         ATTR_NONNULL ATTR_RETURNS_NONNULL;                              \
                                                                         \
-    GENERATED_DECL _type *resize_##_name(_type **arr,                   \
-                                         size_t *oldn, size_t newn)     \
+    GENERATED_DECL_##_scope _type *resize_##_name(_type **arr,          \
+                                                  size_t *oldn,         \
+                                                  size_t newn)          \
         ATTR_NONNULL ATTR_WARN_UNUSED_RESULT;                           \
                                                                         \
     ATTR_NONNULL ATTR_WARN_UNUSED_RESULT                                \
@@ -757,7 +759,7 @@ typedef struct freelist_t {
  * DECLARE_TYPE_ALLOCATOR() and family
  * 
  */
-#define DEFINE_TYPE_ALLOC_COMMON(_type, _args, _init, _clone,           \
+#define DEFINE_TYPE_ALLOC_COMMON(_scope, _type, _args, _init, _clone,   \
                                  _destructor, _fini)                    \
     ALLOC_COUNTER(_type);                                               \
     static freelist_t *freelist_##_type;                                \
@@ -778,14 +780,14 @@ typedef struct freelist_t {
         return _var;                                                    \
     }                                                                   \
                                                                         \
-    GENERATED_DEF _type *new_##_type _args                              \
+    GENERATED_DEF_##_scope _type *new_##_type _args                     \
     {                                                                   \
         _type *_var = alloc_##_type();                                  \
         _init(_var);                                                    \
         return _var;                                                    \
     }                                                                   \
                                                                         \
-    GENERATED_DEF _type *copy_##_type(const _type *_var)                \
+    GENERATED_DEF_##_scope _type *copy_##_type(const _type *_var)       \
     {                                                                   \
         _type *_result = alloc_##_type();                               \
                                                                         \
@@ -812,16 +814,16 @@ typedef struct freelist_t {
  * Generates definitions for allocator functions declared per
  * DECLARE_TYPE_ALLOCATOR()
  */
-#define DEFINE_TYPE_ALLOCATOR(_type, _args, _init, _clone, _fini)       \
-    DEFINE_TYPE_ALLOC_COMMON(_type, _args, _init, _clone,               \
-                             GENERATED_DEF void free_##_type, _fini)
+#define DEFINE_TYPE_ALLOCATOR(_scope, _type, _args, _init, _clone, _fini) \
+    DEFINE_TYPE_ALLOC_COMMON(_scope, _type, _args, _init, _clone,       \
+                             GENERATED_DEF_##_scope void free_##_type, _fini)
 
 /** @cond DEV */
 /**
  * Generates a reference-counting `free` function
  */
-#define DEFINE_REFCNT_FREE(_type)                                       \
-    GENERATED_DEF void free_##_type(_type *_var)                        \
+#define DEFINE_REFCNT_FREE(_scope, _type)                               \
+    GENERATED_DEF_##_scope void free_##_type(_type *_var)               \
     {                                                                   \
         if (!_var) return;                                              \
         assert(_var->refcnt != 0);                                      \
@@ -836,7 +838,7 @@ typedef struct freelist_t {
  * Generates definitions for allocator functions declared per
  * DECLARE_REFCNT_ALLOCATOR()
  */
-#define DEFINE_REFCNT_ALLOCATOR(_type, _args, _init, _clone, _fini)     \
+#define DEFINE_REFCNT_ALLOCATOR(_scope,_type, _args, _init, _clone, _fini) \
     static inline void _type##_initialize(_type *_var)                  \
     {                                                                   \
         _var->refcnt = 1;                                               \
@@ -849,18 +851,18 @@ typedef struct freelist_t {
         _clone(_var);                                                   \
     }                                                                   \
                                                                         \
-    DEFINE_TYPE_ALLOC_COMMON(_type, _args, _type##_initialize,          \
+    DEFINE_TYPE_ALLOC_COMMON(_scope, _type, _args, _type##_initialize,  \
                              _type##_afterclone,                        \
                              static inline void _type##_destroy,        \
                              _fini);                                    \
-    DEFINE_REFCNT_FREE(_type)
+    DEFINE_REFCNT_FREE(_scope, _type)
 
 /** 
  * Generates definition for the preallocated declared by
  * DECLARE_TYPE_PREALLOC()
  */
-#define DEFINE_TYPE_PREALLOC(_type)                                     \
-    GENERATED_DEF void preallocate_##_type##s(size_t size)              \
+#define DEFINE_TYPE_PREALLOC(_scope, _type)                             \
+    GENERATED_DEF_##_scope void preallocate_##_type##s(size_t size)     \
     {                                                                   \
         size_t i;                                                       \
         _type *objs = malloc(size * sizeof(*objs));                     \
@@ -879,7 +881,7 @@ typedef struct freelist_t {
  * Generates definitions for allocator functions declared per
  * DECLARE_ARRAY_ALLOCATOR() and family
  */
-#define DEFINE_ARRAY_ALLOCATOR(_name, _type, _scale, _maxsize,          \
+#define DEFINE_ARRAY_ALLOCATOR(_scope, _name, _type, _scale, _maxsize,  \
                                _init, _clone, _resize, _fini)           \
     ALLOC_COUNTERS(_type, _maxsize + 1);                                \
     static freelist_t *freelists_##_type[_maxsize];                     \
@@ -901,7 +903,7 @@ typedef struct freelist_t {
         return _var;                                                    \
     }                                                                   \
                                                                         \
-    GENERATED_DEF _type *new_##_name(size_t _n)                         \
+    GENERATED_DEF_##_scope _type *new_##_name(size_t _n)                \
     {                                                                   \
         _type *_result = alloc_##_type(_n);                             \
         _type *_var;                                                    \
@@ -913,7 +915,7 @@ typedef struct freelist_t {
         return _result;                                                 \
     }                                                                   \
                                                                         \
-    GENERATED_DEF _type *copy_##_name(const _type *_var, size_t _n)     \
+    GENERATED_DEF_##_scope _type *copy_##_name(const _type *_var, size_t _n) \
     {                                                                   \
         _type *_result = alloc_##_type(_n);                             \
         _type *_newvar = _result;                                       \
@@ -941,7 +943,7 @@ typedef struct freelist_t {
         TRACK_FREE_IDX(_type, _sz > _maxsize ? _maxsize : _sz);         \
     }                                                                   \
                                                                         \
-    GENERATED_DEF _type *resize_##_name(_type **_obj, size_t *_oldn,    \
+    GENERATED_DEF_##_scope _type *resize_##_name(_type **_obj, size_t *_oldn, \
                                         size_t _newn)                   \
     {                                                                   \
         size_t old_order;                                               \
@@ -988,7 +990,7 @@ typedef struct freelist_t {
         return _result;                                                 \
     }                                                                   \
                                                                         \
-    GENERATED_DEF free_##_name(_type *_var, size_t n)                   \
+    GENERATED_DEF_##_scope free_##_name(_type *_var, size_t n)          \
     {                                                                   \
         size_t i;                                                       \
                                                                         \
