@@ -355,32 +355,8 @@ extern "C"
 *  ASSERT_UINT_EQ(track_alloc_simple_type2, 0);
  * @endcode
  */
-#define DECLARE_TYPE_PREALLOC(_type)                            \
-    GENERATED_DECL void preallocate_##_type##s(unsigned size)
-
-
-/** @cond DEV */ 
-/**
- * Generate declarations for specific array-handling functions
- */
-#define DECLARE_ARRAY_ALLOC_COMMON(_name, _eltype)                      \
-    GENERATED_DECL _type *resize_##_name(_type **arr,                   \
-                                       size_t *oldn, size_t newn)       \
-        ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT;                   \
-                                                                        \
-    ATTR_NONNULL_1ST ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT       \
-    static inline _type *ensure_##_type##_size(_type **_arr,            \
-                                               size_t *oldn,            \
-                                               size_t req,              \
-                                               size_t delta)            \
-    {                                                                   \
-        if (*oldn >= req)                                               \
-            return  _arr;                                               \
-        return resize_##_type(_arr, oldn, req + delta);                 \
-    }                                                                   \
-    struct fake
-/** @endcond */
-
+#define DECLARE_TYPE_PREALLOC(_type)                        \
+    GENERATED_DECL void preallocate_##_type##s(size_t size)
 
 /**
  * Generate declarations for free-list based array allocations 
@@ -640,9 +616,29 @@ extern "C"
  *   `ASSERT_UINT_EQ(arr1->nelts, sz + 1 + delta);`
  * - Cleanup: `free_simple_array(arr1);`
  */
-#define DECLARE_ARRAY_ALLOCATOR(_type)              \
-    DECLARE_TYPE_ALLOCATOR(_type, (unsigned n));    \
-    DECLARE_ARRAY_ALLOC_COMMON(_type)       
+#define DECLARE_ARRAY_ALLOCATOR(_name, _type)                           \
+    GENERATED_DECL _type *new_##_name(size_t n);                        \
+    ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL;                       \
+    GENERATED_DECL void free_##_name(_type *_obj, size_t n);            \
+    GENERATED_DECL _type *copy_##_name(const _type *_oldobj, size_t n)  \
+        ATTR_NONNULL ATTR_RETURNS_NONNULL;                              \
+                                                                        \
+    GENERATED_DECL _type *resize_##_name(_type **arr,                   \
+                                         size_t *oldn, size_t newn)     \
+        ATTR_NONNULL ATTR_WARN_UNUSED_RESULT;                           \
+                                                                        \
+    ATTR_NONNULL ATTR_WARN_UNUSED_RESULT                                \
+    static inline _type *ensure_##_name##_size(_type **_arr,            \
+                                               size_t *oldn,            \
+                                               size_t req,              \
+                                               size_t delta)            \
+    {                                                                   \
+        if (*oldn >= req)                                               \
+            return *_arr;                                               \
+        return resize_##_name(_arr, oldn, req + delta);                 \
+    }                                                                   \
+    struct fake
+
 
 /**
  * Generate declarations for free-list based array allocations
@@ -739,16 +735,6 @@ typedef struct freelist_t {
 
 /** @endcond */
 
-/**
- * A helpers to reference old objects in clone and resize handlers
- */
-#define OLD(_var) old_##_var
-
-/**
- * A helpers to reference old objects in clone and resize handlers
- */
-#define NEW(_var) new_##_var
-
 #if TRACK_ALLOCATOR
 #define ALLOC_COUNTER(_name) static size_t track_alloc_##_name
 #define ALLOC_COUNTERS(_name, _size) ALLOC_COUNTER(_name)[_size]
@@ -771,7 +757,7 @@ typedef struct freelist_t {
  * DECLARE_TYPE_ALLOCATOR() and family
  * 
  */
-#define DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var, _init, _clone,     \
+#define DEFINE_TYPE_ALLOC_COMMON(_type, _args, _init, _clone,           \
                                  _destructor, _fini)                    \
     ALLOC_COUNTER(_type);                                               \
     static freelist_t *freelist_##_type;                                \
@@ -795,24 +781,24 @@ typedef struct freelist_t {
     GENERATED_DEF _type *new_##_type _args                              \
     {                                                                   \
         _type *_var = alloc_##_type();                                  \
-        _init;                                                          \
+        _init(_var);                                                    \
         return _var;                                                    \
     }                                                                   \
                                                                         \
-    GENERATED_DEF _type *copy_##_type(const _type *OLD(_var))           \
+    GENERATED_DEF _type *copy_##_type(const _type *_var)                \
     {                                                                   \
-        _type *NEW(_var) = alloc_##_type();                             \
+        _type *_result = alloc_##_type();                               \
                                                                         \
-        assert(OLD(_var) != NULL);                                      \
-        memcpy(NEW(_var), OLD(_var), sizeof(*OLD(_var)));               \
-        _clone;                                                         \
-        return NEW(_var);                                               \
+        assert(_var != NULL);                                           \
+        memcpy(_result, _var, sizeof(_type));                           \
+        _clone(_result);                                                \
+        return _result;                                                 \
     }                                                                   \
                                                                         \
     _destructor(_type *_var)                                            \
     {                                                                   \
         if (!_var) return;                                              \
-        _fini;                                                          \
+        _fini(_var);                                                    \
         ((freelist_t *)_var)->chain = freelist_##_type;                 \
         freelist_##_type = (freelist_t *)_var;                          \
         TRACK_FREE(_type);                                              \
@@ -826,21 +812,21 @@ typedef struct freelist_t {
  * Generates definitions for allocator functions declared per
  * DECLARE_TYPE_ALLOCATOR()
  */
-#define DEFINE_TYPE_ALLOCATOR(_type, _args, _var, _init, _clone, _fini) \
-    DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var, _init, _clone,         \
+#define DEFINE_TYPE_ALLOCATOR(_type, _args, _init, _clone, _fini)       \
+    DEFINE_TYPE_ALLOC_COMMON(_type, _args, _init, _clone,               \
                              GENERATED_DEF void free_##_type, _fini)
 
 /** @cond DEV */
 /**
  * Generates a reference-counting `free` function
  */
-#define DEFINE_REFCNT_FREE(_type, _var)                                 \
+#define DEFINE_REFCNT_FREE(_type)                                       \
     GENERATED_DEF void free_##_type(_type *_var)                        \
     {                                                                   \
         if (!_var) return;                                              \
         assert(_var->refcnt != 0);                                      \
         if (--_var->refcnt == 0)                                        \
-            destroy_##_type(_var);                                      \
+            _type##_destroy(_var);                                      \
     }                                                                   \
     struct fake
 /** @endcond */
@@ -850,30 +836,41 @@ typedef struct freelist_t {
  * Generates definitions for allocator functions declared per
  * DECLARE_REFCNT_ALLOCATOR()
  */
-#define DEFINE_REFCNT_ALLOCATOR(_type, _args, _var, _init, _clone, _fini) \
-    DEFINE_TYPE_ALLOC_COMMON(_type, _args, _var,                        \
-                             { _var->refcnt = 1; _init; },              \
-                             { NEW(_var)->refcnt = 1; _clone; },        \
-                             static inline void destroy_##_type, _fini); \
-    DEFINE_REFCNT_FREE(_type, _var)
+#define DEFINE_REFCNT_ALLOCATOR(_type, _args, _init, _clone, _fini)     \
+    static inline void _type##_initialize(_type *_var)                  \
+    {                                                                   \
+        _var->refcnt = 1;                                               \
+        _init(_var);                                                    \
+    }                                                                   \
+                                                                        \
+    static inline void _type##_afterclone(_type *_var)                  \
+    {                                                                   \
+        _var->refcnt = 1;                                               \
+        _clone(_var);                                                   \
+    }                                                                   \
+                                                                        \
+    DEFINE_TYPE_ALLOC_COMMON(_type, _args, _type##_initialize,          \
+                             _type##_afterclone,                        \
+                             static inline void _type##_destroy,        \
+                             _fini);                                    \
+    DEFINE_REFCNT_FREE(_type)
 
 /** 
  * Generates definition for the preallocated declared by
  * DECLARE_TYPE_PREALLOC()
  */
 #define DEFINE_TYPE_PREALLOC(_type)                                     \
-    GENERATED_DEF void preallocate_##_type##s(unsigned size)            \
+    GENERATED_DEF void preallocate_##_type##s(size_t size)              \
     {                                                                   \
-        unsigned i;                                                     \
+        size_t i;                                                       \
         _type *objs = malloc(size * sizeof(*objs));                     \
                                                                         \
-        assert(freelist_##_type == NULL);                               \
         assert(sizeof(*objs) >= sizeof(freelist_t));                    \
         for (i = 0; i < size - 1; i++)                                  \
         {                                                               \
             ((freelist_t *)&objs[i])->chain = (freelist_t *)&objs[i + 1]; \
         }                                                               \
-        ((freelist_t *)&objs[size - 1])->chain = NULL;                  \
+        ((freelist_t *)&objs[size - 1])->chain = freelist_##_type;      \
         freelist_##_type = (freelist_t *)objs;                          \
     }    
 
@@ -882,63 +879,57 @@ typedef struct freelist_t {
  * Generates definitions for allocator functions declared per
  * DECLARE_ARRAY_ALLOCATOR() and family
  */
-#define DEFINE_ARRAY_ALLOC_COMMON(_type, _scale, _maxsize, _var,        \
-                                  _init, _clone, _resize, _fini)        \
+#define DEFINE_ARRAY_ALLOCATOR(_name, _type, _scale, _maxsize,          \
+                               _init, _clone, _resize, _fini)           \
     ALLOC_COUNTERS(_type, _maxsize + 1);                                \
     static freelist_t *freelists_##_type[_maxsize];                     \
                                                                         \
     ATTR_MALLOC ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL            \
-    static _type *alloc_##_type(unsigned n)                             \
+    static _type *alloc_##_name(size_t n)                               \
     {                                                                   \
         _type *_var;                                                    \
-        unsigned _sz = _scale##_order(n);                               \
+        size_t _sz = _scale##_order(n);                                 \
                                                                         \
         if (_sz >= _maxsize || freelists_##_type[_sz] == NULL)          \
-            _var = frlmalloc(sizeof (*_var) + _scale##_size(_sz) *      \
-                             sizeof(_var->elts[0]));                    \
+            _var = frlmalloc(_scale##_size(_sz) * sizeof(_type));       \
         else                                                            \
         {                                                               \
             _var = (_type *)freelists_##_type[_sz];                     \
             freelists_##_type[_sz] = freelists_##_type[_sz]->chain;     \
         }                                                               \
         TRACK_ALLOC_IDX(_type, _sz > _maxsize ? _maxsize : _sz);        \
-        _var->nelts = n;                                                \
         return _var;                                                    \
     }                                                                   \
                                                                         \
-    GENERATED_DEF _type *new_##_type(unsigned _n)                       \
+    GENERATED_DEF _type *new_##_name(size_t _n)                         \
     {                                                                   \
-        _type *_var = alloc_##_type(_n);                                \
-        unsigned _idxvar;                                               \
+        _type *_result = alloc_##_type(_n);                             \
+        _type *_var;                                                    \
                                                                         \
-        for (_idxvar = 0; _idxvar < _n; _idxvar++)                      \
+        for (_var = _result; _var < _result + _n; _var++)               \
         {                                                               \
-            _inite;                                                     \
+            _init(_var);                                                \
         }                                                               \
-        _initc;                                                         \
-        return _var;                                                    \
+        return _result;                                                 \
     }                                                                   \
                                                                         \
-    GENERATED_DEF _type *copy_##_type(const _type *OLD(_var))           \
+    GENERATED_DEF _type *copy_##_name(const _type *_var, size_t _n)     \
     {                                                                   \
-        _type *NEW(_var) = alloc_##_type(OLD(_var)->nelts);             \
-        unsigned _idxvar;                                               \
+        _type *_result = alloc_##_type(_n);                             \
+        _type *_newvar = _result;                                       \
                                                                         \
-        memcpy(NEW(_var), OLD(_var),                                    \
-               sizeof(_type) +                                          \
-               OLD(_var)->nelts * sizeof(OLD(_var)->elts[0]));          \
-        for (_idxvar = 0; _idxvar < OLD(_var)->nelts; _idxvar++)        \
+        memcpy(_newvar, _var, _n * sizeof(_type));                      \
+        for (; _newvar < _result + _n; _newvar++)                       \
         {                                                               \
-            _clonee;                                                    \
+            _clone(_newvar);                                            \
         }                                                               \
-        _clonec;                                                        \
-        return NEW(_var);                                               \
+        return _result;                                                 \
     }                                                                   \
                                                                         \
     ATTR_NONNULL                                                        \
-    static void dispose_##_type(_type *_var)                            \
+    static void dispose_##_name(_type *_var, size_t _n)                 \
     {                                                                   \
-        unsigned _sz = _scale##_order(_var->nelts);                     \
+        size_t _sz = _scale##_order(_n);                                \
                                                                         \
         if(_sz >= _maxsize)                                             \
             free(_var);                                                 \
@@ -950,21 +941,22 @@ typedef struct freelist_t {
         TRACK_FREE_IDX(_type, _sz > _maxsize ? _maxsize : _sz);         \
     }                                                                   \
                                                                         \
-    GENERATED_DEF _type *resize_##_type(_type *_var, unsigned _newn)    \
+    GENERATED_DEF _type *resize_##_name(_type **_obj, size_t *_oldn,    \
+                                        size_t _newn)                   \
     {                                                                   \
-        unsigned _idxvar;                                               \
-        unsigned old_order;                                             \
-        unsigned new_order;                                             \
+        size_t old_order;                                               \
+        size_t new_order;                                               \
+        size_t i;                                                       \
                                                                         \
-        if (_var == NULL)                                               \
-            return new_##_type(_newn);                                  \
+        if (*_obj == NULL)                                              \
+            return (*_obj = new_##_type(_newn));                        \
                                                                         \
-        old_order = _scale##_order(_var->nelts);                        \
+        old_order = _scale##_order(*_oldn);                             \
         new_order = _scale##_order(_newn);                              \
                                                                         \
-        for (_idxvar = _newn; _idxvar < _var->nelts; _idxvar++)         \
+        for (i = _newn; _var < *_oldn; i++)                             \
         {                                                               \
-            _finie;                                                     \
+            _fini(&(*_obj)[i]);                                          \
         }                                                               \
                                                                         \
         if (new_order < old_order)                                      \
@@ -976,39 +968,34 @@ typedef struct freelist_t {
         }                                                               \
         else if (new_order > old_order)                                 \
         {                                                               \
-            const _type *OLD(_var) = _var;                              \
-            _type *NEW(_var) = alloc_##_type(_newn);                    \
+            _type *_result = alloc_##_type(_newn);                      \
                                                                         \
-            memcpy(NEW(_var), OLD(_var),                                \
-                   sizeof(_type) +                                      \
-                   OLD(_var)->nelts * sizeof(OLD(_var)->elts[0]));      \
-            for (_idxvar = 0; _idxvar < NEW(_var)->nelts; _idxvar++)    \
+            memcpy(_result, *_obj,                                      \
+                   *_oldn * sizeof(_type));                             \
+            for (i = 0; i < *_oldn; i++)                                \
             {                                                           \
-                _adjuste;                                               \
+                _resize(&_result[i], &(*_obj)[i]);                      \
             }                                                           \
-            _adjustc;                                                   \
-            dispose_##_type(_var);                                      \
-            _var = NEW(_var);                                           \
+            dispose_##_type(*_obj);                                     \
+            *_obj = _result;                                            \
         }                                                               \
                                                                         \
-        for (_idxvar = _var->nelts; _idxvar < _newn; _idxvar++)         \
+        for (i = *_oldn; i < _newn; i++)                                \
         {                                                               \
-            _inite;                                                     \
+            _init(&_result[i]);                                         \
         }                                                               \
-        _var->nelts = _newn;                                            \
-        _resizec;                                                       \
-        return _var;                                                    \
+        *_oldn = _newn;                                                 \
+        return _result;                                                 \
     }                                                                   \
                                                                         \
-    _destructor(_type *_var)                                            \
+    GENERATED_DEF free_##_name(_type *_var, size_t n)                   \
     {                                                                   \
-        unsigned _idxvar;                                               \
+        size_t i;                                                       \
                                                                         \
-        for (_idxvar = 0; _idxvar < _var->nelts; _idxvar++)             \
+        for (i = 0; i < n; i++)                                         \
         {                                                               \
-            _finie;                                                     \
+            _fini(&_var[i]);                                            \
         }                                                               \
-        _finic;                                                         \
         dispose_##_type(_var);                                          \
     }                                                                   \
     struct fake
@@ -1164,32 +1151,26 @@ static inline unsigned log2_order(unsigned x)
     struct fake
 
 
-#define DEFINE_ARRAY_ALLOCATOR(_type, _scale, _maxsize, _var, _idxvar,  \
-                               _initc, _inite,                          \
-                               _clonec, _clonee,                        \
-                               _adjustc, _adjuste, _resizec,            \
-                               _finic, _finie)                          \
-    DEFINE_ARRAY_ALLOC_COMMON(_type, _scale, _maxsize, _var, _idxvar,   \
-                              _initc, _inite,                           \
-                              _clonec, _clonee,                         \
-                              _adjustc, _adjuste, _resizec,             \
-                              GENERATED_DEF void free_##_type,          \
-                              _finic, _finie)
+#define elt_initialize_to_null(_obj) (void)(*(_obj) = NULL)
 
-#define DEFINE_REFCNT_ARRAY_ALLOCATOR(_type, _scale, _maxsize, _var,    \
-                                      _idxvar,                          \
-                                      _initc, _inite,                   \
-                                      _clonec, _clone,                  \
-                                      _adjustc, _adjuste, _resizec,     \
-                                      _finic, _finie)                   \
-    DEFINE_ARRAY_ALLOC_COMMON(_type, _scale, _maxsize, _var, _idxvar,   \
-                              { _var->refcnt = 1; _initc}, _inite,      \
-                              { NEW(_var)->refcnt = 1; _clonec}, _clone, \
-                              _adjustc, _adjuste,                       \
-                              {assert(_var->refcnt == 1); _resizec},    \
-                              static inline void destroy_##_type,       \
-                              _finic, _finie);                          \
-    DEFINE_REFCNT_FREE(_type, _var)
+#define DEFINE_ARRAY_ALLOCATOR_REFCNT(_type, _scale, _maxsize)          \
+    static inline void do_clone_elt_##_type(_type **obj)                \
+    {                                                                   \
+        *obj = copy_##_type(*obj);                                      \
+    }                                                                   \
+                                                                        \
+    static inline void do_free_elt_##_type(_type **obj)                 \
+    {                                                                   \
+        free_##_type(*obj);                                             \
+        obj = NULL;                                                     \
+    }                                                                   \
+                                                                        \
+    DEFINE_ARRAY_ALLOCATOR(_type##s, _type *,                           \
+                           elt_initialize_to_null,                      \
+                           do_clone_elt_##_type,                        \
+                           trivial_hook2,                               \
+                           do_free_elt_##_type)
+        
 
 #endif // defined(ALLOCATOR_IMP)
   

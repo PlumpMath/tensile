@@ -172,30 +172,40 @@ static inline unsigned count_leading_zeroes(unsigned i)
  * `ASSERT_UINT_EQ(count_leading_zeroes(i), expected);`
  *  @testvar{unsigned,i,u} | @testvar{unsigned,expected}
  *  -----------------------|------------------------
- *  `0u`                   | `sizeof(unsigned) * CHAR_BIT`
- *  `1u`                   | `sizeof(unsigned) * CHAR_BIT - 1`
- *  `0x12340u`             | `sizeof(unsigned) * CHAR_BIT - 17`
- *  `UINT_MAX`             | `0`
- *  `UINT_MAX >> 1`        | `1`
- *  `UINT_MAX >> 2`        | `2`
+ *  `0u`                   | `sizeof(size_t) * CHAR_BIT`
+ *  `1u`                   | `sizeof(size_t) * CHAR_BIT - 1`
+ *  `0x12340u`             | `sizeof(size_t) * CHAR_BIT - 17`
+ *  `SIZE_MAX`             | `0`
+ *  `SIZE_MAX >> 1`        | `1`
+ *  `SIZE_MAX >> 2`        | `2`
  *
  */
-static inline unsigned count_leading_zeroes(unsigned i)
+static inline size_t count_leading_zeroes(size_t i)
 {
-    unsigned j;
+    size_t j;
   
     if (i == 0)
-        return (unsigned)sizeof(i) * CHAR_BIT;
+        return sizeof(i) * CHAR_BIT;
     for (j = sizeof(i) * CHAR_BIT - 1; j > 0; j--)
     {
         if (i & (1u << j))
-            return (unsigned)sizeof(i) * CHAR_BIT - 1 - j;
+            return sizeof(i) * CHAR_BIT - 1 - j;
     }
-    return (unsigned)sizeof(i) * CHAR_BIT - 1;
+    return sizeof(i) * CHAR_BIT - 1;
 }
 #endif
 
 #include "gen_extern.h"
+
+/**
+ * A stub for an arbitrary object-manipulating hook wherever one is needed
+ */
+#define trivial_hook(_obj) ((void)0)
+
+/**
+ * A stub for an arbitrary two object-manipulating hook wherever one is needed
+ */
+#define trivial_hook2(_obj1, _obj2) ((void)0)
 
 
 #ifdef __cplusplus
