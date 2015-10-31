@@ -759,7 +759,8 @@ typedef struct freelist_t {
  * DECLARE_TYPE_ALLOCATOR() and family
  * 
  */
-#define DEFINE_TYPE_ALLOC_COMMON(_scope, _type, _args, _init, _clone,   \
+#define DEFINE_TYPE_ALLOC_COMMON(_scope, _type, _args, _init, _initargs, \
+                                 _clone,                                \
                                  _destructor, _fini)                    \
     ALLOC_COUNTER(_type);                                               \
     static freelist_t *freelist_##_type;                                \

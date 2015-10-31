@@ -214,6 +214,21 @@ static inline size_t count_leading_zeroes(size_t i)
 #define trivial_hook2(_obj1, _obj2) ((void)0)
 
 
+/**
+ * A wrapper for hooks processing variable number of arguments
+ */
+#define VA_HOOK(_lastarg, _hook)                \
+    do                                          \
+    {                                           \
+        va_list _vargs;                         \
+        va_start(_vargs, _lastarg);             \
+        _hook(_vargs);                          \
+        va_end(_vargs);                         \
+    } while(0)
+
+
+
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
