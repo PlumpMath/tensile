@@ -213,20 +213,25 @@ static inline size_t count_leading_zeroes(size_t i)
  */
 #define trivial_hook2(_obj1, _obj2) ((void)0)
 
+#define _OBJHOOK_VARNAME __obj__
+#define OBJHOOK0(_hook) _hook(_OBJHOOK_VARNAME) 
+#define OBJHOOK(_hook, ...) _hook(_OBJHOOK_VARNAME, __VA_ARGS__)
+
 
 /**
  * A wrapper for hooks processing variable number of arguments
  */
-#define VA_HOOK(_lastarg, _hook)                \
+#define VA_HOOK(_hook)                          \
     do                                          \
     {                                           \
         va_list _vargs;                         \
-        va_start(_vargs, _lastarg);             \
+        va_start(_vargs, _OBJHOOK_VARNAME);     \
         _hook(_vargs);                          \
         va_end(_vargs);                         \
     } while(0)
 
 
+#define PROVIDE(_feature) _feature##_REQUIRED_FIELDS
 
 
 #ifdef __cplusplus

@@ -58,12 +58,27 @@ extern "C"
  *    unsigned tag;
  * } simple_type;
  *
- * DECLARE_TYPE_ALLOCATOR(simple_type, (unsigned tag));
+ * DECLARE_TYPE_ALLOCATOR(EXTERN, simple_type, (unsigned tag));
  *
- * DEFINE_TYPE_ALLOCATOR(simple_type, (unsigned tag), obj,
- * { obj->tag = tag; },
- * { NEW(obj)->tag = OLD(obj)->tag | STATE_CLONED; },
- * { obj->tag = STATE_FINALIZED; });
+ * static inline void simple_type_init(simple_type *obj, unsigned tag)
+ * {
+ *    obj->tag = tag;
+ * }
+ *
+ * static inline void simple_type_clone(simple_type *obj)
+ * {
+ *    obj->tag |= STATE_CLONED;
+ * }
+ *
+ * static inline void simple_type_fini(simple_type *obj)
+ * {
+ *    obj->tag = STATE_FINALIZED;
+ * }
+ *
+ * DEFINE_TYPE_ALLOCATOR(EXTERN, simple_type, (unsigned tag), obj,
+ *                       OBJHOOK(simple_type_init, tag),
+ *                       simple_type_clone,
+ *                       simple_type_fini);
  * @endcode
  *
  * @test Allocate
@@ -306,6 +321,8 @@ extern "C"
         return val;                                                     \
     }                                                                   \
     struct fake
+
+#define REFCNT_REQUIRED_FIELDS unsigned refcnt
 
 /** 
  * Generates a declaration for a function to pre-allocate a free-list 
@@ -759,7 +776,7 @@ typedef struct freelist_t {
  * DECLARE_TYPE_ALLOCATOR() and family
  * 
  */
-#define DEFINE_TYPE_ALLOC_COMMON(_scope, _type, _args, _init, _initargs, \
+#define DEFINE_TYPE_ALLOC_COMMON(_scope, _type, _args, _init,           \
                                  _clone,                                \
                                  _destructor, _fini)                    \
     ALLOC_COUNTER(_type);                                               \
@@ -783,8 +800,8 @@ typedef struct freelist_t {
                                                                         \
     GENERATED_DEF_##_scope _type *new_##_type _args                     \
     {                                                                   \
-        _type *_var = alloc_##_type();                                  \
-        _init(_var);                                                    \
+        _type *_OBJHOOK_VARNAME = alloc_##_type();                      \
+        _init;                                                          \
         return _var;                                                    \
     }                                                                   \
                                                                         \
@@ -840,19 +857,14 @@ typedef struct freelist_t {
  * DECLARE_REFCNT_ALLOCATOR()
  */
 #define DEFINE_REFCNT_ALLOCATOR(_scope,_type, _args, _init, _clone, _fini) \
-    static inline void _type##_initialize(_type *_var)                  \
-    {                                                                   \
-        _var->refcnt = 1;                                               \
-        _init(_var);                                                    \
-    }                                                                   \
-                                                                        \
     static inline void _type##_afterclone(_type *_var)                  \
     {                                                                   \
         _var->refcnt = 1;                                               \
         _clone(_var);                                                   \
     }                                                                   \
                                                                         \
-    DEFINE_TYPE_ALLOC_COMMON(_scope, _type, _args, _type##_initialize,  \
+    DEFINE_TYPE_ALLOC_COMMON(_scope, _type, _args,                      \
+                             do { _OBJHOOK_VARNAME->refcnt = 1; _init; } while(0), \
                              _type##_afterclone,                        \
                              static inline void _type##_destroy,        \
                              _fini);                                    \
