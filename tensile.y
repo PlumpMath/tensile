@@ -40,21 +40,21 @@
 %left ','
 %nonassoc TOK_RULE
 %nonassoc TOK_FOREIGN                        
-%nonassoc TOK_ASSIGN
+%nonassoc '='
 %right TOK_THEN                        
 %nonassoc TOK_HOT TOK_COLD TOK_IDLE TOK_GREEDY
 %nonassoc TOK_ELSE
 %right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_TYPECASE TOK_POLL TOK_FREEZE TOK_WATCH
 %nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_RETURN TOK_YIELD TOK_ERROR TOK_GOTO TOK_ASSERT TOK_NEED
 %right TOK_PUT TOK_PUT_ALL TOK_PUT_NEXT 
-%left '='
+%left TOK_PUT_BACK
 %right '?'
 %nonassoc TOK_MATCH_BINDING TOK_MATCH_BINDING_ALL
 %left '|' 
 %left '&'
 %nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH TOK_IN TOK_ISTYPE
 %left TOK_MAX TOK_MIN 
-%left '+' '-' TOK_APPEND TOK_CHOP 
+%left '+' '-' TOK_APPEND TOK_CHOP TOK_CHOP_HEAD
 %left '*' '/' TOK_DIV TOK_MOD TOK_INTERSPERSE TOK_SPLIT
 %right '^'
 %left TOK_TYPECAST
@@ -181,13 +181,13 @@ nodeargs:       nodearg
                 ;
 
 nodearg:        nodeargname
-        |       nodeargname TOK_ASSIGN expression
+        |       nodeargname '=' expression
                 ;
 
 nodeargname:    scope TOK_ID
         ;
 
-instantiate:    TOK_ASSIGN noderef '(' instanceargs0 ')' ';'
+instantiate:    '=' noderef '(' instanceargs0 ')' ';'
                 ;
 
 instanceargs0:  /*empty*/
@@ -198,7 +198,7 @@ instanceargs:   instancearg
         |       instanceargs ',' instancearg
         ;
 
-instancearg:    TOK_ID TOK_ASSIGN expression
+instancearg:    TOK_ID '=' expression
                 ;
 
 nodeblock:   '{' sequence  '}'
@@ -332,7 +332,7 @@ bindings:       binding
         |       bindings ';' binding
                 ;
 
-binding: TOK_ID TOK_ASSIGN expression
+binding: TOK_ID '=' expression
         | pragma
         | TOK_HOOK TOK_ID
                 ;
@@ -428,7 +428,7 @@ pattern:        TOK_ID
         |       TOK_REGEXP
         |       '(' pattern ')'
         |       block                
-        |       TOK_ID TOK_ASSIGN pattern %prec '^'
+        |       TOK_ID '=' pattern %prec '^'
         |       TOK_ID '(' patternlist0 ')' %prec '('
         |       '[' patternlist ']'
         |       '[' patternassoclist ']'
