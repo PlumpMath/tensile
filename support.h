@@ -30,6 +30,7 @@ extern "C"
 #endif
 
 #include <limits.h>
+#include <inttypes.h>
 
 /** @cond DEV */
 

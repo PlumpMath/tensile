@@ -188,10 +188,14 @@ extern "C"
  * @code
  *  typedef short small_type;
  *
- *  DECLARE_TYPE_ALLOCATOR(small_type, ());
- *  DEFINE_TYPE_ALLOCATOR(small_type, (), obj,
- *  {*obj = (short)STATE_INITIALIZED;},
- *  {}, {});
+ *  static inline void small_type_init(small_type *obj)
+ *  {
+ *      *obj = (short)STATE_INITIALIZED;
+ *  }
+ *  DECLARE_TYPE_ALLOCATOR(EXTERN, small_type, ());
+ *  DEFINE_TYPE_ALLOCATOR(EXTERN, small_type, (), 
+ *  OBJHOOK0(small_type_init),
+ *  trivial_hook, trivial_hook);
  * @endcode
  *
  * @test Allocate and free small
@@ -225,16 +229,16 @@ extern "C"
  * @test Background:
  * @code
  *  typedef struct refcnt_type {
- *    unsigned refcnt;
+ *    PROVIDE(REFCNT);
  *    void *ptr;
  *    unsigned tag;
  *  } refcnt_type;
  *
- * DECLARE_REFCNT_ALLOCATOR(refcnt_type, (unsigned tag));
- * DEFINE_REFCNT_ALLOCATOR(refcnt_type, (unsigned tag), obj,
- *                       {obj->tag = tag;},
- *                       {NEW(obj)->tag = OLD(obj)->tag | STATE_CLONED;},
- *                       {obj->tag = STATE_FINALIZED;});
+ * DECLARE_REFCNT_ALLOCATOR(EXTERN, refcnt_type, (unsigned tag));
+ * DEFINE_REFCNT_ALLOCATOR(EXTERN, refcnt_type, (unsigned tag), 
+ *                         OBJHOOK(refcnt_type_init, tag),
+ *                         refcnt_type_clone,
+ *                         refcnt_type_fini);
  * @endcode
  *
  * @test Allocate refcounted
@@ -637,14 +641,17 @@ extern "C"
     GENERATED_DECL_##_scope _type *new_##_name(size_t n);               \
     ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL;                       \
     GENERATED_DECL_##_scope void free_##_name(_type *_obj, size_t n);   \
+    GENERATED_DECL_##_scope _type *unshare_##_name(_type *_oldobj,      \
+                                                   size_t n)            \
+    ATTR_NONNULL ATTR_RETURNS_NONNULL;                                  \
     GENERATED_DECL_##_scope _type *copy_##_name(const _type *_oldobj,   \
                                                 size_t n)               \
-        ATTR_NONNULL ATTR_RETURNS_NONNULL;                              \
+    ATTR_NONNULL ATTR_RETURNS_NONNULL;                                  \
                                                                         \
     GENERATED_DECL_##_scope _type *resize_##_name(_type **arr,          \
                                                   size_t *oldn,         \
                                                   size_t newn)          \
-        ATTR_NONNULL ATTR_WARN_UNUSED_RESULT;                           \
+    ATTR_NONNULL ATTR_WARN_UNUSED_RESULT;                               \
                                                                         \
     ATTR_NONNULL ATTR_WARN_UNUSED_RESULT                                \
     static inline _type *ensure_##_name##_size(_type **_arr,            \
@@ -856,7 +863,7 @@ typedef struct freelist_t {
  * Generates definitions for allocator functions declared per
  * DECLARE_REFCNT_ALLOCATOR()
  */
-#define DEFINE_REFCNT_ALLOCATOR(_scope,_type, _args, _init, _clone, _fini) \
+#define DEFINE_REFCNT_ALLOCATOR(_scope, _type, _args, _init, _clone, _fini) \
     static inline void _type##_afterclone(_type *_var)                  \
     {                                                                   \
         _var->refcnt = 1;                                               \
@@ -928,17 +935,23 @@ typedef struct freelist_t {
         return _result;                                                 \
     }                                                                   \
                                                                         \
+    GENERATED_DEF_##_scope _type *unshare_##_name(_type *_var, size_t _n) \
+    {                                                                   \
+        _type *iter;                                                    \
+                                                                        \
+        for (iter = _var; iter < _var + _n; _iter++)                    \
+        {                                                               \
+            _clone(_iter);                                              \
+        }                                                               \
+        return _var;                                                    \
+    }                                                                   \
+                                                                        \
     GENERATED_DEF_##_scope _type *copy_##_name(const _type *_var, size_t _n) \
     {                                                                   \
         _type *_result = alloc_##_type(_n);                             \
-        _type *_newvar = _result;                                       \
                                                                         \
-        memcpy(_newvar, _var, _n * sizeof(_type));                      \
-        for (; _newvar < _result + _n; _newvar++)                       \
-        {                                                               \
-            _clone(_newvar);                                            \
-        }                                                               \
-        return _result;                                                 \
+        memcpy(_result, _var, _n * sizeof(_type));                      \
+        return unshare_##_name(_result, _n);                            \
     }                                                                   \
                                                                         \
     ATTR_NONNULL                                                        \
