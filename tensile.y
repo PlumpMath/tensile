@@ -50,13 +50,12 @@
 %left TOK_PUT_BACK
 %right '?'
 %nonassoc TOK_MATCH_BINDING TOK_MATCH_BINDING_ALL
-%left '|' 
+%left '|' '^'
 %left '&'
 %nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH TOK_IN TOK_ISTYPE
 %left TOK_MAX TOK_MIN 
 %left '+' '-' TOK_APPEND TOK_CHOP TOK_CHOP_HEAD
 %left '*' '/' TOK_DIV TOK_MOD TOK_INTERSPERSE TOK_SPLIT
-%right '^'
 %left TOK_TYPECAST
 %left '[' 
 %right '!' TOK_TRACING TOK_PEEK TOK_UMINUS
@@ -285,7 +284,7 @@ expression: literal
         |       expression TOK_MATCH_BINDING pattern
         |       expression TOK_NOT_MATCH pattern
         |       expression TOK_IN expression
-        |       expression TOK_ISTYPE typechoice
+        |       expression TOK_ISTYPE typename
         |       expression '=' expression
         |       expression TOK_PUT expression
         |       expression TOK_PUT_ALL expression
@@ -304,9 +303,9 @@ expression: literal
         |       TOK_FOR '(' bindings ';' expression ';' bindings ')' expression %prec TOK_FOR
         |       TOK_FOREACH '(' foreach_spec ')' expression %prec TOK_FOREACH
         |       TOK_FREEZE '(' expression ')' expression %prec TOK_FREEZE
-        |       TOK_SWITCH '(' expression ')' '{' alternatives '}'
-        |       TOK_POLL '{' select_alternatives '}'
-        |       TOK_TYPECASE '(' expression ')' '{' generic_alternatives '}'
+        |       TOK_SWITCH '(' expression ')' '{' alternatives '}' %prec TOK_SWITCH
+        |       TOK_POLL '{' select_alternatives '}' %prec TOK_POLL
+        |       TOK_TYPECASE '(' expression ')' '{' generic_alternatives '}' %prec TOK_TYPECASE
         |       TOK_WATCH '(' expression TOK_RULE expression ')' expression %prec TOK_WATCH
         |       TOK_HOT expression
         |       TOK_COLD expression
@@ -403,6 +402,7 @@ selector:       varref
         |       '(' selector ')'
         |       selector '&' selector
         |       selector '|' selector
+        |       selector '^' selector                
         ;
 
 generic_alternatives:
@@ -419,7 +419,7 @@ typechoice:     typename
         ;
 
 typename:       TOK_ID
-        |       '&' expression
+        |       '&' expression %prec TOK_UMINUS
         ;
 
 pattern:        TOK_ID
@@ -428,7 +428,7 @@ pattern:        TOK_ID
         |       TOK_REGEXP
         |       '(' pattern ')'
         |       block                
-        |       TOK_ID '=' pattern %prec '^'
+        |       TOK_ID '=' pattern %prec TOK_EQ
         |       TOK_ID '(' patternlist0 ')' %prec '('
         |       '[' patternlist ']'
         |       '[' patternassoclist ']'

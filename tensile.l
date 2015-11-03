@@ -43,7 +43,7 @@ _ { return TOK_WILDCARD; }
 "*?" { return TOK_PEEK; }
 "++" { return TOK_APPEND; }
 "--" { return TOK_CHOP; }
-"-/-" { return TOK_CHOP_HEAD; }
+"^^" { return TOK_CHOP_HEAD; }
 "**" { return TOK_INTERSPERSE; }
 "//" { return TOK_SPLIT; }
 "<>" { return TOK_QUEUE; }
