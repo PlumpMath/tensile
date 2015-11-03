@@ -229,7 +229,12 @@ TAB_SIZE               = 4
 # newlines.
 
 ALIASES                =   testvar{3}="(`\1`) `\2` \%`\3`"
-ALIASES                +=  testvar{2}="(`\1`) `\2`"
+ALIASES               +=   testvar{2}="(`\1`) `\2`"
+ALIASES               +=   given{1}="- *Given* \1:\n@code\n"
+ALIASES               +=   when{1}="- *When* \1:\n@code\n"
+ALIASES               +=   then{1}="- *Then*  \1:\n@code\n"
+ALIASES               +=   cleanup="- Cleanup:\n@code\n"
+ALIASES               +=   background="Background:\n@code\n"
 
 # This tag can be used to specify a number of word-keyword mappings (TCL only).
 # A mapping has the form "name=value". For example adding "class=itcl::class"
@@ -1945,7 +1950,7 @@ MACRO_EXPANSION        = YES
 # The default value is: NO.
 # This tag requires that the tag ENABLE_PREPROCESSING is set to YES.
 
-EXPAND_ONLY_PREDEF     = YES
+EXPAND_ONLY_PREDEF     = NO
 
 # If the SEARCH_INCLUDES tag is set to YES the includes files in the
 # INCLUDE_PATH will be searched if a #include is found.
@@ -1986,15 +1991,7 @@ PREDEFINED             = __DOXYGEN__=1
 # definition found in the source code.
 # This tag requires that the tag ENABLE_PREPROCESSING is set to YES.
 
-EXPAND_AS_DEFINED      = DECLARE_TYPE_ALLOCATOR DECLARE_REFCNT_ALLOCATOR
-EXPAND_AS_DEFINED      += DECLARE_TYPE_PREALLOC
-EXPAND_AS_DEFINED      += DECLARE_ARRAY_ALLOCATOR
-EXPAND_AS_DEFINED      += DECLARE_REFCNT_ARRAY_ALLOCATOR
-EXPAND_AS_DEFINED      += DECLARE_ARRAY_TYPE
-EXPAND_AS_DEFINED      += GENERATED_DECL_STATIC GENERATED_DEF_STATIC
-EXPAND_AS_DEFINED      += GENERATED_DECL_EXTERN GENERATED_DEF_EXTER
-EXPAND_AS_DEFINED      += GENERATED_DECL_STATIC_INLINE GENERATED_DEF_STATIC_INLINE
-EXPAND_AS_DEFINED      += PROVIDE
+EXPAND_AS_DEFINED      = 
 
 
 # If the SKIP_FUNCTION_MACROS tag is set to YES then doxygen's preprocessor will

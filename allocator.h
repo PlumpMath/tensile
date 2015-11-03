@@ -43,9 +43,20 @@ extern "C"
  * - `_type *new_<_type>(_args)`
  * - `void free_<_type>(void)`
  * - `_type *copy_<_type>(const _type *obj)`
- *
- * @test Background:
- * @code
+ * @param _scope Scope for generated functions 
+ * (`EXTERN`, `STATIC` or `STATIC_INLINE`)
+ * @param _type  The type of allocated objects
+ * @param _args  Arguments to the constructor, in parenthese
+ */
+#define DECLARE_TYPE_ALLOCATOR(_scope, _type, _args)                    \
+    GENERATED_DECL_##_scope _type *new_##_type _args                    \
+    ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL;                       \
+    GENERATED_DECL_##_scope void free_##_type(_type *_obj);             \
+    GENERATED_DECL_##_scope _type *copy_##_type(const _type *_oldobj)   \
+        ATTR_NONNULL ATTR_RETURNS_NONNULL
+
+/**
+ * @test @background
  *  enum object_state {
  *    STATE_INITIALIZED = 0xb1ff,
  *    STATE_CLONED = 0x20000000,
@@ -82,43 +93,51 @@ extern "C"
  * @endcode
  *
  * @test Allocate
- * - Given a fresh object 
- * @code
+ * @given{a fresh object}
  * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
  * simple_type *st = new_simple_type(thetag);
+ * @end
+ * @then{it is allocated}
+ * ASSERT_PTR_NEQ(st, NULL);
  * @endcode
- * - Then it is allocated `ASSERT_PTR_NEQ(st, NULL);`
- * - And it is initialized `ASSERT_UINT_EQ(st->tag, thetag);`
- * - Clean up `free_simple_type(st);`
+ * @then{it is initialized}
+ * ASSERT_UINT_EQ(st->tag, thetag);
+ * @endcode
+ * @cleanup 
+ * free_simple_type(st);
+ * @endcode
  *
  * @test Allocate and free
- * - Given an allocated object 
+ * @given{an allocated object}
  * @code
  * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
  * simple_type *st = new_simple_type(thetag);
+ * @end
+ * @when{it is destroyed}
+ * free_simple_type(st);
  * @endcode
- * - When it is destroyed `free_simple_type(st);`
- * - Then the free list is in proper state `ASSERT_PTR_EQ(freelist_simple_type, st);`
- * - And the object is finalized `ASSERT_UINT_EQ(st->tag, STATE_FINALIZED);`
- * - And the allocated object count is zero:
- *   `ASSERT_UINT_EQ(track_alloc_simple_type, 0);`
+ * @then{the free list is in proper state}
+ * ASSERT_PTR_EQ(freelist_simple_type, st);
+ * @endcode
+ * @then{the object is finalized}{ASSERT_UINT_EQ(st->tag, STATE_FINALIZED);}
+ * @then{the allocated object count is zero}{ASSERT_UINT_EQ(track_alloc_simple_type, 0);}
  *
  * @test Allocate, free and reallocate
- * - Given an allocated object
- * @code
+ * @given{an allocated object}
  * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
  * unsigned thetag2 = ARBITRARY(unsigned, 1, 0xfffff);
  * simple_type *st = new_simple_type(thetag);
  * simple_type *st1;
- * @endcode
- * - When it is destroyed `free_simple_type(st);`
- * - And when another object is allocated `st1 = new_simple_type(thetag2);`
- * - Then the memory is reused `ASSERT_PTR_EQ(st, st1);`
- * - And the free list is in proper state `ASSERT_PTR_EQ(freelist_simple_type, NULL);`
- * - And the new object is initialized `ASSERT_UINT_EQ(st1->tag, thetag2);`
- * - And the allocated object count is one: 
- *   `ASSERT_UINT_EQ(track_alloc_simple_type, 1);`
- * - Clean up `free_simple_type(st1);`
+ * @end
+ * @when{it is destroyed}{free_simple_type(st);}
+ * @when{another object is allocated}{st1 = new_simple_type(thetag2);}
+ * @then{the memory is reused}{ASSERT_PTR_EQ(st, st1);}
+ * @then{free list is in proper state}{ASSERT_PTR_EQ(freelist_simple_type, NULL);}
+ * @then{the new object is initialized}{ASSERT_UINT_EQ(st1->tag, thetag2);}
+ * @then{the allocated object count is one}{ASSERT_UINT_EQ(track_alloc_simple_type, 1);}
+ * @cleanup 
+ * free_simple_type(st1);
+ * @end
  *
  * @test Allocate, free, reallocate and allocate another
  * - Given an allocated object
@@ -212,12 +231,6 @@ extern "C"
  * - And the second object is initialized `ASSERT_INT_EQ(*sm1, (short)STATE_INITIALIZED);`
  * - Cleanup `free_small_type(sm1);`
  */
-#define DECLARE_TYPE_ALLOCATOR(_scope, _type, _args)                    \
-    GENERATED_DECL_##_scope _type *new_##_type _args                    \
-    ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL;                       \
-    GENERATED_DECL_##_scope void free_##_type(_type *_obj);             \
-    GENERATED_DECL_##_scope _type *copy_##_type(const _type *_oldobj)   \
-        ATTR_NONNULL ATTR_RETURNS_NONNULL
 
 
 /**
@@ -225,8 +238,32 @@ extern "C"
  * which are reference-counted
  * - see DECLARE_TYPE_ALLOCATOR()
  * - `_type *use_<_type>(_type *)`
- *
- * @test Background:
+ * - `void assign_<_type>(_type **, _type *)`
+ * @param _scope Scope for declared functions
+ * @param _type  The type of allocated objects
+ * @param _args  Arguments to the constructor in parentheses
+ */
+#define DECLARE_REFCNT_ALLOCATOR(_scope, _type, _args)                  \
+    DECLARE_TYPE_ALLOCATOR(_scope, _type, _args);                       \
+                                                                        \
+    static inline _type *use_##_type(_type *val)                        \
+    {                                                                   \
+        if (!val) return NULL;                                          \
+        val->refcnt++;                                                  \
+        return val;                                                     \
+    }                                                                   \
+                                                                        \
+    ATTR_NONNULL_1ST                                                    \
+    static inline void assign_##_type(_type **loc, _type *val)          \
+    {                                                                   \
+        use_##_type(val);                                               \
+        free_##_type(*loc);                                             \
+        *loc = val;\                                                    \
+    }                                                                   \
+    struct fake
+
+ 
+ /* @test Background:
  * @code
  *  typedef struct refcnt_type {
  *    PROVIDE(REFCNT);
@@ -315,16 +352,7 @@ extern "C"
  * ASSERT_UINT_EQ(track_alloc_refcnt_type, 0);
  * @endcode
  */
-#define DECLARE_REFCNT_ALLOCATOR(_scope, _type, _args)                  \
-    DECLARE_TYPE_ALLOCATOR(_scope, _type, _args);                       \
-                                                                        \
-    static inline _type *use_##_type(_type *val)                        \
-    {                                                                   \
-        if (!val) return NULL;                                          \
-        val->refcnt++;                                                  \
-        return val;                                                     \
-    }                                                                   \
-    struct fake
+
 
 #define REFCNT_REQUIRED_FIELDS unsigned refcnt
 
@@ -336,14 +364,14 @@ extern "C"
  * @code 
  * typedef struct simple_type2 { void *ptr; } simple_type2;
  *
- * DECLARE_TYPE_ALLOCATOR(simple_type2, ());
- * DECLARE_TYPE_PREALLOC(simple_type2);
+ * DECLARE_TYPE_ALLOCATOR(EXTERN, simple_type2, ());
+ * DECLARE_TYPE_PREALLOC(EXTERN, simple_type2);
  *
- * DEFINE_TYPE_ALLOCATOR(simple_type2, (), obj,
+ * DEFINE_TYPE_ALLOCATOR(EXTERN, simple_type2, (), obj,
  * {},
- * {},
- * {});
- * DEFINE_TYPE_PREALLOC(simple_type2);
+ * trivial_hook,
+ * trivial_hooj);
+ * DEFINE_TYPE_PREALLOC(EXTERN, simple_type2);
  * @endcode
  *
  * @test Preallocated items
@@ -385,7 +413,9 @@ extern "C"
  * @test Background:
  * @code
  * 
- *  DECLARE_ARRAY_TYPE(simple_array, void *ptr; unsigned tag;, unsigned);
+ * typedef struct simple_array_item {
+ *     unsigned tag;
+ * } simple_array_item;
  *  DECLARE_ARRAY_ALLOCATOR(simple_array);
  * 
  * 

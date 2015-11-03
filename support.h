@@ -170,7 +170,9 @@ static inline unsigned count_leading_zeroes(unsigned i)
  * @return Number of leading zero bits in a 32-bit unsigned integer 
  * @test
  *  Verify that the number of leading zeroes is correct
- * `ASSERT_UINT_EQ(count_leading_zeroes(i), expected);`
+ *  @code
+ *  ASSERT_UINT_EQ(count_leading_zeroes(i), expected);
+ *  @endcode
  *  @testvar{unsigned,i,u} | @testvar{unsigned,expected}
  *  -----------------------|------------------------
  *  `0u`                   | `sizeof(size_t) * CHAR_BIT`
@@ -233,7 +235,7 @@ static inline size_t count_leading_zeroes(size_t i)
 
 
 #define PROVIDE(_feature) _feature##_REQUIRED_FIELDS
-
+#define PROVIDE_TYPED(_feature, _type) _feature##_REQUIRED_FIELDS(_type)
 
 #ifdef __cplusplus
 }

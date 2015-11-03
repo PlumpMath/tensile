@@ -58,7 +58,7 @@
   </xsl:template>
   
   <xsl:template match="para">
-    <xsl:variable name="tag" select="normalize-space(text())" />
+    <xsl:variable name="tag" select="normalize-space()" />
     <xsl:if test="not(starts-with($tag, 'Background:'))">
       <xsl:variable name="step">
         <xsl:choose>
@@ -71,7 +71,7 @@
       </xsl:variable>
       <xsl:variable name="background" select="parent::xrefdescription/../../preceding-sibling::para[xrefsect[xreftitle[string() = 'Test'] and
                                               xrefdescription/para[starts-with(normalize-space(), 'Background:')]]][1]/xrefsect/xrefdescription/para" />
-      BEGIN_TESTSTEP_<xsl:value-of select="$step" />(<xsl:value-of select="count(ancestor::listitem)" />, "<xsl:value-of select="$tag" />");      
+      BEGIN_TESTSTEP_<xsl:value-of select="$step" />(<xsl:value-of select="count(ancestor::listitem)" />, "<xsl:value-of select="normalize-space(emphasis[1])" /><xsl:if test="emphasis"><xsl:text>&#x20;</xsl:text></xsl:if><xsl:value-of select="normalize-space(text())" />");      
       <xsl:for-each select="table|$background/table">
         <xsl:choose>
           <xsl:when test="count(row) = 2">
