@@ -159,40 +159,41 @@ extern "C"
 /** @endcond */
 
 #if __GNUC__ >= 4
-static inline unsigned count_leading_zeroes(unsigned i)
+static inline unsigned count_leading_zeroes(size_t i)
 {
     if (i == 0u)
-        return (unsigned)sizeof(i) * CHAR_BIT;
-    return (unsigned)__builtin_clz(i);
+        return sizeof(i) * CHAR_BIT;
+    return (unsigned)__builtin_clzl(i);
 }
 #else
 /**
  * @return Number of leading zero bits in a 32-bit unsigned integer 
  * @test
- *  Verify that the number of leading zeroes is correct
- *  @code
+ *  *Verify* that the number of leading zeroes is correct:
+ *  ~~~~
  *  ASSERT_UINT_EQ(count_leading_zeroes(i), expected);
- *  @endcode
- *  @testvar{unsigned,i,u} | @testvar{unsigned,expected}
- *  -----------------------|------------------------
+ *  ~~~~
+ *  @testvar{size_t,i,zu}  | @testvar{unsigned,expected}
+ *  -----------------------|----------------------------
  *  `0u`                   | `sizeof(size_t) * CHAR_BIT`
  *  `1u`                   | `sizeof(size_t) * CHAR_BIT - 1`
  *  `0x12340u`             | `sizeof(size_t) * CHAR_BIT - 17`
+ *  `UINT_MAX`             | `(sizeof(size_t) - sizeof(unsigned)) * CHAR_BIT`
  *  `SIZE_MAX`             | `0`
  *  `SIZE_MAX >> 1`        | `1`
  *  `SIZE_MAX >> 2`        | `2`
  *
  */
-static inline size_t count_leading_zeroes(size_t i)
+static inline unsigned count_leading_zeroes(size_t i)
 {
-    size_t j;
+    unsigned j;
   
     if (i == 0)
         return sizeof(i) * CHAR_BIT;
     for (j = sizeof(i) * CHAR_BIT - 1; j > 0; j--)
     {
-        if (i & (1u << j))
-            return sizeof(i) * CHAR_BIT - 1 - j;
+        if ((i & (1ul << j)) != 0)
+            return (unsigned)sizeof(i) * CHAR_BIT - 1 - j;
     }
     return sizeof(i) * CHAR_BIT - 1;
 }

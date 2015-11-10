@@ -83,6 +83,7 @@ partition { return TOK_PARTITION; }
 poll { return TOK_POLL; }
 pragma { return TOK_PRAGMA; }
 prototype { return TOK_PROTOTYPE; }
+receive { return TOK_RECEIVE; }
 resume { return TOK_RESUME; }
 return { return TOK_RETURN; }
 suspend { return TOK_SUSPEND; }
@@ -113,7 +114,9 @@ yield { return TOK_YIELD; }
 '([^\']|{ESCAPE})' {
     return TOK_CHARACTER; 
 } 
-
+0[xX]'[[:space:]]*([[:xdigit:]]{2}[[:space:]]*)*' {
+    return TOK_BINARY;
+}
 \"([^\"\\]+|{ESCAPE})*\" {
     return TOK_STRING; }
 \{\{([^}]+|\}[^}])*\}\} {

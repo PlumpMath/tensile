@@ -12,7 +12,8 @@
 %token TOK_INTEGER
 %token TOK_FLOAT
 %token TOK_TIMESTAMP
-%token TOK_REGEXP                        
+%token TOK_REGEXP
+%token TOK_BINARY
 
 %token TOK_ID
 %token TOK_WILDCARD                        
@@ -45,7 +46,7 @@
 %nonassoc TOK_HOT TOK_COLD TOK_IDLE TOK_GREEDY
 %nonassoc TOK_ELSE
 %right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_TYPECASE TOK_POLL TOK_FREEZE TOK_WATCH
-%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_RETURN TOK_YIELD TOK_ERROR TOK_GOTO TOK_ASSERT TOK_NEED
+%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_RETURN TOK_YIELD TOK_RECEIVE TOK_ERROR TOK_GOTO TOK_ASSERT TOK_NEED
 %right TOK_PUT TOK_PUT_ALL TOK_PUT_NEXT 
 %left TOK_PUT_BACK
 %right '?'
@@ -271,6 +272,7 @@ expression: literal
         |       expression TOK_APPEND expression
         |       expression TOK_INTERSPERSE expression
         |       expression TOK_CHOP expression
+        |       expression TOK_CHOP_HEAD expression                
         |       expression TOK_SPLIT expression
         |       expression TOK_TYPECAST typename
         |       expression TOK_THEN expression                
@@ -282,6 +284,7 @@ expression: literal
         |       expression TOK_GE expression
         |       expression '~' pattern
         |       expression TOK_MATCH_BINDING pattern
+        |       expression TOK_MATCH_BINDING_ALL pattern                                
         |       expression TOK_NOT_MATCH pattern
         |       expression TOK_IN expression
         |       expression TOK_ISTYPE typename
@@ -293,6 +296,7 @@ expression: literal
         |       TOK_SUSPEND expression
         |       TOK_RESUME expression
         |       TOK_YIELD expression
+        |       TOK_RECEIVE expression                
         |       TOK_ERROR expression
         |       TOK_ASSERT expression
         |       TOK_NEED expression
@@ -457,6 +461,7 @@ passockey:      assockey
 literal:        TOK_STRING
         |       TOK_INTEGER
         |       TOK_CHARACTER
+        |       TOK_BINARY
         |       TOK_FLOAT
         |       TOK_TIMESTAMP
         |       TOK_NULL

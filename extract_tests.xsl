@@ -8,7 +8,7 @@
   <xsl:template match="compounddef[@kind = 'file']">
     #include "assertions.h"
     <xsl:variable name="testbg" select="detaileddescription/para/xrefsect[xreftitle[string() = 'Test']]//para[starts-with(normalize-space(), 'Background:')]" />
-    <xsl:apply-templates select="$testbg/programlisting|$testbg/computeroutput" />
+    <xsl:apply-templates select="$testbg/programlisting" />
     #include "<xsl:value-of select="//compounddef[@kind = 'file']/compoundname" />"
     <xsl:apply-templates select="innerclass" />
     <xsl:apply-templates select="sectiondef" />
@@ -32,7 +32,7 @@
 
   <xsl:template match="compounddef">
     <xsl:variable name="testbg" select="detaileddescription/para/xrefsect[xreftitle[string() = 'Test']]//para[starts-with(normalize-space(), 'Background:')]" />    
-    <xsl:apply-templates select="$testbg/programlisting|$testbg/computeroutput" />
+    <xsl:apply-templates select="$testbg/programlisting" />
     <xsl:apply-templates select="innerclass" />    
     <xsl:apply-templates select="sectiondef" />
   </xsl:template>
@@ -49,7 +49,7 @@
     <xsl:variable name="tests" select="detaileddescription/para/xrefsect[xreftitle[string() = 'Test']]" />
     <xsl:if test="$tests">
       <xsl:variable name="testbg" select="$tests//para[starts-with(normalize-space(), 'Background:')]" />
-      <xsl:apply-templates select="$testbg/programlisting|$testbg/computeroutput" />
+      <xsl:apply-templates select="$testbg/programlisting" />
       static void test_<xsl:number level="any" count="memberdef" />(void) {
       BEGIN_TESTCASE("<xsl:value-of select="name"/>");
       <xsl:apply-templates select="$tests/xrefdescription/para" />
@@ -132,7 +132,7 @@
           </xsl:otherwise>
         </xsl:choose>
       </xsl:for-each>
-      <xsl:apply-templates select="programlisting|computeroutput" />
+      <xsl:apply-templates select="programlisting" />
       <xsl:variable name="subtests" select="orderedlist|itemizedlist|$background/orderedlist|$background/itemizedlist" />
       <xsl:if test="$subtests">
         {
@@ -142,6 +142,9 @@
         <xsl:apply-templates select="$subtests/listitem/para[starts-with(normalize-space(), 'Clean')]" />        
         }
         }
+      </xsl:if>
+      <xsl:if test="not($subtests) and not(programlisting)">
+        <xsl:message>Warning: the step ('<xsl:value-of select="$tag" />') has neither assertions nor sub-steps</xsl:message>
       </xsl:if>
       <xsl:for-each select="table|$background/table">}}</xsl:for-each>
       <xsl:choose>
