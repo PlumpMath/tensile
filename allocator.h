@@ -82,7 +82,7 @@ extern "C"
     {                                                                   \
         use_##_type(val);                                               \
         free_##_type(*loc);                                             \
-        *loc = val;\                                                    \
+        *loc = val;                                                     \
     }                                                                   \
     struct fake
 
@@ -101,7 +101,7 @@ extern "C"
  * Generate declarations for free-list based array allocations 
  */
 #define DECLARE_ARRAY_ALLOCATOR(_scope, _name, _type)                   \
-    GENERATED_DECL_##_scope _type *new_##_name(size_t n);               \
+    GENERATED_DECL_##_scope _type *new_##_name(size_t n)                \
     ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL;                       \
     GENERATED_DECL_##_scope void free_##_name(_type *_obj, size_t n);   \
     GENERATED_DECL_##_scope _type *unshare_##_name(_type *_oldobj,      \
@@ -128,6 +128,9 @@ extern "C"
     }                                                                   \
     struct fake
 
+/**
+ * Generate declarations for arrays of refcounter objects
+ */
 
 #define DECLARE_ARRAY_ALLOCATOR_REFCNT(_scope, _name, _type)            \
     DECLARE_ARRAY_ALLOCATOR(_scope, _name, _type *);                    \
@@ -1173,7 +1176,6 @@ DECLARE_REFCNT_ALLOCATOR(EXTERN, refcnt_type, (unsigned tag));
  * simple_type *st;
  * simple_type *st1;
  * simple_type *st2;
- *  
  * preallocate_simple_types(2);
  * ~~~~~
  * - *When* three objects are allocated:
@@ -1207,7 +1209,6 @@ DECLARE_REFCNT_ALLOCATOR(EXTERN, refcnt_type, (unsigned tag));
  * simple_type *st1;
  * simple_type *st2;
  * simple_type *st3;
- *
  * st = new_simple_type(ARBITRARY(1, 0xffff));
  * free_simple_type(st);
  * ~~~~~
@@ -1285,11 +1286,11 @@ DECLARE_TYPE_PREALLOC(EXTERN, simple_type);
  * ~~~~~
  * if (size != 4)
  * ~~~~~
- *   + Then the elements are finalized: 
- *     ~~~~~
- *     for(j = 0; j < size; j++)
- *       ASSERT_UINT_EQ(arr[j], STATE_FINALIZED);
- *     ~~~~~
+ *   + *Then* the elements are finalized: 
+ * ~~~~~
+ * for(j = 0; j < size; j++)
+ *   ASSERT_UINT_EQ(arr[j], STATE_FINALIZED);
+ * ~~~~~
  * - *And* the allocated object count is zero:
  * ~~~~~
  *   ASSERT_UINT_EQ(track_alloc_simple_array[size], 0);
@@ -1299,9 +1300,9 @@ DECLARE_TYPE_PREALLOC(EXTERN, simple_type);
  * prev = arr;
  * ~~~~~
  */
-/* @fn free_simple_array(simple_type *, size_t)
+/** @fn free_simple_array(simple_type *, size_t)
  * @test Allocate, free and reallocate
- * - *Given* an allocated array of a given size
+ * - *Given* an allocated array of a given size:
  * ~~~~~
  * simple_array *arr = new_simple_array(size);
  * simple_array *arr1;
@@ -1320,7 +1321,7 @@ DECLARE_TYPE_PREALLOC(EXTERN, simple_type);
  * ~~~~~~
  * - Cleanup:
  * ~~~~~~
- * free_simple_array(arr1); `
+ * free_simple_array(arr1);
  * ASSERT_UINT_EQ(track_alloc_simple_array[size], 0);
  * ~~~~~~
  * .
@@ -1329,7 +1330,7 @@ DECLARE_TYPE_PREALLOC(EXTERN, simple_type);
  * | @testvar{unsigned,size,u}|`0`  |`3`|
  */
 
-/* @fn copy_simple_array(const simple_type *, size_t)
+/** @fn copy_simple_array(const simple_type *, size_t)
  * @test Copy
  * - *Given* an array:
  * ~~~~~
@@ -1367,143 +1368,232 @@ DECLARE_TYPE_PREALLOC(EXTERN, simple_type);
  * |--------------------------|-----|---|
  * | @testvar{unsigned,size,u}|`0`  |`4`|
  */
-
-/* @fn resize_simple_array(simple_type **, size_t *, size_t)
+/** @fn resize_simple_array(simple_type **, size_t *, size_t)
  *@test Resize Null
- * - When a NULL pointer to an array is resized 
- * @code
- * simple_array *arr = resize_simple_array(NULL, 3);
+ * - *When* a NULL pointer to an array is resized 
+ * ~~~~~
+ * size_t size = 0;
+ * simple_array *arr = NULL;
  * unsigned j;
- * @endcode
- * - Then the result is not NULL `ASSERT_PTR_NEQ(arr, NULL);`
- * - And the number of elements is correct `ASSERT_UINT_EQ(arr->nelts, 3);`
- * - And the array is initialized `ASSERT_UINT_EQ(arr->tag, STATE_INITIALIZED);`
- * - And the elements are initialized `for (j = 0; j < arr->nelts; j++) ASSERT_UINT_EQ(arr->elts[j], j);`
- * - Cleanup `free_simple_array(arr);`
+ * simple_array *arr0 = resize_simple_array(&arr, &size, 3);
+ * ~~~~~
+ * - *Then* the result is not `NULL`:
+ * ~~~~~
+ * ASSERT_PTR_NEQ(arr, NULL);
+ * ~~~~~
+ * - *And* the returned and stored pointers are the same:
+ * ~~~~~
+ * ASSERT_PTR_EQ(arr, arr0);
+ * ~~~~~
+ * - *And* the stored size is correct:
+ * ~~~~~
+ * ASSERT_UINT_EQ(size, 3);
+ * ~~~~~
+ * - *And* the elements are initialized:
+ * ~~~~~
+ * for (j = 0; j < 3; j++) 
+ *    ASSERT_UINT_EQ(arr[j], j);
+ * ~~~~~
+ * - Cleanup:
+ * ~~~~~
+ * free_simple_array(arr);
+ * ~~~~~
  *
  * @test Verify that resizing to a lesser size works
  * Varying                  | From | To
  * -------------------------|------|----
  * @testvar{unsigned,size,u}| `3`  | `4`
- * @code
+ * ~~~~~
  * test_resize_smaller_n(size);
- * @endcode
+ * ~~~~~
  *
  * @test Verify that resizing to a larger size works
  * Varying                  | From | To
  * -------------------------|------|----
  * @testvar{unsigned,size,u}| `2`  | `3`
- * @code
+ * ~~~~~
  * test_resize_larger_n(size);
- * @endcode
+ * ~~~~~
  *
  * @test Resize and Allocate
- * - Given an array
- * @code
- * simple_array *arr = new_simple_array(2);
- * @endcode
- * - When it is resized
- * @code
- * simple_array *arr1 = resize_simple_array(arr, 3);
- * @endcode
- * - And when a new array with the same size as the original is allocated
- * @code
+ * - *Given* an array
+ * ~~~~~
+ * unsigned j;
+ * size_t size = 2;
+ * simple_array *arr = new_simple_array(size);
+ * ~~~~~
+ * - *When* it is resized:
+ * ~~~~~
+ * simple_array *arr1 = arr;
+ * resize_simple_array(&arr, &size, 3);
+ * ~~~~~
+ * - *And when* a new array with the same size as the original is allocated:
+ * ~~~~~
  * simple_array *arr2 = new_simple_array(2);
- * @endcode
- * - Then the memory is reused `ASSERT_PTR_EQ(arr2, arr);`
- * - Cleanup
- * @code
- * free_simple_array(arr1);
+ * ~~~~~
+ * - *Then* the memory is reused:
+ * ~~~~~
+ * ASSERT_PTR_EQ(arr2, arr1);
+ * ~~~~~
+ * - Cleanup:
+ * ~~~~~
+ * free_simple_array(arr);
  * free_simple_array(arr2);
- * @endcode
- *
- * @test Background:
- * @code
- * DECLARE_ARRAY_TYPE(simple_log_array, void *ptr; unsigned tag;, unsigned);
- * DECLARE_ARRAY_ALLOCATOR(simple_log_array);
- *
- * DEFINE_ARRAY_ALLOCATOR(simple_log_array, log2, 4, arr, i,
- *                      {arr->tag = STATE_INITIALIZED;},
- *                      {arr->elts[i] = i; },
- *                      {NEW(arr)->tag = STATE_CLONED; },
- *                      {NEW(arr)->elts[i] = OLD(arr)->elts[i] | STATE_CLONED; },
- *                      {NEW(arr)->tag = STATE_ADJUSTED; },
- *                      {NEW(arr)->elts[i] = OLD(arr)->elts[i] | STATE_ADJUSTED; },
- *                      {arr->tag |= STATE_RESIZED; },
- *                      {arr->tag = STATE_FINALIZED; },
- *                      {arr->elts[i] = STATE_FINALIZED; });
- * @endcode
- *
+ * for (j = 0; j <= 4; j++)
+ *    ASSERT_UINT_EQ(track_alloc_simple_array[j], 0);
+ * ~~~~~
+ */
+
+/** @fn ensure_simple_array_size(simple_type **, size_t *, size_t, size_t)
+ * @test
+ * Ensure Size
+ * - *Given* an allocated array:
+ * ~~~~~
+ * size_t sz = ARBITRARY(size_t 1, 4);
+ * size_t origsz = sz;
+ * size_t delta = ARBITRARY(size_t, 0, 4);
+ * simple_array *arr = new_simple_array(sz);
+ * simple_array *arr1 = NULL;
+ * ~~~~~
+ * - *When a lesser size is ensured:
+ * ~~~~~
+ * arr1 = arr;
+ * ensure_simple_array_size(&arr, &sz, sz - 1, 1);
+ * ~~~~~
+ * - *Then* the array is not reallocated:
+ * ~~~~~
+ * ASSERT_PTR_EQ(arr, arr1);
+ * ~~~~~
+ * - *And* the number of elements is unchanged:
+ * ~~~~~
+ * ASSERT_UINT_EQ(origsz, sz);
+ * ~~~~~
+ * - *When* a larger size is ensured
+ * ~~~~~
+ * ensure_simple_array_size(&arr, &sz, sz + 1, delta);
+ * - *Then* the array is reallocated:
+ * ~~~~~
+ * ASSERT_PTR_NEQ(arr, arr1);
+ * ~~~~~
+ * - *And* the number of elements is incremented:
+ * ~~~~~
+ * ASSERT_UINT_EQ(sz, origsz + 1 + delta);
+ * ~~~~~
+ * - Cleanup: 
+ * ~~~~~
+ * free_simple_array(arr1);
+ * ~~~~~
+ */
+DECLARE_ARRAY_ALLOCATOR(EXTERN, simple_array, simple_type);
+
+/** @fn new_simple_log_array(size_t)
  * @test Allocate and free (log scale)
  * | Varying                  | From|To |
  * |--------------------------|-----|---|
  * |@testvar{unsigned,order,u}|`0`  |`3`|
- * `simple_log_array *prev = NULL;`
- * - Given an allocated array of a certain size
- *   `simple_log_array *arr = new_simple_log_array(1u << order);`
- * - Verify it is allocated `ASSERT_PTR_NEQ(arr, NULL);`
- * - Verify the memory is not shared with `ASSERT_PTR_NEQ(arr, prev);`
- * - Verify that it is initialzied `ASSERT_UINT_EQ(arr->tag, STATE_INITIALIZED);`
- * - Verify that the number of elements is correct `ASSERT_UINT_EQ(arr->nelts, 1u << order);`
- * - When it is freed `free_simple_log_array(arr);`
- * - When it is not so large `if (order != 4)`
-     + Then it is finalized `ASSERT_UINT_EQ(arr->tag, STATE_FINALIZED);`
- * - Cleanup `prev = arr;`
- *
+ * ~~~~~~
+ * simple_log_array *prev = NULL;
+ * unsigned j;
+ * ~~~~~~
+ * - *Given* an allocated array of a certain size:
+ * ~~~~~~
+ * simple_log_array *arr = new_simple_log_array(1u << order);
+ * ~~~~~~
+ * - *Verify* it is allocated
+ * ~~~~~~
+ * ASSERT_PTR_NEQ(arr, NULL);
+ * ~~~~~~
+ * - *Verify* the memory is not shared with:
+ * ~~~~~~
+ * ASSERT_PTR_NEQ(arr, prev);
+ * ~~~~~~
+ * - *Verify* that it is initialized:
+ * ~~~~~~
+ * for (j = 0; j < (1u << order); j++)
+ *   ASSERT_PTR_EQ(arr[j], j);
+ * ~~~~~~
+ * - *When* it is freed:
+ * ~~~~~
+ * free_simple_log_array(arr);
+ * ~~~~~
+ * - *When* it is not so large:
+ * ~~~~~
+ * if (order != 4)
+ * ~~~~~
+ *    + *Then* it is finalized:
+ * ~~~~~
+ * for (j = 0; j < (1u << order); j++)
+ *   ASSERT_PTR_EQ(arr[j], STATE_FINALIZED);
+ * ~~~~~
+ * - *Then* the number of allocated objects is zero:
+ * ~~~~~
+ * for (j = 0; j <= 4; j++)
+ *   ASSERT_UINT_EQ(track_simple_log_array[j], 0);
+ * ~~~~~
+ * - Cleanup:
+ * ~~~~~
+ * prev = arr;
+ * ~~~~~
+ */
+/** @fn free_simple_log_array(simple_type *, size_t)
  * @test Allocate, free and allocate slightly lesser
- * - Given an allocated array of a certain size
- * @code
+ * - *Given* an allocated array of a certain size
+ * ~~~~~
  * simple_log_array *arr = new_simple_log_array(1u << order);
  * simple_log_array *arr1;
- * @endcode
- * - When it freed `free_simple_log_array(arr);`
- * - And when a new array which is slightly less is allocated
- *   `arr1 = new_simple_log_array((1u << order) - 1);`
- * - Then it shares memory with the first array `ASSERT_PTR_EQ(arr, arr1);`
- * - Cleanup `free_simple_log_array(arr1);`
+ * ~~~~~
+ * - *When* it freed:
+ * ~~~~~
+ * free_simple_log_array(arr, 1u << order);
+ * ~~~~~
+ * - *And when* a new array which is slightly less is allocated:
+ * ~~~~~
+ * arr1 = new_simple_log_array((1u << order) - 1);
+ * ~~~~~
+ * - *Then* it shares memory with the first array:
+ * ~~~~~
+ * ASSERT_PTR_EQ(arr, arr1);
+ * ~~~~~
+ * - Cleanup:
+ * ~~~~~
+ * free_simple_log_array(arr1, (1u << order) - 1);
+ * ~~~~~
  * .
  * | Varying                   | From|To |
  * |---------------------------|-----|---|
  * | @testvar{unsigned,order,u}|`2`  |`3`|
- *
- * @test Make slightly larger
- * - Given an allocated array of a certain size
- * `simple_log_array *arr = new_simple_log_array(9);`
- * - When it is enlarged such that log2 size is still the same
- * `simple_log_array *arr1 = resize_simple_log_array(arr, 10);`
- * - Then the memory is not reallocated
- * `ASSERT_PTR_EQ(arr, arr1);`
- * - And the number of elements is set properly
- * `ASSERT_UINT_EQ(arr1->nelts, 10);`
- * - And the extra elements are initialized
- * `ASSERT_UINT_EQ(arr1->elts[9], 9);`
- * - Cleanup `free_simple_log_array(arr1);`
- *
- * @test
- * Ensure Size
- * - Given an allocated array
- * @code
- * unsigned sz = ARBITRARY(unsigned, 1, 4);
- * unsigned delta = ARBITRARY(unsigned, 0, 4);
- * simple_array *arr = new_simple_array(sz);
- * simple_array *arr1 = NULL;
- * @endcode
- * - When a lesser size is ensured:
- *   `arr1 = ensure_simple_array_size(arr, sz - 1, 1);`
- * - Then the array is not reallocated:
- *   `ASSERT_PTR_EQ(arr, arr1);`
- * - And the number of elements is unchanged:
- *  `ASSERT_UINT_EQ(arr->nelts, sz);`
- * - When a larger size is ensured
- *   `arr1 = ensure_simple_array_size(arr, sz + 1, delta);`
- * - Then the array is reallocated:
- *   `ASSERT_PTR_NEQ(arr, arr1);`
- * - And the number of elements is incremented:
- *   `ASSERT_UINT_EQ(arr1->nelts, sz + 1 + delta);`
- * - Cleanup: `free_simple_array(arr1);`
  */
-DECLARE_ARRAY_ALLOCATOR(EXRERN, simple_array, simple_type);
- 
+/** @fn resize_simple_log_array(simple_type **, size_t *, size_t)
+ * @test Make slightly larger
+ * - *Given* an allocated array of a certain size:
+ * ~~~~~
+ * size_t size = 9;
+ * simple_log_array *arr = new_simple_log_array(size);
+ * ~~~~~
+ * - *When* it is enlarged such that log2 size is still the same:
+ * ~~~~~
+ * simple_log_array *arr1 = arr;
+ * resize_simple_log_array(&arr, &size, 10);
+ * ~~~~~
+ * - *Then* the memory is not reallocated:
+ * ~~~~~
+ * ASSERT_PTR_EQ(arr, arr1);
+ * ~~~~~
+ * - *And* the number of elements is set properly:
+ * ~~~~~
+ * ASSERT_UINT_EQ(size, 10);
+ * ~~~~~
+ * - *And* the extra elements are initialized:
+ * ~~~~~~
+ * ASSERT_UINT_EQ(arr[9], 9);
+ * ~~~~~~
+ * - Cleanup:
+ * ~~~~
+ * free_simple_log_array(arr, 10);
+ * ~~~~
+ */
+DECLARE_ARRAY_ALLOCATOR(EXTERN, simple_log_array, simple_type);
+
 #endif
 
 #if defined(TEST_ALLOCATOR)
@@ -1573,6 +1663,12 @@ DEFINE_REFCNT_ALLOCATOR(EXTERN, refcnt_type, (unsigned tag),
 DEFINE_TYPE_PREALLOC(EXTERN, simple_type);
 
 DEFINE_ARRAY_ALLOCATOR(EXTERN, simple_array, simple_type, linear, 4,
+                       simple_type_init_idx,
+                       simple_type_clone,
+                       simple_type_resize,
+                       simple_type_fini);
+
+DEFINE_ARRAY_ALLOCATOR(EXTERN, simple_log_array, simple_type, log2, 4,
                        simple_type_init_idx,
                        simple_type_clone,
                        simple_type_resize,

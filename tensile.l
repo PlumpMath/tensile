@@ -56,7 +56,6 @@ div { return TOK_DIV; }
 else { return TOK_ELSE; }
 end { return TOK_END; }
 error { return TOK_ERROR; }
-extern { return TOK_EXTERN; }
 false { return TOK_FALSE; }
 for { return TOK_FOR; }
 foreach { return TOK_FOREACH; }
@@ -82,10 +81,12 @@ null { yylval->value = NULL_VALUE;  return TOK_NULL; }
 partition { return TOK_PARTITION; }
 poll { return TOK_POLL; }
 pragma { return TOK_PRAGMA; }
+private { return TOK_PRIVATE; }
+protected { return TOK_PROTECTED; }
 prototype { return TOK_PROTOTYPE; }
+public { return TOK_PUBLIC; }
 receive { return TOK_RECEIVE; }
 resume { return TOK_RESUME; }
-return { return TOK_RETURN; }
 suspend { return TOK_SUSPEND; }
 switch { return TOK_SWITCH; }
 then { return TOK_THEN; }
@@ -94,6 +95,7 @@ true { return TOK_TRUE; }
 typecase { return TOK_TYPECASE; }
 watch { return TOK_WATCH; }
 while { return TOK_WHILE; }
+with { return TOK_WITH; }
 yield { return TOK_YIELD; }
 [+-]?[0-9]+ {
     return TOK_INTEGER;
@@ -104,7 +106,7 @@ yield { return TOK_YIELD; }
 0[bB][01]+ {
     return TOK_INTEGER;
 }
-[+-]?(([0-9]+\.[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?|[0-9]+[eE][+-]?[0-9]+) { 
+[+-]?([0-9]+\.[0-9]*([eE][+-]?[0-9]+)?|[0-9]+[eE][+-]?[0-9]+) { 
     return TOK_FLOAT; 
 }
 [0-9]{4}-[0-9]{2}-[0-9]{2}T([0-9]{2}:[0-9]{2}(:[0-9]{2})?)? { 
@@ -114,7 +116,7 @@ yield { return TOK_YIELD; }
 '([^\']|{ESCAPE})' {
     return TOK_CHARACTER; 
 } 
-0[xX]'[[:space:]]*([[:xdigit:]]{2}[[:space:]]*)*' {
+0[xX]'[[:space:][:punct:]]*([[:xdigit:]]+[[:space:][[:punct:]]*)*' {
     return TOK_BINARY;
 }
 \"([^\"\\]+|{ESCAPE})*\" {

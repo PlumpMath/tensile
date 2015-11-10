@@ -16,23 +16,25 @@
 %token TOK_BINARY
 
 %token TOK_ID
-%token TOK_WILDCARD                        
+%token TOK_WILDCARD
 
 %token TOK_TRUE
 %token TOK_FALSE
 %token TOK_NULL
 %token TOK_QUEUE
 %token TOK_ME
+%token TOK_END                        
                         
 %token TOK_MODULE
-%token TOK_EXTERN
+%token TOK_PRIVATE
 %token TOK_LOCAL
+%token TOK_PROTECTED
+%token TOK_PUBLIC
 %token TOK_IMPORT
 %token TOK_PROTOTYPE
 %token TOK_PARTITION
 %token TOK_PRAGMA
 %token TOK_INCLUDE
-%token TOK_HOOK
 %token TOK_AUGMENT
 
 
@@ -45,8 +47,8 @@
 %right TOK_THEN                        
 %nonassoc TOK_HOT TOK_COLD TOK_IDLE TOK_GREEDY
 %nonassoc TOK_ELSE
-%right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_TYPECASE TOK_POLL TOK_FREEZE TOK_WATCH
-%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_RETURN TOK_YIELD TOK_RECEIVE TOK_ERROR TOK_GOTO TOK_ASSERT TOK_NEED
+%right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_TYPECASE TOK_POLL TOK_FREEZE TOK_WATCH TOK_WITH
+%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_YIELD TOK_RECEIVE TOK_ERROR TOK_GOTO TOK_ASSERT TOK_NEED
 %right TOK_PUT TOK_PUT_ALL TOK_PUT_NEXT 
 %left TOK_PUT_BACK
 %right '?'
@@ -61,7 +63,8 @@
 %left '[' 
 %right '!' TOK_TRACING TOK_PEEK TOK_UMINUS
 %left '.'
-%nonassoc TOK_ID TOK_REGEXP
+%nonassoc TOK_HOOK                        
+%nonassoc TOK_ID 
 %{
 extern int yylex(YYSTYPE* yylval_param, YYLTYPE * yylloc_param, exec_context *context);
 static void yyerror(YYLTYPE * yylloc_param, exec_context *context, const char *msg);
@@ -137,7 +140,7 @@ moduleforeign: TOK_FOREIGN TOK_STRING
                 ;
 
 scope:          /*empty*/
-        |       TOK_EXTERN
+        |       TOK_PUBLIC
         |       TOK_LOCAL
                 ;
 
@@ -164,7 +167,7 @@ importalias:    /*empty*/
         |       TOK_TYPECAST TOK_ID
                 ;
 
-nodedecl:       nodekind TOK_ID '(' nodeargs ')' nodedef
+nodedecl:       nodekind TOK_ID '(' nodeargs0 ')' nodedef
                 ;
 
 nodekind:     /*empty*/
@@ -176,6 +179,10 @@ nodedef:        instantiate ';'
         |       nodeblock
                 ;
 
+nodeargs0:      /*              empty */
+        |       nodeargs
+        ;
+
 nodeargs:       nodearg
         |       nodeargs ',' nodearg
                 ;
@@ -184,7 +191,12 @@ nodearg:        nodeargname
         |       nodeargname '=' expression
                 ;
 
-nodeargname:    scope TOK_ID
+nodeargname:    argscope TOK_ID
+        ;
+
+argscope:       scope
+        |       TOK_PRIVATE
+        |       TOK_PROTECTED
         ;
 
 instantiate:    '=' noderef '(' instanceargs0 ')' ';'
@@ -217,7 +229,11 @@ statelabel:     TOK_ID
         |       TOK_KILL
         ;
 
-augment:        TOK_AUGMENT hookref block
+augment:        TOK_AUGMENT hookref nodeargs00 block
+        ;
+
+nodeargs00: /*              empty */
+        |       '(' nodeargs0 ')'
         ;
 
 noderef:        TOK_ID
@@ -240,9 +256,13 @@ expression: literal
         |       '.' assockey
         |       block
         |       anonymous_node
-        |       TOK_ID '(' exprlist0 ')' 
+        |       TOK_ID
+        |       TOK_WILDCARD
+        |       TOK_ID '(' exprlist0 ')'
+        |	    TOK_HOOK TOK_ID
         |       TOK_ME
         |       TOK_QUEUE
+        |       TOK_END
         |       TOK_REGEXP
         |       expression '.' assockey                
         |       expression '[' expression0 ']'
@@ -292,6 +312,7 @@ expression: literal
         |       expression TOK_PUT expression
         |       expression TOK_PUT_ALL expression
         |       expression TOK_PUT_NEXT expression
+        |       expression TOK_PUT_BACK expression                
         |       TOK_KILL expression
         |       TOK_SUSPEND expression
         |       TOK_RESUME expression
@@ -300,8 +321,7 @@ expression: literal
         |       TOK_ERROR expression
         |       TOK_ASSERT expression
         |       TOK_NEED expression
-        |       TOK_GOTO TOK_ID
-        |       TOK_RETURN
+        |       TOK_GOTO gotodest
         |       TOK_IF '(' expression ')' expression %prec TOK_IF
         |       TOK_WHILE '(' expression ')' expression %prec TOK_WHILE
         |       TOK_FOR '(' bindings ';' expression ';' bindings ')' expression %prec TOK_FOR
@@ -311,12 +331,18 @@ expression: literal
         |       TOK_POLL '{' select_alternatives '}' %prec TOK_POLL
         |       TOK_TYPECASE '(' expression ')' '{' generic_alternatives '}' %prec TOK_TYPECASE
         |       TOK_WATCH '(' expression TOK_RULE expression ')' expression %prec TOK_WATCH
+        |       TOK_WITH  '(' expression ')' expression %prec TOK_WITH
         |       TOK_HOT expression
         |       TOK_COLD expression
         |       TOK_IDLE expression
         |       TOK_GREEDY expression
         |       TOK_FOREIGN  TOK_ID '(' exprlist0 ')' TOK_STRING %prec TOK_FOREIGN
                 ;
+
+gotodest:       TOK_ID
+        |       TOK_WILDCARD
+        |       TOK_PUT_BACK
+        ;
 
 anonymous_node: '@' noderef block local_augments
         |       '@' noderef '(' exprlist0 ')'
@@ -325,7 +351,7 @@ anonymous_node: '@' noderef block local_augments
                 ;
 
 local_augments: /* empty */
-        |       local_augments TOK_AUGMENT TOK_ID block
+        |       local_augments TOK_AUGMENT TOK_ID nodeargs00 block
 
 expression0:    /*empty*/
         |       expression
@@ -337,7 +363,6 @@ bindings:       binding
 
 binding: TOK_ID '=' expression
         | pragma
-        | TOK_HOOK TOK_ID
                 ;
 
 block:   '{'    sequence '}'
@@ -423,6 +448,8 @@ typechoice:     typename
         ;
 
 typename:       TOK_ID
+        |       TOK_NULL
+        |       TOK_END
         |       '&' expression %prec TOK_UMINUS
         ;
 
