@@ -209,59 +209,45 @@ __ASSERT_CMP_INLINE(bits_neq, unsigned long long, "%llx", _arg1 != _arg2);
         srand(seed);                                    \
     } while(0)
 
-#define BEGIN_TESTSUITE(_msg) fprintf(stderr, "%s:\n", (_msg))
-#define BEGIN_TESTCASE(_msg) BEGIN_TESTSUITE(_msg)
+#define __TEST_OPEN_GROUP {
+#define __TEST_CLOSE_GROUP }
 
-#define BEGIN_TESTSTEP_VERBOSE(_indent, _msg)                       \
-    do {                                                            \
-        if ((_indent) > 0)                                          \
-            fprintf(stderr, "%*c%s", 2 * (_indent), ' ', (_msg));   \
-        else                                                        \
-            fputs((_msg), stderr);                                  \
-        fflush(stderr);                                             \
-    } while(0)
-#define BEGIN_TESTSTEP_SILENT(_indent, _msg) ((void)0)
+#define BEGIN_TESTSUITE(_msg)                     \
+    int main(void) __TEST_OPEN_GROUP              \
+        SET_RANDOM_SEED();                        \
+    fprintf(stderr, "%s:\n", (_msg));             \
 
-#define BEGIN_TESTSTEP_CLEANUP BEGIN_TESTSTEP_SILENT
-#define BEGIN_TESTSTEP_PREREQ BEGIN_TESTSTEP_VERBOSE
-#define BEGIN_TESTSTEP_CONDITION BEGIN_TESTSTEP_VERBOSE
-#define BEGIN_TESTSTEP_ASSERTION BEGIN_TESTSTEP_VERBOSE
-#define BEGIN_TESTSTEP_DESCRIPTION BEGIN_TESTSTEP_VERBOSE
+#define END_TESTSUITE                           \
+    return 0;                                   \
+    __TEST_CLOSE_GROUP
 
-#define BEGIN_TESTITER_VERBOSE(_indent, _level, _fmt, ...)              \
-    do {                                                                \
-        fprintf(stderr, "\n%*c" _fmt, 2 * (_indent) + (_level) + 1, ' ', \
-                __VA_ARGS__);                                           \
-        fflush(stderr);                                                 \
-    } while(0)
 
-#define BEGIN_TESTITER_SILENT(_indent, _level, _fmt, ...) ((void)0)
+#define BEGIN_TESTCASE(_msg)                    \
+    fprintf(stderr, "%s...", (_msg));           \
+    fflush(stderr);                             \
+    __TEST_OPEN_GROUP
+    
 
-#define BEGIN_TESTITER_CLEANUP BEGIN_TESTITER_SILENT
-#define BEGIN_TESTITER_PREREQ BEGIN_TESTITER_VERBOSE
-#define BEGIN_TESTITER_CONDITION BEGIN_TESTITER_VERBOSE
-#define BEGIN_TESTITER_ASSERTION BEGIN_TESTITER_VERBOSE
-#define BEGIN_TESTITER_DESCRIPTION BEGIN_TESTITER_VERBOSE
+#define END_TESTCASE       \
+    fputs("OK\n", stderr); \
+    __TEST_CLOSE_GROUP
 
-#define BEGIN_TESTSUBSTEP_VERBOSE() fputc('\n', stderr)
-#define BEGIN_TESTSUBSTEP_SILENT() ((void)0)
+#define BEGIN_TESTITER(_name, _vars, ...)               \
+    __TEST_OPEN_GROUP                                   \
+    struct {                                            \
+        _vars;                                          \
+    } const *_name, _name##_values[] = {__VA_ARGS__};   \
+                                                        \
+    for (_name = _name##_values;                        \
+    _name < _name##_values + sizeof(_name##_values) /   \
+             sizeof(*_name##_values);                   \
+         _name++)                                       \
+        __TEST_OPEN_GROUP
 
-#define BEGIN_TESTSUBSTEP_CLEANUP BEGIN_TESTSUBSTEP_SILENT
-#define BEGIN_TESTSUBSTEP_PREREQ BEGIN_TESTSUBSTEP_VERBOSE
-#define BEGIN_TESTSUBSTEP_CONDITION BEGIN_TESTSUBSTEP_VERBOSE
-#define BEGIN_TESTSUBSTEP_ASSERTION BEGIN_TESTSUBSTEP_VERBOSE
-#define BEGIN_TESTSUBSTEP_DESCRIPTION BEGIN_TESTSUBSTEP_VERBOSE
+#define TESTITER_LOG(_fmt, ...)                 \
+    fprintf(stderr, "[" _fmt "]", __VA_ARGS__)
 
-#define END_TESTSTEP_VERBOSE(_indent)               \
-    fprintf(stderr, "%*s\n", 2 * (_indent), " OK")
-#define END_TESTSTEP_NEWLINE(_indent) fputc('\n', stderr)
-#define END_TESTSTEP_SILENT(_indent) ((void)0)
-
-#define END_TESTSTEP_CLEANUP END_TESTSTEP_SILENT
-#define END_TESTSTEP_PREREQ END_TESTSTEP_NEWLINE
-#define END_TESTSTEP_CONDITION END_TESTSTEP_NEWLINE
-#define END_TESTSTEP_ASSERTION END_TESTSTEP_VERBOSE
-#define END_TESTSTEP_DESCRIPTION END_TESTSTEP_NEWLINE
+#define END_TESTITER __TEST_CLOSE_GROUP
 
 
 #ifdef __cplusplus
