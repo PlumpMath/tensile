@@ -22,7 +22,9 @@ LP_HEADERS =
 C_SOURCES = $(LP_SOURCES:.w=.c)
 C_SOURCES += tensile.tab.c lex.yy.c
 
-TESTABLES =
+GENERATED_FILES = $(C_SOURCES) $(LP_HEADERS:.w=.h)
+
+TESTABLES = support
 
 APPLICATION = tensile
 
@@ -58,8 +60,10 @@ tests/%.c : %.h
 	touch $@
 
 ifneq ($(MAKECMDGOALS),clean)
+Makefile : $(GENERATED_FILES)
+
 include $(C_SOURCES:.c=.d)
-include $(patsubst %,tests/%.d,$(TESTS))
+include $(patsubst %,tests/%.d,$(TESTABLES))
 endif
 
 .PHONY : check
@@ -84,10 +88,7 @@ clean :
 	rm -f *.d tests/*.d
 	rm -f tests/*.c
 	rm -f $(APPLICATION)
-	rm -f lex.yy.c
-	rm -f tensile.tab.*
-	rm -f $(LP_SOURCES:.w=.c)
-	rm -f $(LP_HEADERS:.w=.h)
+	rm -f $(GENERATED_FILES)
 
 %.o : %.c
 	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $<

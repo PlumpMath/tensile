@@ -1,35 +1,22 @@
-/*
- * Copyright (c) 2015  Artem V. Andreev
- * This file is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3, or (at your option)
- * any later version.
- *
- * This file is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; see the file COPYING.  If not, write to
- * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
- * Boston, MA 02110-1301, USA.
- *
- */
-/** @file
- * @brief fast object allocation macros
- *
- * @author Artem V. Andreev <artem@AA5779.spb.edu>
- * @test Background:
- * @code
- * #define IMPLEMENT_ALLOCATOR 1
- * #define TEST_ALLOCATOR 1
- * #define TRACK_ALLOCATOR 1
- * @endcode
- */
-#ifndef ALLOCATOR_H
-#define ALLOCATOR_H 1
+% Copyright (c) 2015  Artem V. Andreev
+% This file is free software; you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation; either version 3, or (at your option)
+% any later version.
+%
+% This file is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details.
+%
+% You should have received a copy of the GNU General Public License
+% along with this program; see the file COPYING.  If not, write to
+% the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+% Boston, MA 02110-1301, USA.
 
+@
+@c
+/* Note: this file is intended to be included multiple times, so no guard */
 #ifdef __cplusplus
 extern "C"
 {
@@ -39,6 +26,94 @@ extern "C"
 #include <limits.h>
 #include "support.h"
 
+@<Setup@>@;
+@<Declarations@>@;
+
+#if defined(IMPLEMENT_ALLOCATOR)
+@<Definitions@>@;
+#endif
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
+@ Test
+@(tests/allocator.c@>=
+#include "assertions.h"
+
+  @<Test declarations@>@;
+  
+  BEGIN_TESTSUITE("Allocator routines");
+  @<Testcases@>@;
+  END_TESTSUITE
+@
+@f ALLOC_SCOPE extern
+@f ALLOC_DEFN_SCOPE extern
+@<Setup@>=
+#ifndef THE_TYPE
+#error "THE_TYPE is not defined"
+#endif
+#ifndef ALLOC_ARGS
+#define ALLOC_ARGS void
+#endif
+#ifndef INIT_TYPE
+#define INIT_TYPE(_var) /* nothing */
+#endif  
+#ifndef ALLOC_SCOPE
+#define ALLOC_SCOPE extern
+#endif
+#define ALLOC_DEFN_SCOPE DEFN_SCOPE(ALLOC_SCOPE)
+#define NEW_TYPE MAKE_EXP_NAME(new, THE_TYPE)
+#define FREE_TYPE MAKE_EXP_NAME(free, THE_TYPE)
+#define COPY_TYPE MAKE_EXP_NAME(copy, THE_TYPE)
+@
+@<Declarations@>=
+ALLOC_SCOPE THE_TYPE *NEW_TYPE(ALLOC_ARGS);
+@
+@<Definitions@>=
+  @<Allocation tracker@>@;
+  
+#undef FREE_LIST
+#define FREE_LIST MAKE_EXP_NAME(freelist, THE_TYPE)
+#define ALLOC_TYPE MAKE_EXP_NAME(alloc, THE_TYPE)  
+  static freelist_t *FREE_LIST;
+  
+  ATTR_MALLOC ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL
+  static THE_TYPE *ALLOC_TYPE(void)
+  {
+      THE_TYPE *var;
+      if (FREE_LIST == NULL)
+          var = frlmalloc(sizeof(*var));
+      else
+      {
+          var = (THE_TYPE *)FREE_LIST;
+          FREE_LIST = FREE_LIST->chain;
+      }
+      @<Track alloc>@;
+      return _var;
+  }
+  
+  ALLOC_DEFN_SCOPE THE_TYPE *new_##_type _args
+  {
+      THE_TYPE *_var = ALLOC_TYPE();
+      INIT_TYPE(_var);
+      return _var;
+  }
+@
+@<Declarations@>+=
+@
+@<Definitions@>+=  
+  ALLOC_DEFN_SCOPE THE_TYPE *COPY_TYPE(const THE_TYPE *_var)
+    {
+        THE_TYPE *_result = ALLOC_TYPE();
+        
+        assert(_var != NULL);
+        memcpy(_result, _var, sizeof(THE_TYPE));
+        CLONE_TYPE(_result);
+        return _result;
+    }
+
+@
 /**
  * Generates declarations for freelist-based typed memory allocations:
  * - `_type *new_<_type>(_args)`
@@ -1718,7 +1793,5 @@ static void test_resize_larger_n(size_t n)
 
 #endif // defined(ALLOCATOR_IMP)
   
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
+
 #endif /* ALLOCATOR_H */

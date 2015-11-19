@@ -29,6 +29,7 @@
 *.tab.h
 lex.yy.c
 support.h
+allocator.h
 
 doc/*
 tests/*

@@ -209,31 +209,31 @@ __ASSERT_CMP_INLINE(bits_neq, unsigned long long, "%llx", _arg1 != _arg2);
         srand(seed);                                    \
     } while(0)
 
-#define __TEST_OPEN_GROUP {
-#define __TEST_CLOSE_GROUP }
+#define __BEGIN {
+#define __END }
 
 #define BEGIN_TESTSUITE(_msg)                     \
-    int main(void) __TEST_OPEN_GROUP              \
+    int main(void) __BEGIN                        \
         SET_RANDOM_SEED();                        \
     fprintf(stderr, "%s:\n", (_msg));             \
 
 #define END_TESTSUITE                           \
     return 0;                                   \
-    __TEST_CLOSE_GROUP
+    __END
 
 
-#define BEGIN_TESTCASE(_msg)                    \
+#define BEGIN_TESTCASE(_msg, _decls)            \
+    __BEGIN                                     \
+    _decls;                                     \
     fprintf(stderr, "%s...", (_msg));           \
-    fflush(stderr);                             \
-    __TEST_OPEN_GROUP
-    
+    fflush(stderr)
 
-#define END_TESTCASE       \
-    fputs("OK\n", stderr); \
-    __TEST_CLOSE_GROUP
+#define END_TESTCASE                            \
+    __END                                       \
+    fputs(" OK\n", stderr)
 
 #define BEGIN_TESTITER(_name, _vars, ...)               \
-    __TEST_OPEN_GROUP                                   \
+    __BEGIN                                             \
     struct {                                            \
         _vars;                                          \
     } const *_name, _name##_values[] = {__VA_ARGS__};   \
@@ -242,13 +242,12 @@ __ASSERT_CMP_INLINE(bits_neq, unsigned long long, "%llx", _arg1 != _arg2);
     _name < _name##_values + sizeof(_name##_values) /   \
              sizeof(*_name##_values);                   \
          _name++)                                       \
-        __TEST_OPEN_GROUP
+        __BEGIN
 
-#define TESTITER_LOG(_fmt, ...)                 \
-    fprintf(stderr, "[" _fmt "]", __VA_ARGS__)
-
-#define END_TESTITER __TEST_CLOSE_GROUP
-
+#define END_TESTITER __END __END
+            
+#define LOG_TESTITER(_fmt, ...)                 \
+    fprintf(stderr, " [" _fmt "]", __VA_ARGS__)
 
 #ifdef __cplusplus
 }

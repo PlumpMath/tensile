@@ -30,6 +30,7 @@ extern "C"
 
 @<Compiler attributes@>@;
 @<Bit counting@>@;
+@<Miscellanea@>@;
 
 #ifdef __cplusplus
 }
@@ -194,7 +195,7 @@ static inline unsigned count_leading_zeroes(size_t i)
 
 @
 @<Testcases@>=
-  BEGIN_TESTCASE("Count leading zeroes")
+  BEGIN_TESTCASE("Count leading zeroes", {});
   BEGIN_TESTITER(clz, size_t val; unsigned expected,
                  {0u, sizeof(size_t) * CHAR_BIT},            
                  {1u, sizeof(size_t) * CHAR_BIT - 1},
@@ -202,10 +203,18 @@ static inline unsigned count_leading_zeroes(size_t i)
                  {UINT_MAX, (sizeof(size_t) - sizeof(unsigned)) * CHAR_BIT},
                  {SIZE_MAX, 0},
                  {SIZE_MAX >> 1, 1},
-                 {SIZE_MAX >> 2, 2})
-  TESTITER_LOG("%zu", clz->val);
+                 {SIZE_MAX >> 2, 2});
+  LOG_TESTITER("%zu", clz->val);
   ASSERT_UINT_EQ(count_leading_zeroes(clz->val), clz->expected);
   END_TESTITER;
   END_TESTCASE;
 @
+@<Miscellanea@>=
+/* Make a prefix-qualified name */
+#define MAKE_NAME(_prefix, _name) _prefix##_##_name
+#define MAKE_EXP_NAME(_prefix, _name) MAKE_NAME(_prefix, _name)
 
+#define DEFN_SCOPE_extern
+#define DEFN_SCOPE_static static
+#define DEFN_SCOPE(_declscope) MAKE_NAME(DEFN_SCOPE, _declscope)  
+@
