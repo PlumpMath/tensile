@@ -83,7 +83,6 @@ poll { return TOK_POLL; }
 pragma { return TOK_PRAGMA; }
 private { return TOK_PRIVATE; }
 protected { return TOK_PROTECTED; }
-prototype { return TOK_PROTOTYPE; }
 public { return TOK_PUBLIC; }
 receive { return TOK_RECEIVE; }
 resume { return TOK_RESUME; }
