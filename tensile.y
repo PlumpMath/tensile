@@ -31,14 +31,12 @@
 %token TOK_PROTECTED
 %token TOK_PUBLIC
 %token TOK_IMPORT
-%token TOK_PROTOTYPE
 %token TOK_PARTITION
 %token TOK_PRAGMA
 %token TOK_INCLUDE
 %token TOK_AUGMENT
 
 
-%nonassoc ':'
 %left ';'                      
 %left ','
 %nonassoc TOK_RULE
@@ -56,6 +54,7 @@
 %left '|' '^'
 %left '&'
 %nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH TOK_IN TOK_ISTYPE
+%right ':'                        
 %left TOK_MAX TOK_MIN 
 %left '+' '-' TOK_APPEND TOK_CHOP TOK_CHOP_HEAD
 %left '*' '/' TOK_DIV TOK_MOD TOK_INTERSPERSE TOK_SPLIT
@@ -171,7 +170,6 @@ nodedecl:       nodekind TOK_ID '(' nodeargs0 ')' nodedef
                 ;
 
 nodekind:     /*empty*/
-        |       TOK_PROTOTYPE
         |       TOK_PARTITION
         ;
 
@@ -221,7 +219,7 @@ states:         state
         |       states state
         ;
 
-state:          statelabel ':' sequence
+state:          statelabel TOK_RULE sequence
         ;
 
 statelabel:     TOK_ID
@@ -259,7 +257,7 @@ expression: literal
         |       TOK_ID
         |       TOK_WILDCARD
         |       TOK_ID '(' exprlist0 ')'
-        |	    TOK_HOOK TOK_ID
+        |       TOK_HOOK TOK_ID
         |       TOK_ME
         |       TOK_QUEUE
         |       TOK_END
@@ -285,7 +283,8 @@ expression: literal
         |       expression '^' expression 
         |       expression '&' expression
         |       expression '|' expression
-        |       expression '?' expression 
+        |       expression '?' expression
+        |       expression ':' expression
         |       expression TOK_ELSE expression
         |       expression TOK_MIN expression 
         |       expression TOK_MAX expression
@@ -463,7 +462,8 @@ pattern:        TOK_ID
         |       TOK_ID '(' patternlist0 ')' %prec '('
         |       '[' patternlist ']'
         |       '[' patternassoclist ']'
-        |       pattern '|' pattern                
+        |       pattern ':' pattern
+        |       pattern '|' pattern
         ;
 
 patternlist0: /*empty*/
