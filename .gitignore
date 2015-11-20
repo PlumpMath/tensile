@@ -23,16 +23,9 @@
 *.hex
 
 *~
-*.d
-
-*.tab.c
-*.tab.h
-lex.yy.c
-support.h
-allocator.h
 
 doc/*
-tests/*
+build/*
 
 TAGS
 core
