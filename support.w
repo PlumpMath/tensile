@@ -34,10 +34,10 @@ extern "C"
 
 #ifdef __cplusplus
 }
-#endif /* __cplusplus */
-#endif /* SUPPORT_H */
+#endif
+#endif
 @ Test
-@(tests/support.c@>=
+@(tests/support_ts.c@>=
 #include "assertions.h"
 #include "support.h"  
 
@@ -48,7 +48,7 @@ extern "C"
 
 @<Compiler attributes@>=
 
-#if    __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96)
+#if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96)
 #define ATTR_PURE __attribute__((__pure__))
 #define ATTR_MALLOC __attribute__((__malloc__))
 #else
@@ -58,14 +58,14 @@ extern "C"
 #define ATTR_MALLOC
 #endif
 
-#if     __GNUC__ >= 4
+#if __GNUC__ >= 4
 #define ATTR_SENTINEL  __attribute__((__sentinel__))
 #else
 /* Indicates that a vararg function shall have NULL at the end of varargs */
 #define ATTR_SENTINEL
 #endif
 
-#if     (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3)
+#if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3)
 #define ATTR_ALLOC_SIZE(x) __attribute__((__alloc_size__(x)))
 #define ATTR_ALLOC_SIZE2(x,y) __attribute__((__alloc_size__(x,y)))
 #else
@@ -109,7 +109,7 @@ extern "C"
 #define ATTR_NORETURN __attribute__((__noreturn__))
 #define ATTR_CONST  __attribute__((__const__))
 #define ATTR_UNUSED __attribute__((__unused__))
-#else   /* !__GNUC__ */
+#else 
 /* Indicates that a function is printf-like, and the format string is
  *  in the |_format_idx|'th argument
  */
@@ -132,14 +132,14 @@ extern "C"
 #define ATTR_CONST
 /* Indicates that an object may remain unused */
 #define ATTR_UNUSED
-#endif  /* !__GNUC__ */
+#endif
 
 #if    __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)
 #define ATTR_DEPRECATED __attribute__((__deprecated__))
 #else
 /* Marks the symbol as deprecated */
 #define ATTR_DEPRECATED
-#endif /* __GNUC__ */
+#endif
 
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR >= 3)
 #define ATTR_VISIBILITY(_scope) \
@@ -164,7 +164,7 @@ extern "C"
 #else
 /* Requires a warning if a result value of the function is throw away */
 #define ATTR_WARN_UNUSED_RESULT
-#endif /* __GNUC__ */
+#endif
 
 @
 @<Bit counting@>=

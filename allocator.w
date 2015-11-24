@@ -26,16 +26,19 @@ extern "C"
 #include <limits.h>
 #include "support.h"
 
-@<Setup@>@;
-@<Declarations@>@;
-
-#if defined(IMPLEMENT_ALLOCATOR)
-@<Definitions@>@;
+#if !defined(ALLOCATOR_H)
+#define ALLOCATOR_H 1
+@<Shared allocator code@>@;
 #endif
+
+@<General Setup@>@;
+@<Single allocator@>@;
+@<Array allocator@>@;
+
 
 #ifdef __cplusplus
 }
-#endif /* __cplusplus */
+#endif
 
 @ Test
 @(tests/allocator.c@>=
@@ -47,31 +50,49 @@ extern "C"
   @<Testcases@>@;
   END_TESTSUITE
 @
-@f ALLOC_SCOPE extern
-@f ALLOC_DEFN_SCOPE extern
-@<Setup@>=
+@<General Setup@>=
+#if !NEED_SINGLE_ALLOCATOR && !NEED_ARRAY_ALLOCATOR
+#error "No allocator requested"
+#endif  
 #ifndef THE_TYPE
 #error "THE_TYPE is not defined"
 #endif
+#ifndef THE_SCOPE
+#define THE_SCOPE extern
+#endif
+#undef THE_DEFN_SCOPE  
+#define THE_DEFN_SCOPE DEFN_SCOPE(THE_SCOPE)
+#ifndef TYPE_UNSHARE
+#define TYPE_UNSHARE(_var) /* nothing */
+#endif
+#ifndef TYPE_CLEANUP
+#define TYPE_CLEANUP(_var) /* nothing */
+#endif    
+@
+@<Single allocator@>=
+#ifdef NEED_ARRAY_ALLOCATOR
+  @<Single allocator setup@>@;  
+  @<Single allocator declarations@>@;
+#if IMPLEMENT_ALLOCATOR  
+  @<Single allocator definitions@>@;
+#endif  
+#endif
+@
+@<Single allocator setup@>=
 #ifndef ALLOC_ARGS
 #define ALLOC_ARGS void
 #endif
-#ifndef INIT_TYPE
-#define INIT_TYPE(_var) /* nothing */
-#endif  
-#ifndef ALLOC_SCOPE
-#define ALLOC_SCOPE extern
+#ifndef TYPE_INIT
+#define TYPE_INIT(_var) /* nothing */
 #endif
-#define ALLOC_DEFN_SCOPE DEFN_SCOPE(ALLOC_SCOPE)
 #define NEW_TYPE MAKE_EXP_NAME(new, THE_TYPE)
 #define FREE_TYPE MAKE_EXP_NAME(free, THE_TYPE)
-#define COPY_TYPE MAKE_EXP_NAME(copy, THE_TYPE)
+#define COPY_TYPE MAKE_EXP_NAME(copy, THE_TYPE)    
+@<Single allocator declarations@>=
+  THE_SCOPE THE_TYPE *NEW_TYPE(ALLOC_ARGS);
 @
-@<Declarations@>=
-ALLOC_SCOPE THE_TYPE *NEW_TYPE(ALLOC_ARGS);
-@
-@<Definitions@>=
-  @<Allocation tracker@>@;
+@<Single allocator definitions@>=
+  @<Single allocation tracker@>@;
   
 #undef FREE_LIST
 #define FREE_LIST MAKE_EXP_NAME(freelist, THE_TYPE)

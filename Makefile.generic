@@ -1,3 +1,6 @@
+ifeq ($(TOPDIR),)
+$(error No path to the top directory, do not call this makefile directly)
+endif
 ifeq ($(TARGET_ARCH),)
 $(error Target architecture not defined, please run 'setup.sh')
 endif
@@ -5,26 +8,35 @@ ifeq ($(TARGET_OS),)
 $(error Target OS not defined, please run 'setup.sh')
 endif
 
+VPATH = $(TOPDIR)
 CC ?= gcc
 SED = sed
 RM = rm -f
 BISON = bison -d
 FLEX = flex
-PKGCONFIG = pkg-config
-ETAGS = ctags-exuberant -e -R --exclude='doc/*' --exclude='tests/*'
-CTANGLE = ctanglex
-CWEAVE = cweavex
+ETAGS = etags 
+CTANGLE = ctangle -b
+CWEAVE = cweave -b -x
 
 CFLAGS = -gdwarf-4 -g3 -fstack-protector -W -Wall -Werror -Wmissing-declarations -Wformat=2 -Winit-self -Wuninitialized \
 	-Wsuggest-attribute=pure -Wsuggest-attribute=const -Wconversion -Wstack-protector -Wpointer-arith -Wwrite-strings \
 	-Wmissing-format-attribute
-CPPFLAGS = -I../.. -DTARGET_ARCH=\"$(TARGET_ARCH)\" -DTARGET_OS=\"$(TARGET_OS)\"
+CPPFLAGS = -I../.. -DTARGET_ARCH=\"$(TARGET_ARCH)\" -DTARGET_OS=\"$(TARGET_OS)\" -DTARGET_VARIANT=\"$(TARGET_VARIANT)\"
 LDFLAGS = -Wl,-export-dynamic
 LDLIBS = -lm -lfl -lunistring -ltre
 MFLAGS = -MM -MT $(<:.c=.o)
 
+-include ../../setup/$(TARGET_OS).mk
+-include ../../setup/$(TARGET_ARCH).mk
+-include ../../setup/$(TARGET_OS)_$(TARGET_ARCH).mk
+ifneq ($(TARGET_VARIANT),)
+-include ../../setup/$(TARGET_VARIANT).mk
+endif
+
+.SECONDARY :
+
 LP_SOURCES =
-LP_HEADERS = 
+LP_HEADERS = support.w 
 
 C_SOURCES = $(LP_SOURCES:.w=.c)
 C_SOURCES += tensile.tab.c lex.yy.c
@@ -57,20 +69,20 @@ lex.yy.o lex.yy.d : lex.yy.c tensile.tab.h
 tests/% : CPPFLAGS += -I.
 tests/% : CFLAGS += --coverage
 
-tests/% : tests/%.o
+% : %_ts.o
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS)
 
-tests/%.c : %.c
+tests/%_ts.c : %.c
 	touch $@
 
-tests/%.c : %.h
+tests/%_ts.c : %.h
 	touch $@
 
 ifneq ($(MAKECMDGOALS),clean)
 Makefile : $(GENERATED_FILES)
 
 include $(C_SOURCES:.c=.d)
-include $(patsubst %,tests/%.d,$(TESTABLES))
+include $(patsubst %,tests/%_ts.d,$(TESTABLES))
 endif
 
 .PHONY : check
@@ -83,19 +95,26 @@ check : $(addprefix tests/,$(TESTABLES))
 .PHONY : doc
 doc : manual.tex
 
-manual.tex : $(LP_SOURCES) $(LP_HEADERS)
+manual.w : prologue.tex $(LP_SOURCES) $(LP_HEADERS) epilogue.tex
+	cat $< >$@
+	for f in $(filter %.w,$^); do   \
+		 echo "@i $$f" >>$@; \
+	done
+	echo "@" >>$@
+	cat $(lastword $^) >>$@
+	echo "@" >>$@
 
-TAGS : $(C_SOURCES)
-	$(ETAGS)
+TAGS : $(LP_SOURCES:.w=.c) $(LP_HEADERS:.w=.h)
+	$(ETAGS) $^
 
 
 .PHONY : clean 
 clean :
-	rm -f *.o tests/*.o
-	rm -f *.d tests/*.d
-	rm -f tests/*.c
-	rm -f $(APPLICATION)
-	rm -f $(GENERATED_FILES)
+	$(RM) *.o
+	$(RM) *.d
+	$(RM) tests/*
+	$(RM) $(APPLICATION)
+	$(RM) $(GENERATED_FILES)
 
 %.o : %.c
 	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $<
