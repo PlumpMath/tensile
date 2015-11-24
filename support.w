@@ -38,14 +38,14 @@ extern "C"
 #endif
 @ Test
 @(tests/support_ts.c@>=
+#include "support.h"
+#define TESTSUITE "Support utiltities"
 #include "assertions.h"
-#include "support.h"  
 
-  BEGIN_TESTSUITE("Support utilities");
-  @<Testcases@>@;
-  END_TESTSUITE
+  @<Test bodies@>@;  
+  
+  TESTCASES(@<Test names@>);
 @
-
 @<Compiler attributes@>=
 
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96)
@@ -194,20 +194,24 @@ static inline unsigned count_leading_zeroes(size_t i)
 #endif
 
 @
-@<Testcases@>=
-  BEGIN_TESTCASE("Count leading zeroes", {});
-  BEGIN_TESTITER(clz, size_t val; unsigned expected,
-                 {0u, sizeof(size_t) * CHAR_BIT},            
-                 {1u, sizeof(size_t) * CHAR_BIT - 1},
-                 {0x12340u, sizeof(size_t) * CHAR_BIT - 17},
-                 {UINT_MAX, (sizeof(size_t) - sizeof(unsigned)) * CHAR_BIT},
-                 {SIZE_MAX, 0},
-                 {SIZE_MAX >> 1, 1},
-                 {SIZE_MAX >> 2, 2});
-  LOG_TESTITER("%zu", clz->val);
-  ASSERT_UINT_EQ(count_leading_zeroes(clz->val), clz->expected);
-  END_TESTITER;
-  END_TESTCASE;
+@<Test bodies@>=
+  TEST_PARAMS(clz, size_t val; unsigned expected,
+              {0u, sizeof(size_t) * CHAR_BIT},            
+              {1u, sizeof(size_t) * CHAR_BIT - 1},
+              {0x12340u, sizeof(size_t) * CHAR_BIT - 17},
+              {UINT_MAX, (sizeof(size_t) - sizeof(unsigned)) * CHAR_BIT},
+              {SIZE_MAX, 0},
+              {SIZE_MAX >> 1, 1},
+              {SIZE_MAX >> 2, 2});
+  TEST_BODY(count_leading_zeroes,
+            TEST_FOREACH(clz, 
+                         TEST_LOG("%zx", clz->val);
+                         ASSERT_EQ(bits,
+                                   count_leading_zeroes(clz->val),
+                                   clz->expected)));
+@
+@<Test names@>=
+  TESTCASE(count_leading_zeroes, "Count leading zeroes"),
 @
 @<Miscellanea@>=
 /* Make a prefix-qualified name */

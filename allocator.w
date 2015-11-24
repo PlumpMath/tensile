@@ -42,14 +42,14 @@ extern "C"
 
 @ Test
 @(tests/allocator.c@>=
+#define TESTSUITE "Allocator routines"  
 #include "assertions.h"
 
   @<Test declarations@>@;
   
-  BEGIN_TESTSUITE("Allocator routines");
-  @<Testcases@>@;
-  END_TESTSUITE
+  TESTCASES(@<Test names@>)@;
 @
+
 @<General Setup@>=
 #if !NEED_SINGLE_ALLOCATOR && !NEED_ARRAY_ALLOCATOR
 #error "No allocator requested"
@@ -67,10 +67,25 @@ extern "C"
 #endif
 #ifndef TYPE_CLEANUP
 #define TYPE_CLEANUP(_var) /* nothing */
-#endif    
+#endif
+@
+@<Shared allocator code@>=
+#if IMPLEMENT_ALLOCATOR  
+  typedef struct freelist_t {
+      struct freelist_t * chain; /**< Next free item */
+  } freelist_t;
+  
+  ATTR_MALLOC ATTR_RETURNS_NONNULL
+  static inline void *frlmalloc(size_t sz) 
+  {
+      void *result = malloc(sz > sizeof(freelist_t) ? sz : sizeof(freelist_t));
+      assert(result != NULL);
+      return result;
+  }
+#endif  
 @
 @<Single allocator@>=
-#ifdef NEED_ARRAY_ALLOCATOR
+#if NEED_SINGLE_ALLOCATOR
   @<Single allocator setup@>@;  
   @<Single allocator declarations@>@;
 #if IMPLEMENT_ALLOCATOR  
@@ -78,6 +93,7 @@ extern "C"
 #endif  
 #endif
 @
+
 @<Single allocator setup@>=
 #ifndef ALLOC_ARGS
 #define ALLOC_ARGS void
@@ -87,7 +103,8 @@ extern "C"
 #endif
 #define NEW_TYPE MAKE_EXP_NAME(new, THE_TYPE)
 #define FREE_TYPE MAKE_EXP_NAME(free, THE_TYPE)
-#define COPY_TYPE MAKE_EXP_NAME(copy, THE_TYPE)    
+#define COPY_TYPE MAKE_EXP_NAME(copy, THE_TYPE)
+@
 @<Single allocator declarations@>=
   THE_SCOPE THE_TYPE *NEW_TYPE(ALLOC_ARGS);
 @
@@ -96,6 +113,7 @@ extern "C"
   
 #undef FREE_LIST
 #define FREE_LIST MAKE_EXP_NAME(freelist, THE_TYPE)
+#undef ALLOC_TYPE
 #define ALLOC_TYPE MAKE_EXP_NAME(alloc, THE_TYPE)  
   static freelist_t *FREE_LIST;
   
@@ -122,6 +140,7 @@ extern "C"
   }
 @
 @<Declarations@>+=
+  
 @
 @<Definitions@>+=  
   ALLOC_DEFN_SCOPE THE_TYPE *COPY_TYPE(const THE_TYPE *_var)
@@ -329,9 +348,6 @@ extern "C"
 /**
  * Generic free list
  */
-typedef struct freelist_t {
-    struct freelist_t * chain; /**< Next free item */
-} freelist_t;
 
 /** @endcond */
 

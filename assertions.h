@@ -29,165 +29,130 @@ extern "C"
 {
 #endif
 
-#undef NDEBUG
-#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include <wchar.h>
 
-#define ASSERT(_cond) assert(_cond)
-#define ASSERT_NOT(_cond) assert(!(_cond))
+#if !NONFATAL_ASSERTIONS
+#define ASSERT_FAIL abort()
+#else
+static unsigned assert_failure_count;
+#define ASSERT_FAIL (assert_failure_count++)
+#endif
 
-#define __ASSERT_CMP_INLINE(_name, _type, _fmt, _cmp)                   \
-    static inline void assert_##_name(const char *_descr,               \
-                                      const char *_file,                \
-                                      const char *_func,                \
-                                      unsigned _line,                   \
-                                      _type _arg1, _type _arg2)         \
-    {                                                                   \
-        if (!(_cmp))                                                    \
+#define ASSERT(_expr)                                                   \
+    do {                                                                \
+        if (!(_expr))                                                   \
         {                                                               \
-            fprintf(stderr, "Assertion %s failed at %s(%s):%u: "        \
-                    _fmt " vs. " _fmt "\n",                             \
-                    _descr, _file, _func, _line, _arg1, _arg2);         \
-            abort();                                                    \
+            fprintf(stderr,                                             \
+                    "Assertion " #_expr " failed at %s[%s:%u]\n",       \
+                    __FUNCTION__, __FILE__, __LINE__);                  \
+            ASSERT_FAIL;                                                \
         }                                                               \
-    }                                                                   \
-    struct fake
+    } while(0)
 
-#define __ASSERT_CMP_INLINE_PACK(_name, _type, _fmt,                    \
-                                 _cmpeq, _cmpne, _cmpless, _cmpgtr,     \
-                                 _cmple, _cmpge)                        \
-    __ASSERT_CMP_INLINE(_name##_eq, _type, _fmt, _cmpeq);               \
-    __ASSERT_CMP_INLINE(_name##_neq, _type, _fmt, _cmpne);              \
-    __ASSERT_CMP_INLINE(_name##_less, _type, _fmt, _cmpless);           \
-    __ASSERT_CMP_INLINE(_name##_greater, _type, _fmt, _cmpgtr);         \
-    __ASSERT_CMP_INLINE(_name##_le, _type, _fmt, _cmple);               \
-    __ASSERT_CMP_INLINE(_name##_ge, _type, _fmt, _cmpge)               \
+#define ASSERT_NOT(_cond) ASSERT(!(_cond))
 
-#define __ASSERT_CMP_WRAP(_name, _cmpdescr, _arg1, _arg2)               \
-    assert_##_name(#_arg1 " " _cmpdescr " " #_arg2, __FILE__,                   \
-                   __FUNCTION__, __LINE__,                              \
-                   (_arg1), (_arg2))
+#define __ASSERT2(_type, _fmt, _expr1, _comparator, _cmpname, _expr2)   \
+    do {                                                                \
+        _type __var1 = _expr1;                                          \
+        _type __var2 = _expr2;                                          \
+                                                                        \
+        if (!_comparator(__var1, __var2))                               \
+        {                                                               \
+            fprintf(stderr,                                             \
+                    "Assertion " #_expr1 " " _cmpname " " #_expr2       \
+                    " failed at %s[%s:%u]: expected " _fmt              \
+                    ", got " _fmt "\n",                                 \
+                    __FUNCTION__, __FILE__, __LINE__,                   \
+                    __var1, __var2);                                    \
+            ASSERT_FAIL;                                                \
+        }                                                               \
+    } while(0)
 
-__ASSERT_CMP_INLINE_PACK(int, long, "%ld",
-                         _arg1 == _arg2, _arg1 != _arg2,
-                         _arg1 < _arg2, _arg1 > _arg2,
-                         _arg1 <= _arg2, _arg1 >= _arg2);
-__ASSERT_CMP_INLINE_PACK(uint, unsigned long, "%lu",
-                         _arg1 == _arg2, _arg1 != _arg2,
-                         _arg1 < _arg2, _arg1 > _arg2,
-                         _arg1 <= _arg2, _arg1 >= _arg2);
-__ASSERT_CMP_INLINE_PACK(float, double, "%g",
-                         _arg1 == _arg2, _arg1 != _arg2,
-                         _arg1 < _arg2, _arg1 > _arg2,
-                         _arg1 <= _arg2, _arg1 >= _arg2);
-__ASSERT_CMP_INLINE_PACK(str, const char *, "%s",
-                         strcmp(_arg1, _arg2) == 0,
-                         strcmp(_arg1, _arg2) != 0,
-                         strcmp(_arg1, _arg2) < 0,
-                         strcmp(_arg1, _arg2) > 0,
-                         strcmp(_arg1, _arg2) <= 0,
-                         strcmp(_arg1, _arg2) >= 0);
-__ASSERT_CMP_INLINE_PACK(wstr, const wchar_t *, "%ls",
-                         wcscmp(_arg1, _arg2) == 0,
-                         wcscmp(_arg1, _arg2) != 0,
-                         wcscmp(_arg1, _arg2) < 0,
-                         wcscmp(_arg1, _arg2) > 0,
-                         wcscmp(_arg1, _arg2) <= 0,
-                         wcscmp(_arg1, _arg2) >= 0);
-__ASSERT_CMP_INLINE(ptr_eq, const void *, "%p", _arg1 == _arg2);
-__ASSERT_CMP_INLINE(ptr_neq, const void *, "%p", _arg1 != _arg2);
-__ASSERT_CMP_INLINE(bits_eq, unsigned long long, "%llx", _arg1 == _arg2);
-__ASSERT_CMP_INLINE(bits_neq, unsigned long long, "%llx", _arg1 != _arg2);
+#define _ASSERT2(_type, _expr1, _cmpid, _expr2)         \
+    __ASSERT2(ASSERT_TYPE_##_type,                      \
+              ASSERT_FMT_##_type,                       \
+              _expr1,                                   \
+              ASSERT_TYPE_CMP_##_type##_##_cmpid,       \
+              ASSERT_CMP_NAME_##_cmpid,                 \
+              _expr2)
 
-#define ASSERT_INT_EQ(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(int_eq, "==", _arg1, _arg2)
-#define ASSERT_INT_NEQ(_arg1, _arg2)                \
-    __ASSERT_CMP_WRAP(int_neq, "!=", _arg1, _arg2)
-#define ASSERT_INT_EQ(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(int_eq, "==", _arg1, _arg2)
-#define ASSERT_INT_LESS(_arg1, _arg2)               \
-    __ASSERT_CMP_WRAP(int_less, "<", _arg1, _arg2)
-#define ASSERT_INT_GREATER(_arg1, _arg2)                \
-    __ASSERT_CMP_WRAP(int_greater, ">", _arg1, _arg2)
-#define ASSERT_INT_LE(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(int_le, "<=", _arg1, _arg2)
-#define ASSERT_INT_GE(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(int_ge, ">=", _arg1, _arg2)
+#define ASSERT_TYPE_int      long
+#define ASSERT_TYPE_unsigned unsigned long
+#define ASSERT_TYPE_float    double
+#define ASSERT_TYPE_string   const char *
+#define ASSERT_TYPE_wstring  const wchar_t *
+#define ASSERT_TYPE_ptr      const void *
+#define ASSERT_TYPE_bits     unsigned long long
 
-#define ASSERT_UINT_EQ(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(uint_eq, "==", _arg1, _arg2)
-#define ASSERT_UINT_NEQ(_arg1, _arg2)                \
-    __ASSERT_CMP_WRAP(uint_neq, "!=", _arg1, _arg2)
-#define ASSERT_UINT_EQ(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(uint_eq, "==", _arg1, _arg2)
-#define ASSERT_UINT_LESS(_arg1, _arg2)               \
-    __ASSERT_CMP_WRAP(uint_less, "<", _arg1, _arg2)
-#define ASSERT_UINT_GREATER(_arg1, _arg2)                \
-    __ASSERT_CMP_WRAP(uint_greater, ">", _arg1, _arg2)
-#define ASSERT_UINT_LE(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(uint_le, "<=", _arg1, _arg2)
-#define ASSERT_UINT_GE(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(uint_ge, ">=", _arg1, _arg2)
+#define ASSERT_FMT_int "%ld"
+#define ASSERT_FMT_unsigned "%lu"
+#define ASSERT_FMT_float "%g"
+#define ASSERT_FMT_string "%s"
+#define ASSERT_FMT_wstring "%ls"
+#define ASSERT_FMT_ptr "%p"
+#define ASSERT_FMT_bits "%llx"
 
-#define ASSERT_FLOAT_EQ(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(float_eq, "==", _arg1, _arg2)
-#define ASSERT_FLOAT_NEQ(_arg1, _arg2)                \
-    __ASSERT_CMP_WRAP(float_neq, "!=", _arg1, _arg2)
-#define ASSERT_FLOAT_EQ(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(float_eq, "==", _arg1, _arg2)
-#define ASSERT_FLOAT_LESS(_arg1, _arg2)               \
-    __ASSERT_CMP_WRAP(float_less, "<", _arg1, _arg2)
-#define ASSERT_FLOAT_GREATER(_arg1, _arg2)                \
-    __ASSERT_CMP_WRAP(float_greater, ">", _arg1, _arg2)
-#define ASSERT_FLOAT_LE(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(float_le, "<=", _arg1, _arg2)
-#define ASSERT_FLOAT_GE(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(float_ge, ">=", _arg1, _arg2)
+#define ASSERT_CMP_NAME_eq "=="
+#define ASSERT_CMP_NAME_neq "!="
+#define ASSERT_CMP_NAME_less "<"
+#define ASSERT_CMP_NAME_greater ">"
+#define ASSERT_CMP_NAME_le "<="
+#define ASSERT_CMP_NAME_ge ">="
 
-#define ASSERT_STR_EQ(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(str_eq, "==", _arg1, _arg2)
-#define ASSERT_STR_NEQ(_arg1, _arg2)                \
-    __ASSERT_CMP_WRAP(str_neq, "!=", _arg1, _arg2)
-#define ASSERT_STR_EQ(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(str_eq, "==", _arg1, _arg2)
-#define ASSERT_STR_LESS(_arg1, _arg2)               \
-    __ASSERT_CMP_WRAP(str_less, "<", _arg1, _arg2)
-#define ASSERT_STR_GREATER(_arg1, _arg2)                \
-    __ASSERT_CMP_WRAP(str_greater, ">", _arg1, _arg2)
-#define ASSERT_STR_LE(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(str_le, "<=", _arg1, _arg2)
-#define ASSERT_STR_GE(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(str_ge, ">=", _arg1, _arg2)
+#define ASSERT_TYPE_CMP_int_eq(_x1, _x2) ((_x1) == (_x2))
+#define ASSERT_TYPE_CMP_int_neq(_x1, _x2) ((_x1) != (_x2))
+#define ASSERT_TYPE_CMP_int_less(_x1, _x2) ((_x1) < (_x2))
+#define ASSERT_TYPE_CMP_int_greater(_x1, _x2) ((_x1) > (_x2))
+#define ASSERT_TYPE_CMP_int_le(_x1, _x2) ((_x1) <= (_x2))
+#define ASSERT_TYPE_CMP_int_ge(_x1, _x2) ((_x1) >= (_x2))
 
-#define ASSERT_WSTR_EQ(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(wstr_eq, "==", _arg1, _arg2)
-#define ASSERT_WSTR_NEQ(_arg1, _arg2)                \
-    __ASSERT_CMP_WRAP(wstr_neq, "!=", _arg1, _arg2)
-#define ASSERT_WSTR_EQ(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(wstr_eq, "==", _arg1, _arg2)
-#define ASSERT_WSTR_LESS(_arg1, _arg2)               \
-    __ASSERT_CMP_WRAP(wstr_less, "<", _arg1, _arg2)
-#define ASSERT_WSTR_GREATER(_arg1, _arg2)                \
-    __ASSERT_CMP_WRAP(wstr_greater, ">", _arg1, _arg2)
-#define ASSERT_WSTR_LE(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(wstr_le, "<=", _arg1, _arg2)
-#define ASSERT_WSTR_GE(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(wstr_ge, ">=", _arg1, _arg2)
+#define ASSERT_TYPE_CMP_unsigned_eq(_x1, _x2) ((_x1) == (_x2))
+#define ASSERT_TYPE_CMP_unsigned_neq(_x1, _x2) ((_x1) != (_x2))
+#define ASSERT_TYPE_CMP_unsigned_less(_x1, _x2) ((_x1) < (_x2))
+#define ASSERT_TYPE_CMP_unsigned_greater(_x1, _x2) ((_x1) > (_x2))
+#define ASSERT_TYPE_CMP_unsigned_le(_x1, _x2) ((_x1) <= (_x2))
+#define ASSERT_TYPE_CMP_unsigned_ge(_x1, _x2) ((_x1) >= (_x2))
 
-#define ASSERT_PTR_EQ(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(ptr_eq, "==", _arg1, _arg2)
-#define ASSERT_PTR_NEQ(_arg1, _arg2)                \
-    __ASSERT_CMP_WRAP(ptr_neq, "!=", _arg1, _arg2)
+#define ASSERT_TYPE_CMP_float_eq(_x1, _x2) ((_x1) == (_x2))
+#define ASSERT_TYPE_CMP_float_neq(_x1, _x2) ((_x1) != (_x2))
+#define ASSERT_TYPE_CMP_float_less(_x1, _x2) ((_x1) < (_x2))
+#define ASSERT_TYPE_CMP_float_greater(_x1, _x2) ((_x1) > (_x2))
+#define ASSERT_TYPE_CMP_float_le(_x1, _x2) ((_x1) <= (_x2))
+#define ASSERT_TYPE_CMP_float_ge(_x1, _x2) ((_x1) >= (_x2))    
 
-#define ASSERT_BITS_EQ(_arg1, _arg2)                 \
-    __ASSERT_CMP_WRAP(bits_eq, "==", _arg1, _arg2)
-#define ASSERT_BITS_NEQ(_arg1, _arg2)                \
-    __ASSERT_CMP_WRAP(bits_neq, "!=", _arg1, _arg2)
+#define ASSERT_TYPE_CMP_string_eq(_x1, _x2) (strcmp(_x1, _x2) == 0)
+#define ASSERT_TYPE_CMP_string_neq(_x1, _x2) (strcmp(_x1, _x2) != 0)
+#define ASSERT_TYPE_CMP_string_less(_x1, _x2) (strcmp(_x1, _x2) < 0)
+#define ASSERT_TYPE_CMP_string_greater(_x1, _x2) (strcmp(_x1, _x2) > 0)
+#define ASSERT_TYPE_CMP_string_le(_x1, _x2) (strcmp(_x1, _x2) <= 0)
+#define ASSERT_TYPE_CMP_string_ge(_x1, _x2) (strcmp(_x1, _x2) >= 0)
 
+#define ASSERT_TYPE_CMP_wstring_eq(_x1, _x2) (wcscmp(_x1, _x2) == 0)
+#define ASSERT_TYPE_CMP_wstring_neq(_x1, _x2) (wcscmp(_x1, _x2) != 0)
+#define ASSERT_TYPE_CMP_wstring_less(_x1, _x2) (wcscmp(_x1, _x2) < 0)
+#define ASSERT_TYPE_CMP_wstring_greater(_x1, _x2) (wcscmp(_x1, _x2) > 0)
+#define ASSERT_TYPE_CMP_wstring_le(_x1, _x2) (wcscmp(_x1, _x2) <= 0)
+#define ASSERT_TYPE_CMP_wstring_ge(_x1, _x2) (wcscmp(_x1, _x2) >= 0)
+
+#define ASSERT_TYPE_CMP_ptr_eq(_x1, _x2) ((_x1) == (_x2))
+#define ASSERT_TYPE_CMP_ptr_neq(_x1, _x2) ((_x1) != (_x2))
+
+#define ASSERT_TYPE_CMP_bits_eq(_x1, _x2) ((_x1) == (_x2))
+#define ASSERT_TYPE_CMP_bits_neq(_x1, _x2) ((_x1) != (_x2))
+
+#define ASSERT_EQ(_type, _expr1, _expr2) _ASSERT2(_type, _expr1, eq, _expr2)
+#define ASSERT_NEQ(_type, _expr1, _expr2) _ASSERT2(_type, _expr1, neq, _expr2)
+#define ASSERT_LESS(_type, _expr1, _expr2) _ASSERT2(_type, _expr1, less, _expr2)
+#define ASSERT_GREATER(_type, _expr1, _expr2) _ASSERT2(_type, _expr1, greater, _expr2)
+#define ASSERT_LE(_type, _expr1, _expr2) _ASSERT2(_type, _expr1, greater, _expr2)
+#define ASSERT_GE(_type, _expr1, _expr2) _ASSERT2(_type, _expr1, greater, _expr2)
+
+#define ASSERT_NOT_NULL(_expr) ASSERT_NEQ(ptr, _expr, NULL)
+#define ASSERT_NULL(_expr) ASSERT_EQ(ptr, _expr, NULL)
 
 #define ARBITRARY(_type, _min, _max) \
     ((_type)rand() % ((_max) - (_min) + 1) + (_min))
@@ -209,45 +174,84 @@ __ASSERT_CMP_INLINE(bits_neq, unsigned long long, "%llx", _arg1 != _arg2);
         srand(seed);                                    \
     } while(0)
 
-#define __BEGIN {
-#define __END }
+#ifndef TESTSUITE
+#error "No testsuite name"
+#endif
 
-#define BEGIN_TESTSUITE(_msg)                     \
-    int main(void) __BEGIN                        \
-        SET_RANDOM_SEED();                        \
-    fprintf(stderr, "%s:\n", (_msg));             \
-
-#define END_TESTSUITE                           \
-    return 0;                                   \
-    __END
+typedef struct testcase_t {
+    const char *descr;
+    void (*action)(void);
+} testcase_t;
 
 
-#define BEGIN_TESTCASE(_msg, _decls)            \
-    __BEGIN                                     \
-    _decls;                                     \
-    fprintf(stderr, "%s...", (_msg));           \
-    fflush(stderr)
+static testcase_t test_cases[];
+int main(void)
+{
+    unsigned i;
+    
+    SET_RANDOM_SEED();
+    fprintf(stderr, "%s:\n", TESTSUITE);
+    for (i = 0; test_cases[i].action != NULL; i++)
+    {
+#if NONFATAL_ASSERTIONS
+        unsigned current_failure_count = assert_failure_count;
+#endif
+        fprintf(stderr, "%s... ", test_cases[i].descr);
+        fflush(stderr);
+        test_cases[i].action();
+#if NONFATAL_ASSERTIONS
+        fputs(current_failure_count < assert_failure_count ?
+              "FAIL\n" : "OK\n", stderr);
+#else        
+        fputs("OK\n", stderr);
+#endif        
+    }
+#if NONFATAL_ASSERTIONS
+    if (assert_failure_count > 0)
+    {
+        fprintf(stderr, "%u assertions FAILED\n", assert_failure_count);
+        return 1;
+    }
+#endif
+    return 0;
+}
 
-#define END_TESTCASE                            \
-    __END                                       \
-    fputs(" OK\n", stderr)
+#define TEST_BODY(_name, _body)                 \
+    static void testcase_##_name(void)          \
+    {                                           \
+        _body;                                  \
+    }                                           \
+    
+#define TESTCASE(_name, _descr) {_descr, testcase_##_name}
 
-#define BEGIN_TESTITER(_name, _vars, ...)               \
-    __BEGIN                                             \
-    struct {                                            \
-        _vars;                                          \
-    } const *_name, _name##_values[] = {__VA_ARGS__};   \
-                                                        \
-    for (_name = _name##_values;                        \
-    _name < _name##_values + sizeof(_name##_values) /   \
-             sizeof(*_name##_values);                   \
-         _name++)                                       \
-        __BEGIN
+#define TESTCASES(...)                          \
+    static testcase_t test_cases[] = {          \
+        __VA_ARGS__                             \
+        {NULL, NULL}                            \
+    }
 
-#define END_TESTITER __END __END
-            
-#define LOG_TESTITER(_fmt, ...)                 \
-    fprintf(stderr, " [" _fmt "]", __VA_ARGS__)
+#define TEST_PARAMS(_name, _vars, ...)          \
+    static struct testparams_##_name {          \
+        _vars;                                  \
+    } testparams_##_name[] = {__VA_ARGS__}
+
+#define TEST_LOG(_fmt, ...)                             \
+    do {                                                \
+        fprintf(stderr, "[" _fmt "] ", __VA_ARGS__);    \
+        fflush(stderr);                                 \
+    } while(0)
+
+#define TEST_FOREACH(_name, _body)                                      \
+    do {                                                                \
+        const struct testparams_##_name *_name = testparams_##_name;    \
+        for (; _name < testparams_##_name +                             \
+                 sizeof(testparams_##_name) / sizeof(*testparams_##_name); \
+             _name++) {                                                 \
+            _body;                                                      \
+        }                                                               \
+    } while(0)
+    
+
 
 #ifdef __cplusplus
 }
