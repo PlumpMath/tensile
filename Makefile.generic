@@ -18,10 +18,18 @@ ETAGS = etags
 CTANGLE = ctangle -b
 CWEAVE = cweave -b -x
 
+TARGET_ARCH_SYMBOL := $(subst :,_,$(subst .,_,$(subst -,_,$(subst +,_,$(TARGET_ARCH)))))
+TARGET_OS_SYMBOL := $(subst :,_,$(subst .,_,$(subst -,_,$(subst +,_,$(TARGET_OS)))))
+
 CFLAGS = -gdwarf-4 -g3 -fstack-protector -W -Wall -Werror -Wmissing-declarations -Wformat=2 -Winit-self -Wuninitialized \
 	-Wsuggest-attribute=pure -Wsuggest-attribute=const -Wconversion -Wstack-protector -Wpointer-arith -Wwrite-strings \
 	-Wmissing-format-attribute
 CPPFLAGS = -I../.. -DTARGET_ARCH=\"$(TARGET_ARCH)\" -DTARGET_OS=\"$(TARGET_OS)\" -DTARGET_VARIANT=\"$(TARGET_VARIANT)\"
+CPPFLAGS += -DTARGET_ARCH_IS_$(TARGET_ARCH_SYMBOL)=1 -DTARGET_OS_IS_$(TARGET_OS_SYMBOL)=1
+ifneq ($(TARGET_VARIANT),)
+CPPFLAGS += -DTARGET_VARIANT_IS_$(TARGET_VARIANT)=1
+endif
+
 LDFLAGS = -Wl,-export-dynamic
 LDLIBS = -lm -lfl -lunistring -ltre
 MFLAGS = -MM -MT $(<:.c=.o)

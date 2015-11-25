@@ -84,6 +84,7 @@ extern "C"
   }
 #endif  
 @
+
 @<Single allocator@>=
 #if NEED_SINGLE_ALLOCATOR
   @<Single allocator setup@>@;  
@@ -105,9 +106,11 @@ extern "C"
 #define FREE_TYPE MAKE_EXP_NAME(free, THE_TYPE)
 #define COPY_TYPE MAKE_EXP_NAME(copy, THE_TYPE)
 @
+
 @<Single allocator declarations@>=
   THE_SCOPE THE_TYPE *NEW_TYPE(ALLOC_ARGS);
 @
+
 @<Single allocator definitions@>=
   @<Single allocation tracker@>@;
   
