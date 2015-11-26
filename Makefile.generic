@@ -17,6 +17,8 @@ FLEX = flex
 ETAGS = etags 
 CTANGLE = ctangle -b
 CWEAVE = cweave -b -x
+NM = nm
+AWK = gawk
 
 TARGET_ARCH_SYMBOL := $(subst :,_,$(subst .,_,$(subst -,_,$(subst +,_,$(TARGET_ARCH)))))
 TARGET_OS_SYMBOL := $(subst :,_,$(subst .,_,$(subst -,_,$(subst +,_,$(TARGET_OS)))))
@@ -77,7 +79,7 @@ lex.yy.o lex.yy.d : lex.yy.c tensile.tab.h
 tests/% : CPPFLAGS += -I.
 tests/% : CFLAGS += --coverage
 
-% : %_ts.o
+% : %_ts.o %_ts_all.o testengine.o 
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS)
 
 tests/%_ts.c : %.c
@@ -85,6 +87,9 @@ tests/%_ts.c : %.c
 
 tests/%_ts.c : %.h
 	touch $@
+
+%_ts_all.c : %_ts.o ./extract_tests.awk
+	$(NM) -g $< | $(AWK) -f ./extract_tests.awk >$@
 
 ifneq ($(MAKECMDGOALS),clean)
 Makefile : $(GENERATED_FILES)

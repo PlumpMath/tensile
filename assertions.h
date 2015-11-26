@@ -38,7 +38,7 @@ extern "C"
 #if !NONFATAL_ASSERTIONS
 #define ASSERT_FAIL abort()
 #else
-static unsigned assert_failure_count;
+extern unsigned assert_failure_count;
 #define ASSERT_FAIL (assert_failure_count++)
 #endif
 
@@ -174,79 +174,29 @@ static unsigned assert_failure_count;
         srand(seed);                                    \
     } while(0)
 
-#ifndef TESTSUITE
-#error "No testsuite name"
-#endif
+#define TESTSUITE(_description)                 \
+    const char testsuite_descr[] = _description
 
-typedef struct testcase_t {
-    const char *descr;
-    void (*action)(void);
-} testcase_t;
+#define TESTCASE(_name, _description, _body)                \
+    extern void testcase_##_name(void);                     \
+    const char testcase_##_name##_descr[] = _descripion;    \
+    void testcase_##_name(void) \
+    {                           \
+        _body;                  \
+    }                           \
+    struct fake
 
-
-static testcase_t test_cases[];
-int main(void)
-{
-    unsigned i;
-    
-    SET_RANDOM_SEED();
-    fprintf(stderr, "%s:\n", TESTSUITE);
-    for (i = 0; test_cases[i].action != NULL; i++)
-    {
-#if NONFATAL_ASSERTIONS
-        unsigned current_failure_count = assert_failure_count;
-#endif
-        fprintf(stderr, "%s... ", test_cases[i].descr);
-        fflush(stderr);
-        test_cases[i].action();
-#if NONFATAL_ASSERTIONS
-        fputs(current_failure_count < assert_failure_count ?
-              "FAIL\n" : "OK\n", stderr);
-#else        
-        fputs("OK\n", stderr);
-#endif        
-    }
-#if NONFATAL_ASSERTIONS
-    if (assert_failure_count > 0)
-    {
-        fprintf(stderr, "%u assertions FAILED\n", assert_failure_count);
-        return 1;
-    }
-#endif
-    return 0;
-}
-
-#define TEST_BODY(_name, _body)                 \
-    static void testcase_##_name(void)          \
-    {                                           \
-        _body;                                  \
-    }                                           \
-    
-#define TESTCASE(_name, _descr) {_descr, testcase_##_name}
-
-#define TESTCASES(...)                          \
-    static testcase_t test_cases[] = {          \
-        __VA_ARGS__                             \
-        {NULL, NULL}                            \
-    }
-
-#define TEST_PARAMS(_name, _vars, ...)          \
-    static struct testparams_##_name {          \
-        _vars;                                  \
-    } testparams_##_name[] = {__VA_ARGS__}
-
-#define TEST_LOG(_fmt, ...)                             \
-    do {                                                \
-        fprintf(stderr, "[" _fmt "] ", __VA_ARGS__);    \
-        fflush(stderr);                                 \
-    } while(0)
-
-#define TEST_FOREACH(_name, _body)                                      \
+#define TEST_FOREACH(_name, _vars, _log, _body, ...)                    \
     do {                                                                \
-        const struct testparams_##_name *_name = testparams_##_name;    \
-        for (; _name < testparams_##_name +                             \
-                 sizeof(testparams_##_name) / sizeof(*testparams_##_name); \
+        const struct _name##_params {                                   \
+            _vars;                                                      \
+        } _name##_values[] = {__VA_ARGS__};                             \
+        const struct _name##_params *_name = _name##_values;            \
+                                                                        \
+        for (; _name < _name##_values +                                 \
+                 sizeof(_name##_values) / sizeof(*_name##_values);      \
              _name++) {                                                 \
+            _log
             _body;                                                      \
         }                                                               \
     } while(0)
