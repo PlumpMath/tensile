@@ -22,30 +22,44 @@
 
 #include "assertions.h"
 
+#if NONFATAL_ASSERTIONS
+unsigned assert_failure_count = 0;
+#endif
+
 extern const char testsuite_descr[];
 extern void run_tests(void);
 
+#if NONFATAL_ASSERTIONS
+static unsigned current_failure_count = 0;
+#endif
+
+extern void do_start_test(const char *descr);
+void do_start_test(const char *descr)
+{
+#if NONFATAL_ASSERTIONS
+    current_failure_count = assert_failure_count;
+#endif
+    fprintf(stderr, "%s... ", descr);
+    fflush(stderr);
+}
+
+extern void do_end_test(void);
+void do_end_test(void)
+{
+#if NONFATAL_ASSERTIONS
+    fputs(current_failure_count < assert_failure_count ?
+          "FAIL\n" : "OK\n", stderr);
+#else        
+    fputs("OK\n", stderr);
+#endif
+}
+
 int main(void)
 {
-    unsigned i;
-    
     SET_RANDOM_SEED();
-    fprintf(stderr, "%s:\n", TESTSUITE);
-    for (i = 0; test_cases[i].action != NULL; i++)
-    {
-#if NONFATAL_ASSERTIONS
-        unsigned current_failure_count = assert_failure_count;
-#endif
-        fprintf(stderr, "%s... ", test_cases[i].descr);
-        fflush(stderr);
-        test_cases[i].action();
-#if NONFATAL_ASSERTIONS
-        fputs(current_failure_count < assert_failure_count ?
-              "FAIL\n" : "OK\n", stderr);
-#else        
-        fputs("OK\n", stderr);
-#endif        
-    }
+    fprintf(stderr, "%s:\n", testsuite_descr);
+    run_tests();
+
 #if NONFATAL_ASSERTIONS
     if (assert_failure_count > 0)
     {

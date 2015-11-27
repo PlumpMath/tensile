@@ -39,12 +39,11 @@ extern "C"
 @
 @(tests/support_ts.c@>=
 #include "support.h"
-#define TESTSUITE "Support utiltities"
 #include "assertions.h"
 
-  @<Test bodies@>@;  
+  TESTSUITE("Support utiltities");
   
-  TESTCASES(@<Test names@>);
+  @<Test cases@>@;  
 @
 @<Compiler attributes@>=
   @<Memory-related attributes@>@;
@@ -247,24 +246,26 @@ static inline unsigned count_leading_zeroes(size_t i)
 #endif
 
 @
-@<Test bodies@>=
-  TEST_PARAMS(clz, size_t val; unsigned expected,
-              {0u, sizeof(size_t) * CHAR_BIT},            
-              {1u, sizeof(size_t) * CHAR_BIT - 1},
-              {0x12340u, sizeof(size_t) * CHAR_BIT - 17},
-              {UINT_MAX, (sizeof(size_t) - sizeof(unsigned)) * CHAR_BIT},
-              {SIZE_MAX, 0},
-              {SIZE_MAX >> 1, 1},
-              {SIZE_MAX >> 2, 2});
-  TEST_BODY(count_leading_zeroes,
-            TEST_FOREACH(clz, 
-                         TEST_LOG("%zx", clz->val);
-                         ASSERT_EQ(bits,
-                                   count_leading_zeroes(clz->val),
-                                   clz->expected)));
-@
-@<Test names@>=
-  TESTCASE(count_leading_zeroes, "Count leading zeroes"),
+@<Test cases@>=
+  TESTCASE(count_leading_zeroes, "Count leading zeroes",
+  {
+      TEST_FOREACH(clz,
+                   size_t val;
+                   unsigned expected,
+                   {
+                       TEST_LOG("%zx", clz->val);
+                       ASSERT_EQ(bits,
+                                 count_leading_zeroes(clz->val),
+                                 clz->expected);
+                   },
+                   {0u, sizeof(size_t) * CHAR_BIT},            
+                   {1u, sizeof(size_t) * CHAR_BIT - 1},
+                   {0x12340u, sizeof(size_t) * CHAR_BIT - 17},
+                   {UINT_MAX, (sizeof(size_t) - sizeof(unsigned)) * CHAR_BIT},
+                   {SIZE_MAX, 0},
+                   {SIZE_MAX >> 1, 1},
+                   {SIZE_MAX >> 2, 2});
+  });
 @
 @<Miscellanea@>=
 /* Make a prefix-qualified name */

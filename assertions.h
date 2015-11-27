@@ -179,14 +179,17 @@ extern unsigned assert_failure_count;
 
 #define TESTCASE(_name, _description, _body)                \
     extern void testcase_##_name(void);                     \
-    const char testcase_##_name##_descr[] = _descripion;    \
+    const char testcase_##_name##_descr[] = _description;   \
     void testcase_##_name(void) \
     {                           \
         _body;                  \
     }                           \
     struct fake
 
-#define TEST_FOREACH(_name, _vars, _log, _body, ...)                    \
+#define TEST_LOG(_fmt, ...)                         \
+    fprintf(stderr, "[" _fmt "] ", __VA_ARGS__)
+
+#define TEST_FOREACH(_name, _vars, _body, ...)                          \
     do {                                                                \
         const struct _name##_params {                                   \
             _vars;                                                      \
@@ -196,7 +199,6 @@ extern unsigned assert_failure_count;
         for (; _name < _name##_values +                                 \
                  sizeof(_name##_values) / sizeof(*_name##_values);      \
              _name++) {                                                 \
-            _log
             _body;                                                      \
         }                                                               \
     } while(0)

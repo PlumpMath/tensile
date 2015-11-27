@@ -16,30 +16,25 @@
 
 @
 @c
-/* Note: this file is intended to be included multiple times, so no guard */
+@
+@(allocator_api.h@>=      
+#ifndef ALLOCATOR_API_H
+#define ALLOCATOR_API_H  
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
-#include <assert.h>
-#include <limits.h>
 #include "support.h"
 
-#if !defined(ALLOCATOR_H)
-#define ALLOCATOR_H 1
-@<Shared allocator code@>@;
-#endif
-
-@<General Setup@>@;
-@<Single allocator@>@;
+@<Plain allocator@>@;
+@<Refcnt allocator@>@;
 @<Array allocator@>@;
-
 
 #ifdef __cplusplus
 }
 #endif
-
+#endif
 @ Test
 @(tests/allocator.c@>=
 #define TESTSUITE "Allocator routines"  
