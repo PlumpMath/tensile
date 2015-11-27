@@ -16,8 +16,14 @@
 
 @
 @c
+#include "allocator_api.h"
+
+@<Shared code@>@;             
+@<Plain allocator@>@;
+@<Refcnt allocator@>@;
+@<Array allocator@>@;
 @
-@(allocator_api.h@>=      
+@(allocator_api.h@>=
 #ifndef ALLOCATOR_API_H
 #define ALLOCATOR_API_H  
 #ifdef __cplusplus
@@ -27,43 +33,27 @@ extern "C"
 
 #include "support.h"
 
-@<Plain allocator@>@;
-@<Refcnt allocator@>@;
-@<Array allocator@>@;
+@<Common declarations@>@;
+@<Plain allocator declarations@>@;
+@<Refcnt allocator declarations@>@;
+@<Array allocator declarations@>@;
 
 #ifdef __cplusplus
 }
 #endif
 #endif
 @ Test
-@(tests/allocator.c@>=
-#define TESTSUITE "Allocator routines"  
+@(tests/allocator_ts.c@>=
 #include "assertions.h"
+#include "allocator.c"
 
   @<Test declarations@>@;
-  
-  TESTCASES(@<Test names@>)@;
+  @<Test cases@>@;
+@
+@<Common declarations@>=
+  typedef struct freelist_t freelist_t;  
 @
 
-@<General Setup@>=
-#if !NEED_SINGLE_ALLOCATOR && !NEED_ARRAY_ALLOCATOR
-#error "No allocator requested"
-#endif  
-#ifndef THE_TYPE
-#error "THE_TYPE is not defined"
-#endif
-#ifndef THE_SCOPE
-#define THE_SCOPE extern
-#endif
-#undef THE_DEFN_SCOPE  
-#define THE_DEFN_SCOPE DEFN_SCOPE(THE_SCOPE)
-#ifndef TYPE_UNSHARE
-#define TYPE_UNSHARE(_var) /* nothing */
-#endif
-#ifndef TYPE_CLEANUP
-#define TYPE_CLEANUP(_var) /* nothing */
-#endif
-@
 @<Shared allocator code@>=
 #if IMPLEMENT_ALLOCATOR  
   typedef struct freelist_t {
