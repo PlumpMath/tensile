@@ -16,10 +16,12 @@ RM = rm -f
 BISON = bison -d
 FLEX = flex
 ETAGS = etags 
-CTANGLE = ctangle -b
-CWEAVE = cweave -b -x
 NM = nm
 AWK = gawk
+
+TANGLE = $(AWK) -f $(TOPDIR)/tangle.awk
+WEAVE =  $(AWK) -f $(TOPDIR)/weave.awk
+
 
 TARGET_ARCH_SYMBOL := $(subst :,_,$(subst .,_,$(subst -,_,$(subst +,_,$(TARGET_ARCH)))))
 TARGET_OS_SYMBOL := $(subst :,_,$(subst .,_,$(subst -,_,$(subst +,_,$(TARGET_OS)))))
@@ -73,10 +75,16 @@ lex.yy.o lex.yy.d : lex.yy.c tensile.tab.h
 	$(BISON) $<
 
 %.tab.h : %.tab.c
-	;
+	true
 
-%.h : %.w
-	$(CTANGLE) $< - $@
+%.h : %.w $(TOPDIR)/tangle.awk
+	$(AWK) -f $(filter %.awk,$^) $< >$@
+
+%.c : %.w $(TOPDIR)/tangle.awk
+	$(AWK) -f $(filter %.awk,$^) $< >$@
+
+%.md : %.w $(TOPDIR)/weave.awk
+	$(AWK) -f $(filter %.awk,$^) $< >$@
 
 tests/% : CPPFLAGS += -I.
 tests/% : CFLAGS += --coverage
@@ -85,13 +93,13 @@ tests/% : CFLAGS += --coverage
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS)
 
 tests/%_ts.c : %.c
-	;
+	true
 
 tests/%_ts.c : %.h
-	;
+	true
 
 %_api.h : %.c
-	;
+	true
 
 %_ts_all.c : %_ts.o $(TOPDIR)/extract_tests.awk
 	$(NM) -g $< | $(AWK) -f $(TOPDIR)/extract_tests.awk >$@
@@ -111,16 +119,7 @@ check : $(addprefix tests/,$(TESTABLES))
 	done
 
 .PHONY : doc
-doc : manual.tex
-
-manual.w : prologue.tex $(LP_SOURCES) $(LP_HEADERS) epilogue.tex
-	cat $< >$@
-	for f in $(filter %.w,$^); do   \
-		 echo "@i $$f" >>$@; \
-	done
-	echo "@" >>$@
-	cat $(lastword $^) >>$@
-	echo "@" >>$@
+doc : $(LP_SOURCES:.w=.md) $(LP_HEADERS:.w=.md)
 
 TAGS : $(LP_SOURCES:.w=.c) $(LP_HEADERS:.w=.h)
 	$(ETAGS) $^

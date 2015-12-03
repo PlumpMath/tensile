@@ -1,21 +1,21 @@
-% Copyright (c) 2015  Artem V. Andreev
-% This file is free software; you can redistribute it and/or modify
-% it under the terms of the GNU General Public License as published by
-% the Free Software Foundation; either version 3, or (at your option)
-% any later version.
-%
-% This file is distributed in the hope that it will be useful,
-% but WITHOUT ANY WARRANTY; without even the implied warranty of
-% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-% GNU General Public License for more details.
-%
-% You should have received a copy of the GNU General Public License
-% along with this program; see the file COPYING.  If not, write to
-% the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
-% Boston, MA 02110-1301, USA.
-%
-@
-@c
+/*@<.@>=*/
+/*
+  Copyright (c) 2015  Artem V. Andreev
+  This file is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 3, or (at your option)
+  any later version.
+  
+  This file is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+  
+  You should have received a copy of the GNU General Public License
+  along with this program; see the file COPYING.  If not, write to
+  the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+  Boston, MA 02110-1301, USA.
+*/
 #ifndef SUPPORT_H
 #define SUPPORT_H 1
 
@@ -28,31 +28,33 @@ extern "C"
 #include <limits.h>
 #include <inttypes.h>
 
-@<Compiler attributes@>@;
-@<Bit counting@>@;
-@<Miscellanea@>@;
+/*@<Compiler attributes@>*/
+/*@<Bit counting@>*/
+/*@<Miscellanea@>*/
 
 #ifdef __cplusplus
 }
 #endif
 #endif
-@
-@(tests/support_ts.c@>=
+/*@ */
+/*@<tests/support_ts.c@>=*/
 #include "support.h"
 #include "assertions.h"
 
-  TESTSUITE("Support utiltities");
-  
-  @<Test cases@>@;  
-@
-@<Compiler attributes@>=
-  @<Memory-related attributes@>@;
-  @<Side effect attributes@>@;
-  @<Sanity check attributes@>@;
-  @<Linking attributes@>@;
-  @<Usage hints@>@;
-@
-@<Memory-related attributes@>=
+TESTSUITE("Support utiltities");
+
+/*@<Test cases@>*/
+
+/*@ */
+/*@<Compiler attributes@>=*/
+/*@<Memory-related attributes@>*/
+/*@<Side effect attributes@>*/
+/*@<Sanity check attributes@>*/
+/*@<Linking attributes@>*/
+/*@<Usage hints@>*/
+
+/*@ */
+/*@<Memory-related attributes@>=*/
 /* Indicates that the function returns a pointer to unaliased uninitalized memory */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96)
 #define ATTR_MALLOC __attribute__((__malloc__))
@@ -81,8 +83,8 @@ extern "C"
 #define ATTR_ALLOC_SIZE2(x,y)
 #endif
   
-@  
-@<Side effect attributes@>=
+/*@ */
+/*@<Side effect attributes@>=*/
 /* Indicates that the function has no side effects */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96)
 #define ATTR_PURE __attribute__((__pure__))
@@ -99,9 +101,9 @@ extern "C"
 #else 
 #define ATTR_CONST
 #endif
-  
-@  
-@<Sanity check attributes@>=
+
+/*@ */
+/*@<Sanity check attributes@>=*/
 /* Indicates that a vararg function shall have NULL at the end of varargs */  
 #if __GNUC__ >= 4
 #define ATTR_SENTINEL  __attribute__((__sentinel__))
@@ -157,8 +159,8 @@ extern "C"
 /* Indicates that the first argument is never |NULL| */
 #define ATTR_NONNULL_1ST ATTR_NONNULL_ARGS((1))
 
-@  
-@<Return value attributes@>=  
+/*@ */    
+/*@<Return value attributes@>=*/
 
 /* Indicates that a function returns a non-|NULL| pointer */ 
 #if     (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9)
@@ -181,10 +183,9 @@ extern "C"
 #else
 #define ATTR_WARN_UNUSED_RESULT
 #endif
-  
-  
-@  
-@<Linking attributes@>=
+
+/*@ */
+/*@<Linking attributes@>=*/
 /* Marks the symbol as weak, that is a library symbol that can be
  * overriden in the application code 
  */
@@ -201,9 +202,9 @@ extern "C"
 #else
 #define ATTR_VISIBILITY(_scope)
 #endif
-  
-@
-@<Usage hints@>=
+
+/*@ */
+/*@<Usage hints@>=*/
 /* Indicates that an object may remain unused */  
 #if     __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
 #define ATTR_UNUSED __attribute__((__unused__))
@@ -217,9 +218,9 @@ extern "C"
 #else
 #define ATTR_DEPRECATED
 #endif
-  
-@
-@<Bit counting@>=
+
+/*@ */
+/*@<Bit counting@>=*/
 
 #if __GNUC__ >= 4
 static inline unsigned count_leading_zeroes(size_t i)
@@ -245,34 +246,35 @@ static inline unsigned count_leading_zeroes(size_t i)
 }
 #endif
 
-@
-@<Test cases@>=
-  TESTCASE(count_leading_zeroes, "Count leading zeroes",
-  {
-      TEST_FOREACH(clz,
-                   size_t val;
-                   unsigned expected,
-                   {
-                       TEST_LOG("%zx", clz->val);
-                       ASSERT_EQ(bits,
-                                 count_leading_zeroes(clz->val),
-                                 clz->expected);
-                   },
-                   {0u, sizeof(size_t) * CHAR_BIT},            
-                   {1u, sizeof(size_t) * CHAR_BIT - 1},
-                   {0x12340u, sizeof(size_t) * CHAR_BIT - 17},
-                   {UINT_MAX, (sizeof(size_t) - sizeof(unsigned)) * CHAR_BIT},
-                   {SIZE_MAX, 0},
-                   {SIZE_MAX >> 1, 1},
-                   {SIZE_MAX >> 2, 2});
-  });
-@
-@<Miscellanea@>=
+/*@ */
+/*@<Test cases@>=*/
+TESTCASE(count_leading_zeroes, "Count leading zeroes")
+{
+    TEST_FOREACH(clz,
+                 size_t val;
+                 unsigned expected,
+                 {
+                     TEST_LOG("%zx", clz->val);
+                     ASSERT_EQ(bits,
+                               count_leading_zeroes(clz->val),
+                               clz->expected);
+                 },
+                 {0u, sizeof(size_t) * CHAR_BIT},            
+                 {1u, sizeof(size_t) * CHAR_BIT - 1},
+                 {0x12340u, sizeof(size_t) * CHAR_BIT - 17},
+                 {UINT_MAX, (sizeof(size_t) - sizeof(unsigned)) * CHAR_BIT},
+                 {SIZE_MAX, 0},
+                 {SIZE_MAX >> 1, 1},
+                 {SIZE_MAX >> 2, 2});
+}
+
+/*@ */
+/*@<Miscellanea@>=*/
 /* Make a prefix-qualified name */
-#define MAKE_NAME(_prefix, _name) _prefix##_##_name
-#define MAKE_EXP_NAME(_prefix, _name) MAKE_NAME(_prefix, _name)
+#define QNAME(_prefix, _name) _prefix##_##_name
+#define QXNAME(_prefix, _name) MAKE_NAME(_prefix, _name)
 
 #define DEFN_SCOPE_extern
 #define DEFN_SCOPE_static static
 #define DEFN_SCOPE(_declscope) MAKE_NAME(DEFN_SCOPE, _declscope)  
-@
+

@@ -177,14 +177,11 @@ extern unsigned assert_failure_count;
 #define TESTSUITE(_description)                 \
     const char testsuite_descr[] = _description
 
-#define TESTCASE(_name, _description, _body)                \
+#define TESTCASE(_name, _description)                       \
     extern void testcase_##_name(void);                     \
     const char testcase_##_name##_descr[] = _description;   \
-    void testcase_##_name(void) \
-    {                           \
-        _body;                  \
-    }                           \
-    struct fake
+    void testcase_##_name(void)
+
 
 #define TEST_LOG(_fmt, ...)                         \
     fprintf(stderr, "[" _fmt "] ", __VA_ARGS__)
