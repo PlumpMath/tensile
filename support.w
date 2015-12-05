@@ -271,8 +271,8 @@ TESTCASE(count_leading_zeroes, "Count leading zeroes")
 /*@ */
 /*@<Miscellanea@>=*/
 /* Make a prefix-qualified name */
-#define QNAME(_prefix, _name) _prefix##_##_name
-#define QXNAME(_prefix, _name) MAKE_NAME(_prefix, _name)
+#define _QNAME(_prefix, _name) _prefix##_##_name
+#define QNAME(_prefix, _name) _QNAME(_prefix, _name)
 
 #define DEFN_SCOPE_extern
 #define DEFN_SCOPE_static static

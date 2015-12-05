@@ -81,7 +81,7 @@ static inline void *frlmalloc(size_t sz)
 /*@<Plain allocator declarations@>=*/
 /*@? CONSTRUCTOR_ARGS void */
 THE_SCOPE ATTR_RETURNS_NONNULL ATTR_NONNULL_1ST ATTR_WARN_UNUSED_RESULT
-THE_TYPE *QXNAME(new, THE_TYPE) (CONSTRUCTOR_ARGS);
+THE_TYPE *QNAME(new, THE_TYPE) (CONSTRUCTOR_ARGS);
 
 /*@<Test declarations@>=*/
 enum object_state {
@@ -103,57 +103,57 @@ typedef struct simple_type {
 #include "allocator.h"
 
 /*@<Plain allocator@>=*/
-static free_list_t *QXNAME(THE_TYPE, free_list);
+static free_list_t *QNAME(THE_TYPE, free_list);
 #if TRACK_ALLOCATOR
-static unsigned QXNAME(THE_TYPE, track_alloc);
+static unsigned QNAME(THE_TYPE, track_alloc);
 #endif
 
 ATTR_MALLOC ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT
-static THE_TYPE *QXNAME(alloc, THE_TYPE)(void)
+static THE_TYPE *QNAME(alloc, THE_TYPE)(void)
 {
     THE_TYPE *obj;
     
-    if (QXNAME(THE_TYPE, free_list) == NULL)
+    if (QNAME(THE_TYPE, free_list) == NULL)
     {
         obj = frmalloc(sizeof(THE_TYPE));
     }
     else
     {
-        obj = QXNAME(THE_TYPE, free_list);
-        QXNAME(THE_TYPE, free_list) = QXNAME(THE_TYPE, free_list)->chain;
+        obj = QNAME(THE_TYPE, free_list);
+        QNAME(THE_TYPE, free_list) = QNAME(THE_TYPE, free_list)->chain;
     }
 #if TRACK_ALLOCATOR
-    QXNAME(THE_TYPE, track_alloc)++;
+    QNAME(THE_TYPE, track_alloc)++;
 #endif        
     return obj;
 }
 
 /*@? TYPE_INIT(_var) ((void)0) */
-DEFN_SCOPE(THE_SCOPE) THE_TYPE *QXNAME(new, THE_TYPE)(CONSTRUCTOR_ARGS)
+DEFN_SCOPE(THE_SCOPE) THE_TYPE *QNAME(new, THE_TYPE)(CONSTRUCTOR_ARGS)
 {
-    THE_TYPE *_obj = QXNAME(alloc, THE_TYPE);
+    THE_TYPE *_obj = QNAME(alloc, THE_TYPE);
     TYPE_INIT(_obj);
     return _obj;
 }
 
 /*@<Plain allocator declarations@>+=*/
-THE_SCOPE void QXNAME(free, THE_TYPE)(THE_TYPE *obj);
+THE_SCOPE void QNAME(free, THE_TYPE)(THE_TYPE *obj);
     
 /*@<Plain allocator@>+=*/
 
 /*@? FINI_GUARD(_obj)((void)0) */                                     
 /*@? TYPE_FINI(_obj) ((void)0) */
-DEFN_SCOPE(THE_SCOPE) void QXNAME(free, THE_TYPE)(THE_TYPE *_obj)
+DEFN_SCOPE(THE_SCOPE) void QNAME(free, THE_TYPE)(THE_TYPE *_obj)
 {
     if (_obj == NULL)
         return;
     FINI_GUARD(_obj);
     TYPE_FINI(_obj);
-    ((free_list_t *)_obj)->chain = QXNAME(THE_TYPE, free_list);
-    QXNAME(THE_TYPE, free_list) = (free_list_t *)_obj;
+    ((free_list_t *)_obj)->chain = QNAME(THE_TYPE, free_list);
+    QNAME(THE_TYPE, free_list) = (free_list_t *)_obj;
 #if TRACK_ALLOCATOR
-    assert(QXNAME(THE_TYPE, track_alloc) > 0);
-    QXNAME(THE_TYPE, track_alloc)--;
+    assert(QNAME(THE_TYPE, track_alloc) > 0);
+    QNAME(THE_TYPE, track_alloc)--;
 #endif
 }
 
@@ -251,17 +251,17 @@ TESTCASE(alloc_small, "Allocate and free a small object")
 
 /*@<Plain allocator declarations@>+=*/
 
-THE_SCOPE THE_TYPE *QXNAME(copy, THE_TYPE)(const THE_TYPE *obj);
+THE_SCOPE THE_TYPE *QNAME(copy, THE_TYPE)(const THE_TYPE *obj);
 
 /*@<Plain allocator@>+=*/
 
-THE_TYPE *QXNAME(copy, THE_TYPE)(const THE_TYPE *_obj)
+THE_TYPE *QNAME(copy, THE_TYPE)(const THE_TYPE *_obj)
 {
     if (_obj == NULL)
         return NULL;
     else
     {
-        THE_TYPE *_new = QXNAME(alloc, THE_TYPE)();
+        THE_TYPE *_new = QNAME(alloc, THE_TYPE)();
         
         memcpy(_new, _obj, sizeof(*_obj));
         TYPE_UNSHARE(_new);
