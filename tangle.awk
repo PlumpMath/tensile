@@ -41,7 +41,7 @@ function dump_chunk(contents, dest,  lines, i, n, subname) {
             subname = lines[i];
             sub(/^\s*\/\*@</, "", subname);
             sub(/@>\*\/\s*\\?$/, "", subname);
-            if (subname == ".")
+            if (subname == "*")
             {
                 print "Recursively referencing a top-level section" >"/dev/stderr";
                 exit 1
@@ -60,6 +60,7 @@ function dump_chunk(contents, dest,  lines, i, n, subname) {
 
 
 BEGIN {
+    toplevel_code = 1;
 }
 
 /^\s*\/\*@<.*@>\+?=\*\/\s*$/ {
@@ -72,7 +73,8 @@ BEGIN {
     sub(/@>\+?=\*\/\s*$/, "");
     current_chunk = find_chunk($0, def);
     CHUNKS[current_chunk] = "#line " (FNR + 1) " \"" FILENAME "\"\n"
-    is_macro_chunk = 0;    
+    is_macro_chunk = 0;
+    toplevel_code = 0;
     next
 }
 
@@ -88,6 +90,7 @@ BEGIN {
     CHUNKS[current_chunk] = "#line " (FNR + 1) " \"" FILENAME "\"\n"    
     CHUNKS[current_chunk] = CHUNKS[current_chunk] "#define " id " "
     is_macro_chunk = 1;
+    toplevel_code = 0;
     next
 }
 
@@ -99,16 +102,21 @@ BEGIN {
     previous_chunk = current_chunk;
     current_chunk = "";
     is_macro_chunk = 0;
+    toplevel_code = 0;
     next
+}
+
+!current_chunk && /\*\// {
+    toplevel_code = 1;
 }
 
 current_chunk && !is_macro_chunk && /^\s*\/\*@!\s*\w+(\([^)]*\))?(\s+.*)?\*\/\s*$/ {
     match($0, /@!\*(\w+(\([^)]*\))?)(\s+(.*))?\*\/\s*$/, parts);
     id = parts[1]
     expansion = parts[4]
-    CHUNKS[current_chunk] = "#line " (FNR + 1) " \"" FILENAME "\"\n"        
+    CHUNKS[current_chunk] = CHUNKS[current_chunk] "#line " (FNR + 1) " \"" FILENAME "\"\n"        
     CHUNKS[current_chunk] = CHUNKS[current_chunk] "#undef " id "\n" "#define " id " " expansion "\n"
-    CHUNKS[current_chunk] = "#line " (FNR + 1) " \"" FILENAME "\"\n"    
+    CHUNKS[current_chunk] = CHUNKS[current_chunk] "#line " (FNR + 1) " \"" FILENAME "\"\n"    
     next
 }
 
@@ -116,22 +124,31 @@ current_chunk && !is_macro_chunk && /^\s*\/\*@\?\s*\w+(\([^)]*\))?(\s+.*)?\*\/\s
     match($0, /@\?\*(\w+(\([^)]*\))?)(\s+(.*))?\*\/\s*$/, parts);
     id = parts[1]
     expansion = parts[4]
-    CHUNKS[current_chunk] = "#line " (FNR + 1) " \"" FILENAME "\"\n"    
+    CHUNKS[current_chunk] = CHUNKS[current_chunk] "#line " (FNR + 1) " \"" FILENAME "\"\n"    
     CHUNKS[current_chunk] = CHUNKS[current_chunk] "#ifndef " id "\n"
     if (expansion)
         CHUNKS[current_chunk] = CHUNKS[current_chunk] "#define " id " " expansion "\n"
     else
         CHUNKS[current_chunk] = CHUNKS[current_chunk] "#error \"" id " is not defined\"\n"
     CHUNKS[current_chunk] = CHUNKS[current_chunk] "#endif\n"
-    CHUNKS[current_chunk] = "#line " (FNR + 1) " \"" FILENAME "\"\n"    
+    CHUNKS[current_chunk] = CHUNKS[current_chunk] "#line " (FNR + 1) " \"" FILENAME "\"\n" 
     next
 }
 
-/\/\*@[fF]\s/ { next }
+/\/\*@[fF]\s/ {
+    if (current_chunk) {
+        CHUNKS[current_chunk] = CHUNKS[current_chunk] "#line " (FNR + 1) " \"" FILENAME "\"\n"
+    }
+    next
+}
 
 
 /\/\*@/ && !/^\s*\/\*@<.*@>\*\/\s*$/ {
-    print "warning: unsupported @-block at", FILENAME ":" FNR
+    print  FILENAME ":" FNR ":", "warning: unsupported @-block"
+}
+
+toplevel_code && !/^\s*(\/\*.*\*\/|\/\/.*|([^*]+|\*[^/])*\*\/)?\s*$/ {
+    print FILENAME ":" FNR ":", "warning: code outside of @-sections is ignored" >"/dev/stderr"
 }
 
 current_chunk {
@@ -146,11 +163,11 @@ END {
     if (current_chunk && is_macro_chunk) {
         sub(/\\\n$/, "\n", CHUNKS[current_chunk]);
     }
-    if (!("." in CHUNKS)) {
+    if (!("*" in CHUNKS)) {
         print "No main chunk defined" >"/dev/stderr"
         exit 1
     }
-    dump_chunk(CHUNKS["."], "/dev/stdout");
+    dump_chunk(CHUNKS["*"], "/dev/stdout");
     for (auxfile in CHUNKS) {
         if (auxfile ~ /\.[a-z]+$/)
         {

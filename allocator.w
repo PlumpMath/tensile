@@ -1,6 +1,4 @@
-/*@<.@>=*/
-/*
-  Copyright (c) 2015  Artem V. Andreev
+/*@* Copyright (c) 2015  Artem V. Andreev
   This file is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation; either version 3, or (at your option)
@@ -16,6 +14,7 @@
   the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
   Boston, MA 02110-1301, USA.
 */
+/*@<*@>=*/
 /* This file is intended to be included multiple times, so no include guard */
 
 #if !NEED_PLAIN_ALLOCATOR && !NEED_ARRAY_ALLOCATOR
@@ -33,12 +32,16 @@
 
 #if IMPLEMENT_ALLOCATOR
 #include "allocator_impl.h"
+#if NEED_PLAIN_ALLOCATOR
 /*@<Plain allocator@>*/
+#endif
+#if NEED_ARRAY_ALLOCATOR
 /*@<Array allocator@>*/
+#endif
 #endif
 
 /*@<allocator_impl.h@>=*/
-#ifndef ALLOCATOR_COMMON_H
+#ifndef ALLOCATOR_IMPL_H
 #define ALLOCATOR_IMPL_H  
 #ifdef __cplusplus
 extern "C"
@@ -70,7 +73,7 @@ typedef struct freelist_t {
     struct freelist_t * chain;
 } freelist_t;
   
-ATTR_MALLOC ATTR_RETURNS_NONNULL
+MALLOC_LIKE RETURNS_NONNULL
 static inline void *frlmalloc(size_t sz) 
 {
     void *result = malloc(sz > sizeof(freelist_t) ? sz : sizeof(freelist_t));
@@ -80,7 +83,7 @@ static inline void *frlmalloc(size_t sz)
 
 /*@<Plain allocator declarations@>=*/
 /*@? CONSTRUCTOR_ARGS void */
-THE_SCOPE ATTR_RETURNS_NONNULL ATTR_NONNULL_1ST ATTR_WARN_UNUSED_RESULT
+THE_SCOPE RETURNS_NONNULL NONNULL(1) WARN_UNUSED_RESULT
 THE_TYPE *QNAME(new, THE_TYPE) (CONSTRUCTOR_ARGS);
 
 /*@<Test declarations@>=*/
@@ -108,7 +111,7 @@ static free_list_t *QNAME(THE_TYPE, free_list);
 static unsigned QNAME(THE_TYPE, track_alloc);
 #endif
 
-ATTR_MALLOC ATTR_RETURNS_NONNULL ATTR_WARN_UNUSED_RESULT
+MALLOC_LIKE RETURNS_NONNULL WARN_UNUSED_RESULT
 static THE_TYPE *QNAME(alloc, THE_TYPE)(void)
 {
     THE_TYPE *obj;
@@ -271,7 +274,7 @@ THE_TYPE *QNAME(copy, THE_TYPE)(const THE_TYPE *_obj)
 }
 
 /*@<Plain allocator declarations@>+=*/
-extern ATTR_NONNULL_1ST void allocator_prealloc(allocator_t *alloc,
+extern NONNULL(1) void allocator_prealloc(allocator_t *alloc,
                                                 size_t n);
 
 /*@<Plain allocator@>+=*/
@@ -312,7 +315,7 @@ void allocator_prealloc(allocator_t *alloc, size_t n)
         return val;                                                     \
     }                                                                   \
                                                                         \
-    ATTR_NONNULL_1ST                                                    \
+    NONNULL(1)                                                          \
     static inline void assign_##_type(_type **loc, _type *val)          \
     {                                                                   \
         use_##_type(val);                                               \
@@ -337,21 +340,21 @@ void allocator_prealloc(allocator_t *alloc, size_t n)
  */
 #define DECLARE_ARRAY_ALLOCATOR(_scope, _name, _type)                   \
     GENERATED_DECL_##_scope _type *new_##_name(size_t n)                \
-    ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL;                       \
+    WARN_UNUSED_RESULT RETURNS_NONNULL;                                 \
     GENERATED_DECL_##_scope void free_##_name(_type *_obj, size_t n);   \
     GENERATED_DECL_##_scope _type *unshare_##_name(_type *_oldobj,      \
                                                    size_t n)            \
-    ATTR_NONNULL ATTR_RETURNS_NONNULL;                                  \
+    NONNULL_ALL RETURNS_NONNULL;                                        \
     GENERATED_DECL_##_scope _type *copy_##_name(const _type *_oldobj,   \
                                                 size_t n)               \
-    ATTR_NONNULL ATTR_RETURNS_NONNULL;                                  \
+    NONNULL_ALL RETURNS_NONNULL;                                        \
                                                                         \
     GENERATED_DECL_##_scope _type *resize_##_name(_type **arr,          \
                                                   size_t *oldn,         \
                                                   size_t newn)          \
-    ATTR_NONNULL ATTR_WARN_UNUSED_RESULT;                               \
+    NONNULL_ALL WARN_UNUSED_RESULT;                                     \
                                                                         \
-    ATTR_NONNULL ATTR_WARN_UNUSED_RESULT                                \
+    NONNULL WARN_UNUSED_RESULT                                          \
     static inline _type *ensure_##_name##_size(_type **_arr,            \
                                                size_t *oldn,            \
                                                size_t req,              \
@@ -370,7 +373,7 @@ void allocator_prealloc(allocator_t *alloc, size_t n)
 #define DECLARE_ARRAY_ALLOCATOR_REFCNT(_scope, _name, _type)            \
     DECLARE_ARRAY_ALLOCATOR(_scope, _name, _type *);                    \
                                                                         \
-    ATTR_NONNULL_1ST                                                    \
+    NONNULL(1)                                                          \
     static inline void assign_##_name(_type **base, size_t idx, _type *val) \
     {                                                                   \
         assign_##_type(base + idx, val);                                \
@@ -476,7 +479,7 @@ void allocator_prealloc(allocator_t *alloc, size_t n)
     ALLOC_COUNTER(_type);                                               \
     static freelist_t *freelist_##_type;                                \
                                                                         \
-    ATTR_MALLOC ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL            \
+    MALLOC_LIKE ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL            \
     static _type *alloc_##_type(void)                                   \
     {                                                                   \
         _type *_var;                                                    \
