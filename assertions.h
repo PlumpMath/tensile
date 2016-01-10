@@ -38,7 +38,8 @@ extern "C"
 #if !NONFATAL_ASSERTIONS
 #define ASSERT_FAIL abort()
 #else
-extern unsigned assert_failure_count;
+static unsigned assert_failure_count;
+static bool testcase_failed = false;
 #define ASSERT_FAIL (assert_failure_count++)
 #endif
 
@@ -174,32 +175,71 @@ extern unsigned assert_failure_count;
         srand(seed);                                    \
     } while(0)
 
-#define TESTSUITE(_description)                 \
-    const char testsuite_descr[] = _description
-
-#define TESTCASE(_name, _description)                       \
-    extern void testcase_##_name(void);                     \
-    const char testcase_##_name##_descr[] = _description;   \
-    void testcase_##_name(void)
-
-
-#define TEST_LOG(_fmt, ...)                         \
-    fprintf(stderr, "[" _fmt "] ", __VA_ARGS__)
-
-#define TEST_FOREACH(_name, _vars, _body, ...)                          \
-    do {                                                                \
-        const struct _name##_params {                                   \
-            _vars;                                                      \
-        } _name##_values[] = {__VA_ARGS__};                             \
-        const struct _name##_params *_name = _name##_values;            \
-                                                                        \
-        for (; _name < _name##_values +                                 \
-                 sizeof(_name##_values) / sizeof(*_name##_values);      \
-             _name++) {                                                 \
-            _body;                                                      \
-        }                                                               \
+#define TEST_START_MSG(_msg)                    \
+    do {                                        \
+        fputs(_msg, stderr);                    \
+        fputs("...", stderr);                   \
+        fflush(stderr);                         \
     } while(0)
-    
+
+#define TEST_OK_MSG  fputs("OK\n", stderr)
+#define TEST_FAIL_MSG fputs("FAIL\n", stderr)
+
+#if NONFATAL_ASSERTIONS
+#define TEST_START(_msg)                        \
+    do {                                        \
+        TEST_START_MSG(_msg);                   \
+        testcase_failed = false;                \
+    } while(0)
+#define TEST_END                                \
+    do {                                        \
+    if (testcase_failed)                        \
+        TEST_FAIL_MSG;                          \
+    else                                        \
+        TEST_OK_MSG;                            \
+    } while(0)
+#else
+#define TEST_START(_msg) TEST_START_MSG(_msg)
+#define TEST_END TEST_OK_MSG
+#endif
+
+#define TESTVAL_LOG(_id, _type, _val)                               \
+    do {                                                            \
+        fprintf(stderr, " [" #_id "=" TESTVAL_LOG_FMT_##_type "]",  \
+                TESTVAL_LOG_ARGS_##_type(_val));                    \
+        fflush(stderr);                                             \
+    } while(0)
+
+#define TESTVAL_GENERATE_UINT(_type, _max)                      \
+    0, 1, ARBITRARY(_type, 2, (_max) - 2), (_max) - 1, (_max)
+
+#define TESTVAL_GENERATE_SINT(_type, _min, _max)                    \
+    (_min), (_min) + 1, ARBITRARY(_type, (_min) + 2, -2), -1,       \
+        TESTVAL_GENERATE_UINT(_type, _max)
+
+#define TESTVAL_GENERATE_BITSET(_type, _max)    \
+    0, ARBITRARY(_type, 1, (_max) - 1), _max
+
+#define TESTVAL_GENERATE_BITNUM(_type)  0, sizeof(_type) * CHAR_BIT - 1
+
+
+#define TESTVAL_GENERATE__unsigned_char             \
+    TESTVAL_GENERATE_UINT(unsigned char, UCHAR_MAX)
+#define TESTVAL_GENERATE__signed_char                           \
+    TESTVAL_GENERATE_SINT(signed char, SCHAR_MIN, SCHAR_MAX)
+#define TESTVAL_GENERATE__uint8_t               \
+    TESTVAL_GENERATE_UINT(uint8_t, UINT8_MAX)
+#define TESTVAL_GENERATE__int8_t                \
+    TESTVAL_GENERATE_SINT(int8_t, INT8_MIN, INT8_MAX)
+
+#define TESTVAL_GENERATE__unsigned_short                \
+    TESTVAL_GENERATE_UINT(unsigned short, USE__MAX)
+#define TESTVAL_GENERATE__signed_char                           \
+    TESTVAL_GENERATE_SINT(signed char, SCHAR_MIN, SCHAR_MAX)
+#define TESTVAL_GENERATE__uint8_t               \
+    TESTVAL_GENERATE_UINT(uint8_t, UINT8_MAX)
+#define TESTVAL_GENERATE__int8_t                \
+    TESTVAL_GENERATE_SINT(int8_t, INT8_MIN, INT8_MAX)
 
 
 #ifdef __cplusplus
