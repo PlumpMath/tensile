@@ -72,6 +72,7 @@ is { return TOK_ISTYPE; }
 import { return TOK_IMPORT; }
 include { return TOK_INCLUDE; }
 kill { return TOK_KILL; }
+let { return TOK_LET; }
 local { return TOK_LOCAL; }
 me { return TOK_ME; }
 mod { return TOK_MOD; }
@@ -79,6 +80,7 @@ module { return TOK_MODULE; }
 need { return TOK_NEED; }
 null { yylval->value = NULL_VALUE;  return TOK_NULL; }
 partition { return TOK_PARTITION; }
+passive { return TOK_PASSIVE; }
 poll { return TOK_POLL; }
 pragma { return TOK_PRAGMA; }
 private { return TOK_PRIVATE; }
@@ -86,12 +88,14 @@ protected { return TOK_PROTECTED; }
 public { return TOK_PUBLIC; }
 receive { return TOK_RECEIVE; }
 resume { return TOK_RESUME; }
+runtime { return TOK_RUNTIME; }
 suspend { return TOK_SUSPEND; }
 switch { return TOK_SWITCH; }
 then { return TOK_THEN; }
 tracing { return TOK_TRACING; }
 true { return TOK_TRUE; }
 typecase { return TOK_TYPECASE; }
+typeof { return TOK_TYPEOF; }
 watch { return TOK_WATCH; }
 while { return TOK_WHILE; }
 with { return TOK_WITH; }

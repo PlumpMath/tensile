@@ -15,20 +15,13 @@ SED = sed
 RM = rm -f
 BISON = bison -d
 FLEX = flex
-ETAGS = etags 
+ETAGS = etags
 NM = nm
 AWK = gawk
-
-TANGLE = $(AWK) -f $(TOPDIR)/tangle.awk
-WEAVE =  $(AWK) -f $(TOPDIR)/weave.awk
-
 
 TARGET_ARCH_SYMBOL := $(subst :,_,$(subst .,_,$(subst -,_,$(subst +,_,$(TARGET_ARCH)))))
 TARGET_OS_SYMBOL := $(subst :,_,$(subst .,_,$(subst -,_,$(subst +,_,$(TARGET_OS)))))
 
-CFLAGS = -gdwarf-4 -g3 -fstack-protector -W -Wall -Werror -Wmissing-declarations -Wformat=2 -Winit-self -Wuninitialized \
-	-Wsuggest-attribute=pure -Wsuggest-attribute=const -Wconversion -Wstack-protector -Wpointer-arith -Wwrite-strings \
-	-Wmissing-format-attribute
 CPPFLAGS = -I$(TOPDIR) -DTARGET_ARCH=\"$(TARGET_ARCH)\" -DTARGET_OS=\"$(TARGET_OS)\" -DTARGET_VARIANT=\"$(TARGET_VARIANT)\"
 CPPFLAGS += -DTARGET_ARCH_IS_$(TARGET_ARCH_SYMBOL)=1 -DTARGET_OS_IS_$(TARGET_OS_SYMBOL)=1
 ifneq ($(TARGET_VARIANT),)
@@ -42,29 +35,30 @@ MFLAGS = -MM -MT $(<:.c=.o)
 -include $(TOPDIR)/setup/$(TARGET_OS).mk
 -include $(TOPDIR)/setup/$(TARGET_ARCH).mk
 -include $(TOPDIR)/setup/$(TARGET_OS)_$(TARGET_ARCH).mk
+-include $(TOPDIR)/setup/$(TARGET_CC_FAMILY).mk
+-include $(TOPDIR)/setup/$(TARGET_CC_FAMILY)$(TARGET_CC_VERSION).mk
 ifneq ($(TARGET_VARIANT),)
 -include $(TOPDIR)/setup/$(TARGET_VARIANT).mk
 endif
 
+
 .SECONDARY :
 
-LP_SOURCES =
-LP_HEADERS = support.w
+C_SOURCES =
 
-C_SOURCES = $(LP_SOURCES:.w=.c)
-C_SOURCES += tensile.tab.c lex.yy.c
+IMPL_SOURCES = $(C_SOURCES:.c=_impl.c)
+IMPL_SOURCES += tensile.tab.c lex.yy.c
 
-GENERATED_FILES = $(C_SOURCES) $(LP_HEADERS:.w=.h)
+GENERATED_FILES = $(IMPL_SOURCES) $(C_SOURCES:.c=_api.h)
 
-TESTABLES = support
+TESTABLES =
 
 APPLICATION = tensile
 
 $(APPLICATION) : $(C_SOURCES:.c=.o)
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS)
 
-
-tensile.tab.o lex.yy.o : CFLAGS += -Wno-conversion -Wno-unused-function -Wno-suggest-attribute=pure
+tensile.tab.o lex.yy.o : CFLAGS += $(GENERATED_CFLAGS)
 
 lex.yy.c : tensile.l
 	$(FLEX) $<
@@ -75,15 +69,15 @@ lex.yy.o lex.yy.d : lex.yy.c tensile.tab.h
 	$(BISON) $<
 
 %.tab.h : %.tab.c
-	true
+	;
 
-%.h : %.w $(TOPDIR)/tangle.awk
-	$(AWK) -f $(filter %.awk,$^) $< >$@
+%_api.h : %_impl.c
+	;
 
-%.c : %.w $(TOPDIR)/tangle.awk
-	$(AWK) -f $(filter %.awk,$^) $< >$@
+%_impl.c : %.c $(TOPDIR)/extract_code.awk
+	$(AWK) -f $(filter %.awk,$^) $< $(patsubst %_impl.c,%_api.h,$@) $(patsubst %_impl.c,tests/%_ts.c,$@) >$@
 
-%.md : %.w $(TOPDIR)/weave.awk
+%.md : %.c $(TOPDIR)/extract_doc.awk
 	$(AWK) -f $(filter %.awk,$^) $< >$@
 
 tests/% : CPPFLAGS += -I.
@@ -92,17 +86,8 @@ tests/% : CFLAGS += --coverage
 % : %_ts.o %_ts_all.o testengine.o 
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS)
 
-tests/%_ts.c : %.c
-	true
-
-tests/%_ts.c : %.h
-	true
-
-%_api.h : %.c
-	true
-
-%_ts_all.c : %_ts.o $(TOPDIR)/extract_tests.awk
-	$(NM) -g $< | $(AWK) -f $(TOPDIR)/extract_tests.awk >$@
+tests/%_ts.c : %_impl.c
+	;
 
 ifneq ($(MAKECMDGOALS),clean)
 Makefile : $(GENERATED_FILES)

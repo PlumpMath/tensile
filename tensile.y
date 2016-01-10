@@ -17,6 +17,7 @@
 
 %token TOK_ID
 %token TOK_WILDCARD
+%token TOK_RUNTIME
 
 %token TOK_TRUE
 %token TOK_FALSE
@@ -43,9 +44,9 @@
 %nonassoc TOK_FOREIGN                        
 %nonassoc '='
 %right TOK_THEN                        
-%nonassoc TOK_HOT TOK_COLD TOK_IDLE TOK_GREEDY
+%right TOK_HOT TOK_COLD TOK_IDLE TOK_GREEDY TOK_PASSIVE
 %nonassoc TOK_ELSE
-%right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_TYPECASE TOK_POLL TOK_FREEZE TOK_WATCH TOK_WITH
+%right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_TYPECASE TOK_POLL TOK_FREEZE TOK_WATCH TOK_WITH TOK_LET
 %nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_YIELD TOK_RECEIVE TOK_ERROR TOK_GOTO TOK_ASSERT TOK_NEED
 %right TOK_PUT TOK_PUT_ALL TOK_PUT_NEXT 
 %left TOK_PUT_BACK
@@ -60,7 +61,7 @@
 %left '*' '/' TOK_DIV TOK_MOD TOK_INTERSPERSE TOK_SPLIT
 %left TOK_TYPECAST
 %left '[' 
-%right '!' TOK_TRACING TOK_PEEK TOK_UMINUS
+%right '!' TOK_TRACING TOK_PEEK TOK_UMINUS TOK_TYPEOF
 %left '.'
 %nonassoc TOK_HOOK                        
 %nonassoc TOK_ID 
@@ -166,11 +167,32 @@ importalias:    /*empty*/
         |       TOK_TYPECAST TOK_ID
                 ;
 
-nodedecl:       nodekind TOK_ID '(' nodeargs0 ')' nodedef
+nodedecl:       nodepriority nodedecl1
                 ;
 
-nodekind:     /*empty*/
-        |       TOK_PARTITION
+nodedecl1:      TOK_ID '(' nodeargs0 ')' nodedef
+        |       TOK_PARTITION TOK_ID partition_channels '{' modulecontents '}'
+                ;
+
+
+nodepriority:   /*empty */
+        |       TOK_IDLE
+        |       hot_priority
+        |       cold_priority
+        |       TOK_GREEDY
+        |       TOK_PASSIVE
+        ;
+
+hot_priority:   TOK_HOT
+        |       hot_priority TOK_HOT
+        ;
+
+cold_priority:  TOK_COLD
+        |       cold_priority TOK_COLD
+        ;
+
+partition_channels: '(' idlist ')'
+        |       '(' idlist0 TOK_RULE idlist0 ')'
         ;
 
 nodedef:        instantiate ';'
@@ -259,8 +281,8 @@ expression: literal
         |       TOK_ID '(' exprlist0 ')'
         |       TOK_HOOK TOK_ID
         |       TOK_ME
+        |       TOK_RUNTIME
         |       TOK_QUEUE
-        |       TOK_END
         |       TOK_REGEXP
         |       expression '.' assockey                
         |       expression '[' expression0 ']'
@@ -271,7 +293,8 @@ expression: literal
         |       TOK_TRACING expression
         |       '?' expression  %prec TOK_UMINUS
         |       '&' expression  %prec TOK_UMINUS
-        |       '~' pattern  %prec TOK_UMINUS                
+        |       '~' pattern  %prec TOK_UMINUS
+        |       TOK_TYPEOF expression
         |       '!' expression
         |       TOK_PEEK expression
         |       expression '+' expression 
@@ -331,6 +354,7 @@ expression: literal
         |       TOK_TYPECASE '(' expression ')' '{' generic_alternatives '}' %prec TOK_TYPECASE
         |       TOK_WATCH '(' expression TOK_RULE expression ')' expression %prec TOK_WATCH
         |       TOK_WITH  '(' expression ')' expression %prec TOK_WITH
+        |       TOK_LET '(' bindings ')' expression %prec TOK_LET
         |       TOK_HOT expression
         |       TOK_COLD expression
         |       TOK_IDLE expression
@@ -344,10 +368,15 @@ gotodest:       TOK_ID
         ;
 
 anonymous_node: '@' noderef block local_augments
-        |       '@' noderef '(' exprlist0 ')'
+        |       '@' noderef '(' callexpr ')'
         |       '@' TOK_FOR  '(' bindings ';' expression0 ';' bindings ')' expression %prec TOK_FOR
         |       '@' TOK_FOREACH '(' foreach_spec ')' expression %prec TOK_FOREACH
                 ;
+
+callexpr:       expression
+        |       exprlist ',' expression
+        |       assoclist
+        ;
 
 local_augments: /* empty */
         |       local_augments TOK_AUGMENT TOK_ID nodeargs00 block
@@ -388,6 +417,7 @@ assoc:          assockey TOK_RULE expression
                 ;
 
 assockey:       TOK_ID
+        |       TOK_REGEXP
         |       literal
         ;
 
@@ -449,7 +479,7 @@ typechoice:     typename
 typename:       TOK_ID
         |       TOK_NULL
         |       TOK_END
-        |       '&' expression %prec TOK_UMINUS
+        |       TOK_TYPEOF expression
         ;
 
 pattern:        TOK_ID
@@ -494,6 +524,7 @@ literal:        TOK_STRING
         |       TOK_NULL
         |       TOK_TRUE
         |       TOK_FALSE
+        |       TOK_END
                 ;
 
 %%
