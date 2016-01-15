@@ -2,10 +2,10 @@
 ifeq ($(TOPDIR),)
 $(error No path to the top directory, do not call this makefile directly)
 endif
-ifeq ($(TARGET_ARCH),)
+ifeq ($(PLATFORM_ARCH),)
 $(error Target architecture not defined, please run 'setup.sh')
 endif
-ifeq ($(TARGET_OS),)
+ifeq ($(PLATFORM_OS),)
 $(error Target OS not defined, please run 'setup.sh')
 endif
 
@@ -18,44 +18,47 @@ FLEX = flex
 ETAGS = etags
 NM = nm
 AWK = gawk
+ROBODOC = robodoc
 
-TARGET_ARCH_SYMBOL := $(subst :,_,$(subst .,_,$(subst -,_,$(subst +,_,$(TARGET_ARCH)))))
-TARGET_OS_SYMBOL := $(subst :,_,$(subst .,_,$(subst -,_,$(subst +,_,$(TARGET_OS)))))
+PLATFORM_ARCH_SYMBOL := $(subst :,_,$(subst .,_,$(subst -,_,$(subst +,_,$(PLATFORM_ARCH)))))
+PLATFORM_OS_SYMBOL := $(subst :,_,$(subst .,_,$(subst -,_,$(subst +,_,$(PLATFORM_OS)))))
 
-CPPFLAGS = -I$(TOPDIR) -DTARGET_ARCH=\"$(TARGET_ARCH)\" -DTARGET_OS=\"$(TARGET_OS)\" -DTARGET_VARIANT=\"$(TARGET_VARIANT)\"
-CPPFLAGS += -DTARGET_ARCH_IS_$(TARGET_ARCH_SYMBOL)=1 -DTARGET_OS_IS_$(TARGET_OS_SYMBOL)=1
-ifneq ($(TARGET_VARIANT),)
-CPPFLAGS += -DTARGET_VARIANT_IS_$(TARGET_VARIANT)=1
+CPPFLAGS = -I. -I$(TOPDIR) -DPLATFORM_ARCH=\"$(PLATFORM_ARCH)\" -DPLATFORM_OS=\"$(PLATFORM_OS)\" -DPLATFORM_VARIANT=\"$(PLATFORM_VARIANT)\"
+CPPFLAGS += -DPLATFORM_ARCH_IS_$(PLATFORM_ARCH_SYMBOL)=1 -DPLATFORM_OS_IS_$(PLATFORM_OS_SYMBOL)=1
+ifneq ($(PLATFORM_VARIANT),)
+CPPFLAGS += -DPLATFORM_VARIANT_IS_$(PLATFORM_VARIANT)=1
 endif
+
+TEST_CPPFLAGS = -DTEST_REPEAT_ARBITRARY=2
 
 LDFLAGS = -Wl,-export-dynamic
 LDLIBS = -lm -lfl -lunistring -ltre
 MFLAGS = -MM -MT $(<:.c=.o)
 
--include $(TOPDIR)/setup/$(TARGET_OS).mk
--include $(TOPDIR)/setup/$(TARGET_ARCH).mk
--include $(TOPDIR)/setup/$(TARGET_OS)_$(TARGET_ARCH).mk
--include $(TOPDIR)/setup/$(TARGET_CC_FAMILY).mk
--include $(TOPDIR)/setup/$(TARGET_CC_FAMILY)$(TARGET_CC_VERSION).mk
-ifneq ($(TARGET_VARIANT),)
--include $(TOPDIR)/setup/$(TARGET_VARIANT).mk
+-include $(TOPDIR)/setup/$(PLATFORM_OS).mk
+-include $(TOPDIR)/setup/$(PLATFORM_ARCH).mk
+-include $(TOPDIR)/setup/$(PLATFORM_OS)_$(PLATFORM_ARCH).mk
+-include $(TOPDIR)/setup/$(PLATFORM_CC_FAMILY).mk
+-include $(TOPDIR)/setup/$(PLATFORM_CC_FAMILY)$(PLATFORM_CC_VERSION).mk
+ifneq ($(PLATFORM_VARIANT),)
+-include $(TOPDIR)/setup/$(PLATFORM_VARIANT).mk
 endif
 
 
 .SECONDARY :
 
-C_SOURCES =
+C_SOURCES = bitops.c
 
 IMPL_SOURCES = $(C_SOURCES:.c=_impl.c)
 IMPL_SOURCES += tensile.tab.c lex.yy.c
 
 GENERATED_FILES = $(IMPL_SOURCES) $(C_SOURCES:.c=_api.h)
 
-TESTABLES =
+TESTABLES = bitops
 
 APPLICATION = tensile
 
-$(APPLICATION) : $(C_SOURCES:.c=.o)
+$(APPLICATION) : $(IMPL_SOURCES:.c=.o)
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS)
 
 tensile.tab.o lex.yy.o : CFLAGS += $(GENERATED_CFLAGS)
@@ -68,31 +71,25 @@ lex.yy.o lex.yy.d : lex.yy.c tensile.tab.h
 %.tab.c : %.y
 	$(BISON) $<
 
-%.tab.h : %.tab.c
-	;
+%.tab.h : %.tab.c ;
 
-%_api.h : %_impl.c
-	;
+%_api.h : %_impl.c ;
 
 %_impl.c : %.c $(TOPDIR)/extract_code.awk
 	$(AWK) -f $(filter %.awk,$^) $< $(patsubst %_impl.c,%_api.h,$@) $(patsubst %_impl.c,tests/%_ts.c,$@) >$@
 
-%.md : %.c $(TOPDIR)/extract_doc.awk
-	$(AWK) -f $(filter %.awk,$^) $< >$@
+tests/% : CPPFLAGS += $(TEST_CPPFLAGS)
+tests/% : CFLAGS += $(TEST_CFLAGS)
 
-tests/% : CPPFLAGS += -I.
-tests/% : CFLAGS += --coverage
-
-% : %_ts.o %_ts_all.o testengine.o 
+% : %_ts.o
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS)
 
-tests/%_ts.c : %_impl.c
-	;
+tests/%_ts.c : %_impl.c ;
 
 ifneq ($(MAKECMDGOALS),clean)
 Makefile : $(GENERATED_FILES)
 
-include $(C_SOURCES:.c=.d)
+include $(C_SOURCES:.c=_impl.d)
 include $(patsubst %,tests/%_ts.d,$(TESTABLES))
 endif
 
@@ -104,9 +101,10 @@ check : $(addprefix tests/,$(TESTABLES))
 	done
 
 .PHONY : doc
-doc : $(LP_SOURCES:.w=.md) $(LP_HEADERS:.w=.md)
+doc :
+	cd $(TOPDIR); $(ROBODOC)
 
-TAGS : $(LP_SOURCES:.w=.c) $(LP_HEADERS:.w=.h)
+TAGS : $(C_SOURCES)
 	$(ETAGS) $^
 
 

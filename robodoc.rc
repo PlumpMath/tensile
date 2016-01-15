@@ -1,0 +1,20 @@
+options:
+    --src .
+    --doc ./doc
+    --html
+    --multidoc
+    --index
+    --tabsize 4
+    --nopre
+    --cmode    
+ignore files:
+    .git
+    *~
+    build
+    doc
+    setup
+accept files:
+    *.c
+    *.h
+    *.y
+    *.l

@@ -148,6 +148,7 @@ function dump_public_section(  decl, def) {
     gsub(/ ?, ?/, ",", testdef);
     gsub(/ ?\( ?/, "(", testdef);
     gsub(/ ?\) ?/, ")", testdef);
+    gsub(/ ?\* ?/, "*", testdef);
 
     test_name = gensub(/^(static )?void (\w+)\(.*$/, "\\2", "1", testdef);
     test_args = gensub(/^[^(]+\(([^)]*)\).*$/, "\\1", "1", testdef);
@@ -164,17 +165,21 @@ function dump_public_section(  decl, def) {
             arg_type = gensub(/^(.*\W)\w+$/, "\\1", "1", test_arg_list[i]);
             sub(/ $/, "", arg_type);
             arg_type_id = arg_type;
-            gsub(/ ?\*/, "_ptr", arg_type_id);
+            gsub(/\*/, "_ptr", arg_type_id);
             gsub(/ /, "_", arg_type_id);
             test_call_args = test_call_args "*" arg_name ","
 
-            current_case = sprintf("{\n"                                \
-                                   "%s %s__values = {TESTVAL_GENERATE__%s};\n" \
+            current_case = sprintf("#line 1 \"extract_code.%s%d.c\"\n"  \
+                                   "{\n"                                \
+                                   "%s %s__values[] = {TESTVAL_GENERATE__%s};\n" \
                                    "%s *%s;\n"                          \
                                    "for (%s = %s__values;\n"            \
                                    "%s < %s__values + sizeof(%s__values) / sizeof(*%s__values);\n" \
                                    "%s++)\n"                            \
                                    "{\n"                                \
+                                   "#ifndef TESTVAL_LOG_ARGS_%s\n"      \
+                                   "#define TESTVAL_LOG_ARGS_%s(_val) (_val)\n" \
+                                   "#endif\n"                           \
                                    "TESTVAL_LOG(%s, %s, *%s);\n"        \
                                    "%s"                                 \
                                    "#ifdef TESTVAL_CLEANUP__%s\n"       \
@@ -182,11 +187,14 @@ function dump_public_section(  decl, def) {
                                    "#endif\n"                           \
                                    "}\n"                                \
                                    "}",
+                                   test_name, i,
                                    arg_type, arg_name, arg_type_id,
                                    arg_type, arg_name,
                                    arg_name, arg_name,
                                    arg_name, arg_name, arg_name, arg_name,
                                    arg_name,
+                                   arg_type_id,
+                                   arg_type_id,
                                    arg_name, arg_type_id, arg_name,
                                    current_case,
                                    arg_type_id,
@@ -209,6 +217,7 @@ function dump_public_section(  decl, def) {
         }
         printf "#line %d \"%s\"\n", FNR + 1, FILENAME
     }
+    next
 }
 
 /^\s*\/\*\s*instantiate\s*\*\/\s*$/ {
@@ -284,6 +293,7 @@ END {
             printf "#undef %s\n", header_guard >header_file
     }
     if (testcases) {
+        print "#line 1 \"extract_code.all.c\"" >tests_file
         print "int main(void)" >tests_file
         print "{" >tests_file
         print "SET_RANDOM_SEED();" >tests_file
