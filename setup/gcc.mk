@@ -3,5 +3,5 @@ CFLAGS += -gdwarf-4 -g3 -fstack-protector -W -Wall -Werror -Wmissing-declaration
 		  -Wmissing-format-attribute
 GENERATED_CFLAGS = -Wno-conversion -Wno-unused-function -Wno-suggest-attribute=pure
 
-TEST_CFLAGS = --coverage
+TEST_CFLAGS = 
 

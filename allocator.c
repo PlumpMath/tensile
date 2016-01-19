@@ -1,277 +1,599 @@
-/*@* Copyright (c) 2015  Artem V. Andreev
-  This file is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 3, or (at your option)
-  any later version.
-  
-  This file is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-  
-  You should have received a copy of the GNU General Public License
-  along with this program; see the file COPYING.  If not, write to
-  the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
-  Boston, MA 02110-1301, USA.
-*/
-/*@<*@>=*/
-/* This file is intended to be included multiple times, so no include guard */
+/****h* Library/Allocator
+ * COPYRIGHT 
+ * (c) 2015-2016  Artem V. Andreev
+ * This file is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3, or (at your option)
+ * any later version.
+ * 
+ * This file is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; see the file COPYING.  If not, write to
+ * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
+ *
+ * NAME
+ * allocator.c --- Generic allocator routines
+ *
+ * AUTHOR 
+ * Artem V. Andreev <artem@AA5779.spb.edu>
+ *****/
 
-#if !NEED_PLAIN_ALLOCATOR && !NEED_ARRAY_ALLOCATOR
+/* HEADER */
+#include "compiler.h"
+/* END */
+#include "allocator_common.h"
+
+/* parameter */
+#define REQUIRE_SINGLE_ALLOCATOR false
+/* parameter */
+#define REQUIRE_ARRAY_ALLOCATOR false
+
+#if !REQUIRE_SINGLE_ALLOCATOR && !REQUIRE_ARRAY_ALLOCATOR
 #error "No allocator requested"
 #endif
 
-/*@<Common declarations@>*/
+/* parameter */
+#define ALLOC_TYPE /* required */
+/* parameter */
+#define ALLOC_NAME ALLOC_TYPE
 
-#if NEED_PLAIN_ALLOCATOR
-/*@<Plain allocator declarations@>*/
-#endif
-#if NEED_ARRAY_ALLOCATOR
-/*@<Array allocator declarations@>*/
+/* parameter */
+#define TYPE_IS_REFCNTED false
+
+/* parameter */
+#define TRACK_ALLOCATOR false
+
+/* parameter */
+#define ALLOC_CONSTRUCTOR_ARGS void
+
+/* parameter */
+#define ALLOC_CONSTRUCTOR_CODE(_obj) {}
+/* parameter */
+#define ALLOC_ELEM_CONSTRUCTOR_CODE(_obj) {}
+/* parameter */
+#define ALLOC_DESTRUCTOR_CODE(_obj) {}
+/* parameter */
+#define ALLOC_COPY_CODE(_obj) {}
+
+/* local */
+#define ALLOC_PREFIX(_name) QNAME(_name, ALLOC_NAME)
+/* local */
+#define alloc_TYPE ALLOC_PREFIX(alloc)
+/* local */
+#define new_TYPE ALLOC_PREFIX(new)
+/* local */
+#define unshare_TYPE ALLOC_PREFIX(unshare)
+/* local */
+#define copy_TYPE ALLOC_PREFIX(copy)
+/* local */
+#define free_TYPE ALLOC_PREFIX(free)
+/* local */
+#define freelist_TYPE ALLOC_PREFIX(freelist)
+/* local */
+#define freelists_TYPE ALLOC_PREFIX(freelists)
+/* local */
+#define track_TYPE ALLOC_PREFIX(track)
+/* local */
+#define tracks_TYPE ALLOC_PREFIX(tracks)
+
+/* local */
+#define use_TYPE ALLOC_PREFIX(use)
+/* local */
+#define assign_TYPE ALLOC_PREFIX(assign)
+
+
+/* parameter */
+#define USE_ALLOC_POOL false
+/* parameter */
+#define ALLOC_POOL_PTR NULL
+/* parameter */
+#define ALLOC_POOL_SIZE NULL
+
+/* public */
+#if REQUIRE_SINGLE_ALLOCATOR
+
+static freelist_t *freelist_TYPE;
+#if TRACK_ALLOCATOR
+static size_t track_TYPE;
 #endif
 
-#if IMPLEMENT_ALLOCATOR
-#include "allocator_impl.h"
-#if NEED_PLAIN_ALLOCATOR
-/*@<Plain allocator@>*/
-#endif
-#if NEED_ARRAY_ALLOCATOR
-/*@<Array allocator@>*/
-#endif
-#endif
-
-/*@<allocator_impl.h@>=*/
-#ifndef ALLOCATOR_IMPL_H
-#define ALLOCATOR_IMPL_H  
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
-#include "support.h"
-
-/*@<Shared allocator code@>*/
-
-#ifdef __cplusplus
-}
-#endif
-#endif
-
-/*@<tests/allocator_ts.c@>=*/
+/* TESTS */
 #include "assertions.h"
-#define TRACK_ALLOCATOR 1
-#define IMPLEMENT_ALLOCATOR 1
+#define TESTSUITE "Allocator"
 
-/*@<Test declarations@>*/
-/*@<Test cases@>*/
-
-/*@<Common declarations@>=*/
-/*@? THE_TYPE */
-/*@? THE_SCOPE extern */
-/*@<Shared allocator code@>=*/
-typedef struct freelist_t {
-    struct freelist_t * chain;
-} freelist_t;
-  
-MALLOC_LIKE RETURNS_NONNULL
-static inline void *frlmalloc(size_t sz) 
-{
-    void *result = malloc(sz > sizeof(freelist_t) ? sz : sizeof(freelist_t));
-    assert(result != NULL);
-    return result;
-}
-
-/*@<Plain allocator declarations@>=*/
-/*@? CONSTRUCTOR_ARGS void */
-THE_SCOPE RETURNS_NONNULL NONNULL(1) WARN_UNUSED_RESULT
-THE_TYPE *QNAME(new, THE_TYPE) (CONSTRUCTOR_ARGS);
-
-/*@<Test declarations@>=*/
 enum object_state {
-    STATE_INITIALIZED = 0xaaaabbbb,
-    STATE_CLONED = 0xccccdddd,    
-    STATE_FINALIZED = 0xdeadbeef
+    STATE_INITIALIZED = STATIC_ARBITRARY(16),
+    STATE_COPIED = STATIC_ARBITRARY(16),
+    STATE_FINALIZED = STATIC_ARBITRARY(16)
 };
 
 typedef struct simple_type {
-    void *ptr;
-    unsigned tag;
+    void *placeholder;
+    testval_tag_t tag;
+    enum object_state state;
 } simple_type;
 
-/*@! THE_TYPE simple_type */
-/*@! CONSTRUCTOR_ARGS unsigned tag */
-/*@! TYPE_INIT(_obj) ((_obj)->tag = tag) */
-/*@! TYPE_FINI(_obj) ((_obj)->tag = STATE_FINALIZED) */
-/*@! TYPE_UNSHARE(_obj) ((_obj)->tag = STATE_CLONED) */
-#include "allocator.h"
+/* instantiate */
+#define REQUIRE_SINGLE_ALLOCATOR true
+#define ALLOC_TYPE simple_type
+#define TRACK_ALLOCATOR true
+#define ALLOC_CONSTRUCTOR_ARGS testval_tag_t tag
+#define ALLOC_CONSTRUCTOR_CODE(_obj)            \
+    do {                                        \
+        (_obj)->tag = tag;                      \
+        (_obj)->state = STATE_INITIALIZED;      \
+    } while(0)
+#define ALLOC_COPY_CODE(_obj) (_obj)->state = STATE_COPIED
+#define ALLOC_DESTRUCTOR_CODE(_obj) (_obj)->state = STATE_FINALIZED
+#include "allocator_api.h"
+#include "allocator_impl.c"
+/* end */
 
-/*@<Plain allocator@>=*/
-static free_list_t *QNAME(THE_TYPE, free_list);
-#if TRACK_ALLOCATOR
-static unsigned QNAME(THE_TYPE, track_alloc);
+/* END */
+
+static returns(not_null) returns(fresh_pointer) returns(important)
+ALLOC_TYPE *alloc_TYPE(void)
+{
+    ALLOC_TYPE *obj;
+#if USE_ALLOC_POOL
+    static const size_t pool_incr = sizeof(*obj) > sizeof(double) ?
+        sizeof(*obj) : sizeof(double);
 #endif
 
-MALLOC_LIKE RETURNS_NONNULL WARN_UNUSED_RESULT
-static THE_TYPE *QNAME(alloc, THE_TYPE)(void)
-{
-    THE_TYPE *obj;
-    
-    if (QNAME(THE_TYPE, free_list) == NULL)
-    {
-        obj = frmalloc(sizeof(THE_TYPE));
-    }
-    else
-    {
-        obj = QNAME(THE_TYPE, free_list);
-        QNAME(THE_TYPE, free_list) = QNAME(THE_TYPE, free_list)->chain;
-    }
 #if TRACK_ALLOCATOR
-    QNAME(THE_TYPE, track_alloc)++;
-#endif        
-    return obj;
+    track_TYPE++;
+#endif
+    
+#if USE_ALLOC_POOL
+    assert(ALLOC_POOL_PTR != NULL);
+    if (ALLOC_POOL_SIZE >= pool_incr)
+    {        
+        obj = (ALLOC_TYPE *)ALLOC_POOL_PTR;
+        ALLOC_POOL_PTR = (uint8_t *)ALLOC_POOL_PTR + pool_incr;
+        ALLOC_POOL_SIZE -= pool_incr;
+        PROBE(alloc_from_pool);
+
+        return obj;
+    }
+#endif
+
+    if (freelist_TYPE != NULL)
+    {
+        PROBE(alloc_from_freelist);
+        obj = (ALLOC_TYPE *)freelist_TYPE;
+        freelist_TYPE = freelist_TYPE->chain;
+
+        return obj;
+    }
+
+    PROBE(alloc_malloc);
+    return frlmalloc(sizeof(*obj));
 }
 
-/*@? TYPE_INIT(_var) ((void)0) */
-DEFN_SCOPE(THE_SCOPE) THE_TYPE *QNAME(new, THE_TYPE)(CONSTRUCTOR_ARGS)
+/* public */
+returns(not_null) returns(important)
+ALLOC_TYPE *new_TYPE(ALLOC_CONSTRUCTOR_ARGS)
 {
-    THE_TYPE *_obj = QNAME(alloc, THE_TYPE);
-    TYPE_INIT(_obj);
+    ALLOC_TYPE *_obj = alloc_TYPE();
+
+#if TYPE_IS_REFCNTED
+    PROBE(init_refcnt);
+    _obj->refcnt = 1;
+#endif
+    PROBE(initialize_object);
+    ALLOC_CONSTRUCTOR_CODE(_obj);
     return _obj;
 }
 
-/*@<Plain allocator declarations@>+=*/
-THE_SCOPE void QNAME(free, THE_TYPE)(THE_TYPE *obj);
-    
-/*@<Plain allocator@>+=*/
-
-/*@? FINI_GUARD(_obj)((void)0) */                                     
-/*@? TYPE_FINI(_obj) ((void)0) */
-DEFN_SCOPE(THE_SCOPE) void QNAME(free, THE_TYPE)(THE_TYPE *_obj)
+/****u Allocator/test.allocate
+ * NAME
+ * allocate -- Allocate an object 
+ *****/
+static void allocate(testval_tag_t tag)
 {
-    if (_obj == NULL)
-        return;
-    FINI_GUARD(_obj);
-    TYPE_FINI(_obj);
-    ((free_list_t *)_obj)->chain = QNAME(THE_TYPE, free_list);
-    QNAME(THE_TYPE, free_list) = (free_list_t *)_obj;
-#if TRACK_ALLOCATOR
-    assert(QNAME(THE_TYPE, track_alloc) > 0);
-    QNAME(THE_TYPE, track_alloc)--;
-#endif
-}
-
-/*@<Test cases@>=*/
-
-TESTCASE(allocate, "Allocate an object")
-{
-    unsigned tag = ARBITRARY(unsigned, 1, 0xfffff);
     simple_type *st = new_simple_type(tag);
     
     ASSERT_NOT_NULL(st);
-    ASSERT_EQ(uint, st->tag, tag);
-    ASSERT_EQ(uint, simple_type_track_alloc, 1);
+    ASSERT_EQ(bits, st->tag, tag);
+    ASSERT_EQ(unsigned, track_simple_type, 1);
     free_simple_type(st);
 }
 
-TESTCASE(allocate_free, "Allocate and free an object")
+/****u Allocator/test.allocate_and_free
+ * NAME
+ * allocate_and_free -- Allocate and free an object 
+ *****/
+static void allocate_and_free(testval_tag_t tag)
 {
-    unsigned tag = ARBITRARY(unsigned, 1, 0xfffff);
     simple_type *st = new_simple_type(tag);
     
     free_simple_type(st);
-    ASSERT_EQ(ptr, simple_type_allocator_free_list, (void *)st);
-    ASSERT_EQ(uint, st, STATE_FINALIZED);
-    ASSERT_EQ(uint, simple_type_allocator.n_alloc, 0);
+    ASSERT_EQ(ptr, freelist_simple_type, (void *)st);
+    ASSERT_EQ(unsigned, st->state, STATE_FINALIZED);
+    ASSERT_EQ(unsigned, track_simple_type, 0);
 }
 
-TESTCASE(allocate_free_allocate,
-         "Allocate and free an object and allocate another")
+/* testcase: Allocate and free an object and allocate another */
+static void allocate_free_allocate(testval_tag_t tag)
 {
-    unsigned tag = ARBITRARY(unsigned, 1, 0xfffff);
-    unsigned tag2 = ARBITRARY(unsigned, 1, 0xfffff);             
-    simple_type *st = NEW_TYPED(simple_type, tag);
+    simple_type *st = new_simple_type(tag);
     simple_type *st1;
     
     free_simple_type(st);
-    st1 = new_simple_type(tag2);
+    st1 = new_simple_type(~tag);
     ASSERT_EQ(ptr, st, st1);
-    ASSERT_NULL(simple_type_allocator.free_list);
-    ASSERT_EQ(uint, st1->tag, tag2);
-    ASSERT_EQ(uint, simple_type_allocator.n_alloc, 1);
+    ASSERT_NULL(freelist_simple_type);
+    ASSERT_EQ(unsigned, st1->tag, ~tag);
+    ASSERT_EQ(unsigned, track_simple_type, 1);
     free_simple_type(st1);
 }
 
-TESTCASE(allocate_free_allocate2,
-         "Allocate and free an object and allocate two more")
+/* public */
+static inline arguments(not_null)
+void unshare_TYPE(unused ALLOC_TYPE *_obj)
 {
-    unsigned tag = ARBITRARY(unsigned, 1, 0xfffff);
-    unsigned tag2 = ARBITRARY(unsigned, 1, 0xfffff);
-    unsigned tag3 = ARBITRARY(unsigned, 1, 0xfffff);
-    simple_type *st = NEW_TYPED(simple_type, tag);
+#if TYPE_IS_REFCNTED
+    PROBE(unshare_refcnt);
+    _obj->refcnt = 1;
+#endif
+    PROBE(unshare_object);
+    ALLOC_COPY_CODE(_obj);
+}
+
+/* public */
+returns(not_null) returns(important) arguments(not_null)
+ALLOC_TYPE *copy_TYPE(const ALLOC_TYPE *_orig)
+{
+    ALLOC_TYPE *_copy = alloc_TYPE();
+
+    assert(_orig != NULL);
+    PROBE(do_copy);
+    memcpy(_copy, _orig, sizeof(*_copy));
+    unshare_TYPE(_copy);
+    return _copy;
+}
+
+/* testcase: Copy */
+static void test_copy(testval_tag_t tag)
+{
+    simple_type *st = new_simple_type(tag);
+    simple_type *st1;
+
+    st1 = copy_simple_type(st);
+    ASSERT_NEQ(ptr, st, st1);
+    ASSERT_EQ(bits, st1->tag, st->tag);
+    ASSERT_EQ(unsigned, st1->state, STATE_COPIED);
+    ASSERT_EQ(unsigned, track_simple_type, 2);
+    free_simple_type(st);
+    free_simple_type(st1);
+    ASSERT_EQ(unsigned, track_simple_type, 0);
+}
+
+/* testcase: Deallocate and copy */
+static void deallocate_and_copy(testval_tag_t tag)
+{
+    simple_type *st = new_simple_type(tag);
+    simple_type *st1 = new_simple_type(~tag);
+    simple_type *st2;
+
+    free_simple_type(st);
+    st2 = copy_simple_type(st1);
+    ASSERT_EQ(ptr, st2, st);
+    free_simple_type(st1);
+    free_simple_type(st2);
+    ASSERT_EQ(unsigned, track_simple_type, 0);
+}
+
+/* public */
+void free_TYPE(ALLOC_TYPE *_obj)
+{
+    if (_obj == NULL) {
+        PROBE(free_null);
+        return;
+    }
+    
+#if TYPE_IS_REFCNTED
+    assert(_obj->refcnt > 0);
+    if (--_obj->refcnt > 0)
+    {
+        PROBE(decr_refcnt);
+        return;
+    }
+#endif
+    ALLOC_DESTRUCTOR_CODE(_obj);
+#if TRACK_ALLOCATOR
+    assert(track_TYPE > 0);
+    track_TYPE--;
+#endif
+#if USE_ALLOC_POOL
+    if ((uint8_t *)_obj + sizeof(*_obj) == ALLOC_POOL_PTR)
+    {
+        PROBE(free_to_pool);
+        ALLOC_POOL_PTR = (void *)_obj;
+        ALLOC_POOL_SIZE += sizeof(*_obj);
+        return;
+    }
+#endif
+    PROBE(free_to_list);
+    ((freelist_t *)_obj)->chain = freelist_TYPE;
+    freelist_TYPE = (freelist_t *)_obj;
+}
+
+/* testcase: Allocate and free an object and allocate two more */
+static void allocate_free_allocate2(testval_tag_t tag)
+{
+    simple_type *st = new_simple_type(tag);
     simple_type *st1;
     simple_type *st2;
     
     free_simple_type(st);
-    st1 = new_simple_type(tag2);
+    st1 = new_simple_type(~tag);
     ASSERT_EQ(ptr, st, st1);
-    st2 = new_simple_type(tag3);
+    st2 = new_simple_type(tag + 1);
     ASSERT_NEQ(ptr, st1, st2);
-    ASSERT_EQ(uint, simple_type_allocator.n_alloc, 2);
+    ASSERT_EQ(unsigned, track_simple_type, 2);
     free_simple_type(st1);
     free_simple_type(st2);
-    ASSERT_EQ(uint, simple_type_allocator.n_alloc, 0);
+    ASSERT_EQ(unsigned, track_simple_type, 0);
 }
 
-/*@<Test declarations@>+=*/
-typedef short small_type;
-
-/*@! THE_TYPE small_type */
-/*@! THE_SCOPE extern */
-/*@! CONSTRUCTOR_ARGS unsigned tag */
-/*@! TYPE_INIT(_obj) (*(_obj) = tag) */
-/*@! TYPE_UNSHARE(_obj) (*(_obj) = STATE_CLONED) */
-/*@! TYPE_FINI(_obj) (*(_obj) = STATE_FINALIZED) */
-#include "allocator.h"
-
-/*@<Test cases@>+=*/
-TESTCASE(alloc_small, "Allocate and free a small object")
+/* testcase: Free NULL */
+static void free_null(void)
 {
-    short tag = ARBITRARY(short, 1, 0x7fff);
-    short tag2 = ARBITRARY(short, 1, 0x7fff);             
-    small_type *sm;
-    small_type *sm1;
+    freelist_t *prev = freelist_simple_type;
+    free_simple_type(NULL);
+    ASSERT_EQ(ptr, freelist_simple_type, prev);
+    ASSERT_EQ(unsigned, track_simple_type, 0);
+}
+
+/* TESTS */
+
+/* instantiate */
+#define REQUIRE_SINGLE_ALLOCATOR true
+#define ALLOC_TYPE short
+#define TRACK_ALLOCATOR true
+#define ALLOC_CONSTRUCTOR_CODE(_obj) *(_obj) = (short)STATE_INITIALIZED
+#include "allocator_api.h"
+#include "allocator_impl.c"
+/* end */
+
+/* testcase: Allocate and free a small object */
+static void alloc_small(void)
+{
+    short *sm;
+    short *sm1;
     
-    sm = new_small_type(tag);
-    ASSERT_EQ(int, *sm, tag);
-    free_small_type(sm);
-    sm1 = new_small_type(tag2);
+    sm = new_short();
+    ASSERT_EQ(int, *sm, (int)STATE_INITIALIZED);
+    free_short(sm);
+    sm1 = new_short();
     ASSERT_EQ(ptr, sm, sm1);
-    ASSERT_EQ(uint, small_type_allocator.n_alloc, 1);
-    ASSERT_EQ(int, *sm2, tag2);
-    free_small_type(sm1);
-    ASSERT_EQ(uint, small_type_allocator.n_alloc, 0);
+    ASSERT_EQ(unsigned, track_short, 1);
+    free_short(sm1);
+    ASSERT_EQ(unsigned, track_short, 0);
+    ASSERT_EQ(ptr, freelist_short, sm1);
 }
 
-/*@<Plain allocator declarations@>+=*/
+/* END */
 
-THE_SCOPE THE_TYPE *QNAME(copy, THE_TYPE)(const THE_TYPE *obj);
 
-/*@<Plain allocator@>+=*/
-
-THE_TYPE *QNAME(copy, THE_TYPE)(const THE_TYPE *_obj)
+/* public */
+#if TYPE_IS_REFCNTED
+/* public */
+static inline ALLOC_TYPE *use_TYPE(ALLOC_TYPE *val)
 {
-    if (_obj == NULL)
-        return NULL;
-    else
+    if (val == NULL)
     {
-        THE_TYPE *_new = QNAME(alloc, THE_TYPE)();
-        
-        memcpy(_new, _obj, sizeof(*_obj));
-        TYPE_UNSHARE(_new);
-        
-        return _new;
+        PROBE(use_null);
+        return NULL;
     }
+    val->refcnt++;
+    PROBE(use_normal);
+    return val;
 }
+
+/* public */
+static inline argument(not_null, 1)
+void assign_TYPE(ALLOC_TYPE **loc, ALLOC_TYPE *val)
+{
+    assert(loc != NULL);
+    use_TYPE(val);
+    free_TYPE(*loc);
+    *loc = val;
+}
+
+/* TESTS */
+typedef struct refcnt_type {
+    void *placeholder;
+    unsigned refcnt;
+    testval_tag_t tag;
+    enum object_state state;
+} refcnt_type;
+
+/* instantiate */
+#define REQUIRE_SINGLE_ALLOCATOR true
+#define TYPE_IS_REFCNTED true
+#define ALLOC_TYPE refcnt_type
+#define TRACK_ALLOCATOR true
+#define ALLOC_CONSTRUCTOR_ARGS testval_tag_t tag
+#define ALLOC_CONSTRUCTOR_CODE(_obj)            \
+    do {                                        \
+        (_obj)->tag = tag;                      \
+        (_obj)->state = STATE_INITIALIZED;      \
+    } while(0)
+#define ALLOC_COPY_CODE(_obj) (_obj)->state = STATE_COPIED
+#define ALLOC_DESTRUCTOR_CODE(_obj) (_obj)->state = STATE_FINALIZED
+#include "allocator_api.h"
+#include "allocator_impl.c"
+/* end */
+
+/* testcase: Allocate refcounted */
+static void allocate_refcnted(testval_tag_t tag)
+{
+    refcnt_type *rt = new_refcnt_type(tag);
+
+    ASSERT_NOT_NULL(rt);
+    ASSERT_EQ(unsigned, rt->tag, tag);
+    ASSERT_EQ(unsigned, rt->state, STATE_INITIALIZED);
+    ASSERT_EQ(unsigned, rt->refcnt, 1);
+    ASSERT_EQ(unsigned, track_refcnt_type, 1);
+    free_refcnt_type(rt);
+}
+
+/* testcase: Allocate and free refcounted */
+static void allocate_free_refcnted(testval_tag_t tag)
+{
+    refcnt_type *rt = new_refcnt_type(tag);
+
+    free_refcnt_type(rt);
+    ASSERT_EQ(unsigned, rt->state, STATE_FINALIZED);
+    ASSERT_EQ(unsigned, rt->refcnt, 0);
+    ASSERT_EQ(unsigned, track_refcnt_type, 0);
+    ASSERT_EQ(ptr, freelist_refcnt_type, rt);
+}
+
+/* testcase: Allocate, free and reallocate refcounted */
+static void allocate_free_allocate2_refcnted(testval_tag_t tag)
+{
+    refcnt_type *rt = new_refcnt_type(tag);
+    refcnt_type *rt1;
+
+    free_refcnt_type(rt);
+    rt1 = new_refcnt_type(~tag);
+
+    ASSERT_EQ(ptr, rt, rt1);
+    ASSERT_EQ(unsigned, rt1->refcnt, 1);
+    ASSERT_EQ(unsigned, rt1->tag, ~tag);
+    free_refcnt_type(rt1);
+    ASSERT_EQ(unsigned, rt1->state, STATE_FINALIZED);
+}
+
+/* testcase: Allocate, use and free refcounted */
+static void allocate_use_free_refcnt(testval_tag_t tag)
+{
+    refcnt_type *rt = new_refcnt_type(tag);
+    refcnt_type *use = use_refcnt_type(rt);
+
+    ASSERT_EQ(ptr, use, rt);
+    ASSERT_EQ(unsigned, use->refcnt, 2);
+    free_refcnt_type(rt);
+    ASSERT_EQ(unsigned, use->refcnt, 1);
+    ASSERT_EQ(unsigned, use->state, STATE_INITIALIZED);
+    free_refcnt_type(use);
+    ASSERT_EQ(unsigned, use->state, STATE_FINALIZED);
+}
+
+/* testcase: Copy refcounted */
+static void copy_refcnted(testval_tag_t tag)
+{
+    refcnt_type *rt = new_refcnt_type(tag);
+    refcnt_type *rt1 = copy_refcnt_type(rt);
+
+    ASSERT_NEQ(ptr, rt, rt1);
+    ASSERT_EQ(unsigned, rt->refcnt, 1);
+    ASSERT_EQ(unsigned, rt1->refcnt, 1);
+    ASSERT_EQ(unsigned, rt1->state, STATE_COPIED);
+    free_refcnt_type(rt1);
+    free_refcnt_type(rt);
+    ASSERT_EQ(unsigned, track_refcnt_type, 0);
+}
+
+/* ~~~~~
+ *
+ ** @fn assign_refcnt_type(refcnt_type **, refcnt_type *)
+ * @test Assign to NULL
+ * - *Given* an empty location:
+ * ~~~~~
+ * refcnt_type *location = NULL;
+ * ~~~~~
+ * - *And given* a fresh object:
+ * ~~~~~
+ * refcnt_type *rt = new_refcnt_type(ARBITRARY(unsigned, 1, 0xffff));
+ * ~~~~~
+ * - *When* an object is assigned to a location:
+ * ~~~~~
+ * assign_refcnt_type(&location, rt);
+ * ~~~~~
+ * - *Then* the location gets equal to the object:
+ * ~~~~~
+ * ASSERT_PTR_EQ(location, rt);
+ * ~~~~~
+ * - *And* the reference counter is incremented:
+ * ~~~~~
+ * ASSERT_UINT_EQ(rt->refcnt, 2);
+ * ~~~~~
+ * - Cleanup:
+ * ~~~~~
+ * free_refcnt_type(location);
+ * free_refcnt_type(rt);
+ * ASSERT_UINT_EQ(track_alloc_refcnt_type, 0);
+ * ~~~~~
+ *
+ * @test Assign to itself
+ * - *Given* a fresh object:
+ * ~~~~~
+ * refcnt_type *rt = new_refcnt_type(ARBITRARY(unsigned, 1, 0xffff));
+ * refcnt_type *location = rt;
+ * ~~~~~
+ * - *When* an object is assigned to a location that already references it:
+ * ~~~~~
+ * assign_refcnt_type(&location, rt);
+ * ~~~~~
+ * - *Then* the location remains equal to the object:
+ * ~~~~~
+ * ASSERT_PTR_EQ(location, rt);
+ * ~~~~~
+ * - *And* the reference counter is unchanged:
+ * ~~~~~
+ * ASSERT_UINT_EQ(rt->refcnt, 1);
+ * ~~~~~
+ * - *And* the object is not finalized:
+ * ~~~~~
+ * ASSERT_UINT_NEQ(rt->tag, STATE_FINALIZED);
+ * ~~~~~
+ * - Cleanup:
+ * ~~~~~
+ * free_refcnt_type(rt);
+ * ASSERT_UINT_EQ(track_alloc_refcnt_type, 0);
+ * ~~~~~
+ *
+ * @test Assign NULL
+ * - *Given* a fresh object:
+ * ~~~~~
+ * refcnt_type *rt = new_refcnt_type(ARBITRARY(unsigned, 1, 0xffff));
+ * ~~~~~
+ * - *When* `NULL` is assigned to its location:
+ * ~~~~~
+ * assign_refcnt_type(&rt, NULL);
+ * ~~~~~
+ * - *Then* the location contains `NULL`:
+ * ~~~~~
+ * ASSERT_PTR_EQ(location, NULL);
+ * ~~~~~
+ * - *And* the object is finalized:
+ * ~~~~~
+ * ASSERT_UINT_EQ(rt->tag, STATE_FINALIZED);
+ * ~~~~~
+ * - *And* the object is freed:
+ * ~~~~~
+ * ASSERT_UINT_EQ(track_alloc_refcnt_type, 0);
+ * ~~~~~
+ */
+
+
+/* END */
+
+#endif
+
+
+#endif /* REQUIRE_SINGLE_ALLOCATOR */
+
+#if 0
 
 /*@<Plain allocator declarations@>+=*/
 extern NONNULL(1) void allocator_prealloc(allocator_t *alloc,
@@ -897,193 +1219,6 @@ static inline unsigned log2_order(unsigned x)
 #if defined(TEST_ALLOCATOR) || defined(__DOXYGEN__)
 
 
-/** @fn new_simple_type(unsigned tag)
- * @test Allocate
- * - *Given* a fresh object:
- * ~~~~~
- * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
- * simple_type *st = new_simple_type(thetag);
- * ~~~~~
- * - *Verify* it is allocated:
- * ~~~~~
- * ASSERT_PTR_NEQ(st, NULL);
- * ~~~~~
- * - *Verify* it is initialized:
- * ~~~~~
- * ASSERT_UINT_EQ(st->tag, thetag);
- * ~~~~~
- * - Cleanup:
- * ~~~~~
- * free_simple_type(st);
- * ~~~~~
- *
- * @test Allocate and free
- * - *Given* an allocated object:
- * ~~~~~
- * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
- * simple_type *st = new_simple_type(thetag);
- * ~~~~~
- * - *When* it is destroyed:
- * ~~~~~
- * free_simple_type(st);
- * ~~~~~
- * - *Then* the free list is in proper state:
- * ~~~~~
- * ASSERT_PTR_EQ(freelist_simple_type, st);
- * ~~~~~
- * - *And* the object is finalized:
- * ~~~~~
- * ASSERT_UINT_EQ(st->tag, STATE_FINALIZED);
- * ~~~~~
- * - *And* the allocated object count is zero:
- * ~~~~~
- * ASSERT_UINT_EQ(track_alloc_simple_type, 0);
- * ~~~~~
- */
-
-/** @fn free_simple_type(simple_type *obj)
- * @test Allocate, free and reallocate
- * - *Given* an allocated object:
- * ~~~~~
- * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
- * unsigned thetag2 = ARBITRARY(unsigned, 1, 0xfffff);
- * simple_type *st = new_simple_type(thetag);
- * simple_type *st1;
- * ~~~~~
- * - *When* it is destroyed:
- * ~~~~~
- * free_simple_type(st);
- * ~~~~~
- * - *And when* another object is allocated:
- * ~~~~~
- * st1 = new_simple_type(thetag2);
- * ~~~~~
- * - *Then* the memory is reused:
- * ~~~~~
- * ASSERT_PTR_EQ(st, st1);
- * ~~~~~
- * - *And* the free list is in proper state:
- * ~~~~~
- * ASSERT_PTR_EQ(freelist_simple_type, NULL);
- * ~~~~~
- * - *And* the new object is initialized:
- * ~~~~~
- * ASSERT_UINT_EQ(st1->tag, thetag2);}
- * ~~~~~
- * - *And* the allocated object count is one:
- * ~~~~~
- * ASSERT_UINT_EQ(track_alloc_simple_type, 1);
- * ~~~~~
- * - Cleanup:
- * ~~~~~
- * free_simple_type(st1);
- * ~~~~~
- *
- * @test Allocate, free, reallocate and allocate another
- * - *Given* an allocated object:
- * ~~~~~
- * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
- * unsigned thetag2 = ARBITRARY(unsigned, 1, 0xfffff);
- * simple_type *st = new_simple_type(thetag);
- * simple_type *st1;
- * simple_type *st2;
- * ~~~~~
- * - *When* it is destroyed:
- * ~~~~~
- * free_simple_type(st);
- * ~~~~~
- * - *And when* a new object is allocated:
- * ~~~~~
- * st1 = new_simple_type(thetag2);
- * ~~~~~
- * - *Then* the memory is reused:
- * ~~~~~
- * ASSERT_PTR_EQ(st, st1);
- * ~~~~~
- * - *When* another object is allocated:
- * ~~~~~
- * st2 = new_simple_type(0);
- * ~~~~~
- * - *Then* the memory is not reused:
- * ~~~~~
- * ASSERT_PTR_NEQ(st2, st1);
- * ~~~~~
- * - *And* the allocated object count is two: 
- * ~~~~~
- * ASSERT_UINT_EQ(track_alloc_simple_type, 2);`
- * ~~~~~
- * - Clean up:
- * ~~~~~
- * free_simple_type(st1);
- * free_simple_type(st2);
- * ASSERT_UINT_EQ(track_alloc_simple_type, 0);
- * ~~~~~
- */
-
-/** @fn copy_simple_type(const simple_type *)
- * @test Copy
- * - *Given* an allocated object:
- * ~~~~~
- * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
- * simple_type *st = new_simple_type(thetag);
- * simple_type *st1;
- * st->ptr = &st;
- * ~~~~~
- * - *When* it is copied:
- * ~~~~~
- * st1 = copy_simple_type(st);
- * ~~~~~
- * - *Then* the memory is not shared:
- * ~~~~~
- * ASSERT_PTR_NEQ(st, st1);
- * ~~~~~
- * - *And* the contents is copied:
- * ~~~~~
- * ASSERT_PTR_EQ(st1->ptr, st->ptr);
- * ~~~~~
- * - *And* the copy hook is executed:
- * ~~~~~
- * ASSERT_UINT_EQ(st1->tag, thetag | STATE_CLONED);
- * ~~~~~
- * - And the allocated object count is two:
- * ~~~~~
- * ASSERT_UINT_EQ(track_alloc_simple_type, 2);
- * ~~~~~
- * - Cleanup:
- * ~~~~~
- * free_simple_type(st);
- * free_simple_type(st1);
- * ASSERT_UINT_EQ(track_alloc_simple_type, 0);
- * ~~~~~
- *
- * @test Deallocate and copy
- * - *Given* two allocated objects:
- * ~~~~~
- * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
- * unsigned thetag2 = ARBITRARY(unsigned, 1, 0xfffff);
- * simple_type *st = new_simple_type(thetag);
- * simple_type *st1 = new_simple_type(thetag2);
- * simple_type *st2;
- * ~~~~~
- * - *When* the first is freed:
- * ~~~~~
- * free_simple_type(st);
- * ~~~~~
- * - *And when* the second is copied:
- * ~~~~~
- * st2 = copy_simple_type(st1);
- * ~~~~~
- * - *Then* the memory of the first object is reused:
- * ~~~~~
- * ASSERT_PTR_EQ(st2, st);
- * ~~~~~
- * - Clean up:
- * ~~~~~
- * free_simple_type(st1);
- * free_simple_type(st2);
- * ASSERT_UINT_EQ(track_alloc_simple_type, 0);
- * ~~~~~
- */
 
 DECLARE_TYPE_ALLOCATOR(EXTERN, simple_type, (unsigned tag));
 typedef short small_type;
@@ -1918,6 +2053,6 @@ static void test_resize_larger_n(size_t n)
 
 
 #endif // defined(ALLOCATOR_IMP)
-  
 
-#endif /* ALLOCATOR_H */
+#endif // 0
+

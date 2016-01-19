@@ -1,4 +1,4 @@
-/****h* Library/Bitops
+/****h* Library/bitops
  * COPYRIGHT 
  * (c) 2016  Artem V. Andreev
  *
@@ -24,35 +24,46 @@
  * Artem V. Andreev <artem@AA5779.spb.edu>
  *****/
 
-/* public */
+/* HEADER */
 #include "compiler.h"
+/* END */
 #include "bitops_api.h"
 
 
-/****f* Bitops/count_leading_zeroes
+/****f* bitops/count_leading_zeroes
  * NAME
  * count_leading_zeroes --- Count leading zeroes
  *
  * RETURN VALUE
  * The number of upper zero bits before the first 1
- ******/
-/* public */
-static inline unsigned count_leading_zeroes(size_t i)
+ ****/
+static inline global_state(none)
+unsigned count_leading_zeroes(size_t i)
 {
 #if __GNUC__ >= 4
-    if (i == 0u)
+    if (i == 0u) {
+        PROBE(clz_zero);
         return sizeof(i) * CHAR_BIT;
+    }
+    PROBE(clz_nonzero);
     return (unsigned)__builtin_clzl(i);
 #else
     unsigned j;
     
     if (i == 0)
+    {
+        PROBE(clz_zero_nobi);
         return sizeof(i) * CHAR_BIT;
+    }
     for (j = sizeof(i) * CHAR_BIT - 1; j > 0; j--)
     {
         if ((i & (1ul << j)) != 0)
+        {
+            PROBE(clz_nonzero_nobi);
             return (unsigned)sizeof(i) * CHAR_BIT - 1 - j;
+        }
     }
+    PROBE(clz_first_bit_nobi);
     return sizeof(i) * CHAR_BIT - 1;
 #endif
 }
@@ -62,19 +73,28 @@ static inline unsigned count_leading_zeroes(size_t i)
 #include "bitops_impl.c"
 #define TESTSUITE "Bit operations"
 
-/* testcase: Zero */
+/****u bitops/test_zero
+ * NAME
+ * test_zero --- Count leading zeroes in 0
+ ****/
 static void test_zero(void)
 {
     ASSERT_EQ(unsigned, count_leading_zeroes(0), sizeof(size_t) * CHAR_BIT);
 }
 
-/* testcase: All ones */
+/****u bitops/test_all_ones
+ * NAME
+ * test_all_ones --- Count leading zeroes in all ones
+ ****/
 static void test_all_ones(void)
 {
     ASSERT_EQ(unsigned, count_leading_zeroes(SIZE_MAX), 0);
 }
 
-/* testcase: Arbitrary bit */
+/****u bitops/test_all_ones
+ * NAME
+ * test_all_ones --- Count leading zeroes in all ones
+ ****/
 static void test_one_bit(testval_bitnum_size_t bit)
 {
     ASSERT_EQ(unsigned,

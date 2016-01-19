@@ -1,4 +1,4 @@
-/****h* Library/CompilerSupport
+/****h Library/compiler.h
  * COPYRIGHT
  * (c) 2015-2016  Artem V. Andreev
  *
@@ -27,7 +27,7 @@
  *
  * AUTHOR 
  * Artem V. Andreev <artem@AA5779.spb.edu>
- ******/
+ *****/
 #ifndef COMPILER_H
 #define COMPILER_H 1
 
@@ -42,16 +42,16 @@ extern "C"
 #include <inttypes.h>
 #include <assert.h>
 
-/****h* CompilerSupport/Annotations
+/****h compiler.h/Annotations
  * FUNCTION
  * Modern compilers, in particular GCC and Clang, support a rich set of
  * annotations to improve code quality. 
  * Unfortunately, various versions of those compilers implement various sets
  * of the attributes, hence we need to wrap them into macros, conditioned by
  * the compiler version
- ******/
+ *****/
 
-/****** Annotations/ReturnValue
+/***** Annotations/returns
  * NAME
  * returns(x) --- return value annotation
  */
@@ -90,7 +90,7 @@ extern "C"
 
 /******/
 
-/****** Annotations/Arguments
+/****** Annotations/arguments
  * NAME
  * arguments(x) --- argument list annotations
  */
@@ -120,7 +120,7 @@ extern "C"
 /******/
 
 
-/****** Annotations/NthArgument
+/****** Annotations/argument
  * NAME
  * argument(x, ...) --- specific argument annotations
  */
@@ -185,7 +185,7 @@ extern "C"
  */ 
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR >= 3)
 #define ANNOTATION_ARGUMENT_not_null(...) \
-    __attribute__ ((__nonnull__ (__VA_ARGS___)))
+    __attribute__ ((__nonnull__ (__VA_ARGS__)))
 #else
 #define ANNOTATION_ARGUMENT_not_null(...)
 #endif
@@ -246,7 +246,7 @@ extern "C"
 /*****/
 
 
-/****** Annotations/GlobalState
+/****** Annotations/global_state
  * NAME
  * global_state(_x) --- Global state affected by the function
  */
@@ -283,7 +283,7 @@ extern "C"
 /*****/
 
 
-/****** Annotations/Linkage
+/****** Annotations/linkage
  * NAME
  * linkage(_x) --- Additional linkage modes
  */
@@ -343,7 +343,7 @@ extern "C"
 /*****/
 
 
-/****** Annotations/Unused
+/****** Annotations/unused
  * NAME
  * unused -- Marks a symbol as explicitly unused
  */
@@ -355,7 +355,7 @@ extern "C"
 
 /*****/
 
-/****f* CompilerSupport/QNAME
+/****f* compiler.h/QNAME
  * NAME
  * QNAME(_prefix, _name) --- Make a qualifed name
  *
@@ -365,6 +365,10 @@ extern "C"
  */
 #define _QNAME(_prefix, _name) _prefix##_##_name
 #define QNAME(_prefix, _name) _QNAME(_prefix, _name)
+
+#ifndef PROBE
+#define PROBE(_name) ((void)0)
+#endif
 
 #ifdef __cplusplus
 }

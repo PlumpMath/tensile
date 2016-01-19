@@ -202,8 +202,8 @@ static inline unsigned long long large_rand(unsigned maxbit)
         fflush(stderr);                         \
     } while(0)
 
-#define TEST_OK_MSG  fputs("OK\n", stderr)
-#define TEST_FAIL_MSG fputs("FAIL\n", stderr)
+#define TEST_OK_MSG  fputs(" OK\n", stderr)
+#define TEST_FAIL_MSG fputs(" FAIL\n", stderr)
 
 #if NONFATAL_ASSERTIONS
 #define TEST_START(_msg)                        \
@@ -223,9 +223,11 @@ static inline unsigned long long large_rand(unsigned maxbit)
 #define TEST_END TEST_OK_MSG
 #endif
 
+#define TEST_SKIP(_msg) fputs(_msg "... SKIP\n", stderr)
+
 #define TESTVAL_LOG(_id, _type, _val)                               \
     do {                                                            \
-        fprintf(stderr, " [" #_id "=" TESTVAL_LOG_FMT_##_type "]",  \
+        fprintf(stderr, " [" #_id "=" TESTVAL_LOG_FMT_##_type "]", \
                 TESTVAL_LOG_ARGS_##_type(_val));                    \
         fflush(stderr);                                             \
     } while(0)
@@ -431,6 +433,18 @@ typedef unsigned testval_bitnum_ptr_t;
 #define TESTVAL_LOG_FMT_testval_bitnum_long_t "%u"
 #define TESTVAL_LOG_FMT_testval_bitnum_size_t "%u"
 #define TESTVAL_LOG_FMT_testval_bitnum_ptr_t "%u"
+
+typedef unsigned testval_tag_t;
+#define TESTVAL_GENERATE__testval_tag_t                         \
+    TESTVAL_GENERATE_ARBITRARY(testval_tag_t, 1, UINT_MAX - 1)
+#define TESTVAL_LOG_FMT_testval_tag_t "%x"
+
+#define PROBE(_name)                                    \
+    do {                                                \
+        extern unsigned testprobe_##_name;              \
+        testprobe_##_name++;                            \
+    } while(0)
+
 
 #ifdef __cplusplus
 }
