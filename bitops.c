@@ -1,5 +1,4 @@
-/****h* Library/bitops
- * COPYRIGHT 
+/*!= Bit operatons
  * (c) 2016  Artem V. Andreev
  *
  * This file is free software; you can redistribute it and/or modify
@@ -16,13 +15,7 @@
  * along with this program; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301, USA.
- *
- * NAME
- * bitops.c --- Bit operatons
- *
- * AUTHOR 
- * Artem V. Andreev <artem@AA5779.spb.edu>
- *****/
+ */
 
 /* HEADER */
 #include "compiler.h"
@@ -30,13 +23,11 @@
 #include "bitops_api.h"
 
 
-/****f* bitops/count_leading_zeroes
- * NAME
- * count_leading_zeroes --- Count leading zeroes
+/*!
+ * Count leading zeroes
  *
- * RETURN VALUE
- * The number of upper zero bits before the first 1
- ****/
+ * Return value: The number of upper zero bits before the first 1
+ */
 static inline global_state(none)
 unsigned count_leading_zeroes(size_t i)
 {
@@ -49,7 +40,7 @@ unsigned count_leading_zeroes(size_t i)
     return (unsigned)__builtin_clzl(i);
 #else
     unsigned j;
-    
+
     if (i == 0)
     {
         PROBE(clz_zero_nobi);
@@ -73,28 +64,22 @@ unsigned count_leading_zeroes(size_t i)
 #include "bitops_impl.c"
 #define TESTSUITE "Bit operations"
 
-/****u bitops/test_zero
- * NAME
- * test_zero --- Count leading zeroes in 0
- ****/
+/*! Test: Count leading zeroes in 0
+ */
 static void test_zero(void)
 {
     ASSERT_EQ(unsigned, count_leading_zeroes(0), sizeof(size_t) * CHAR_BIT);
 }
 
-/****u bitops/test_all_ones
- * NAME
- * test_all_ones --- Count leading zeroes in all ones
- ****/
+/*! Test: Count leading zeroes in all ones
+ */
 static void test_all_ones(void)
 {
     ASSERT_EQ(unsigned, count_leading_zeroes(SIZE_MAX), 0);
 }
 
-/****u bitops/test_all_ones
- * NAME
- * test_all_ones --- Count leading zeroes in all ones
- ****/
+/*! Test: Leading zeroes for a single bit
+ */
 static void test_one_bit(testval_bitnum_size_t bit)
 {
     ASSERT_EQ(unsigned,

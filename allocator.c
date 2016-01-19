@@ -1,27 +1,20 @@
-/****h* Library/Allocator
- * COPYRIGHT 
+/*!= Generic allocator routines
  * (c) 2015-2016  Artem V. Andreev
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
  * any later version.
- * 
+ *
  * This file is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301, USA.
- *
- * NAME
- * allocator.c --- Generic allocator routines
- *
- * AUTHOR 
- * Artem V. Andreev <artem@AA5779.spb.edu>
- *****/
+ */
 
 /* HEADER */
 #include "compiler.h"
@@ -148,11 +141,11 @@ ALLOC_TYPE *alloc_TYPE(void)
 #if TRACK_ALLOCATOR
     track_TYPE++;
 #endif
-    
+
 #if USE_ALLOC_POOL
     assert(ALLOC_POOL_PTR != NULL);
     if (ALLOC_POOL_SIZE >= pool_incr)
-    {        
+    {
         obj = (ALLOC_TYPE *)ALLOC_POOL_PTR;
         ALLOC_POOL_PTR = (uint8_t *)ALLOC_POOL_PTR + pool_incr;
         ALLOC_POOL_SIZE -= pool_incr;
@@ -190,40 +183,37 @@ ALLOC_TYPE *new_TYPE(ALLOC_CONSTRUCTOR_ARGS)
     return _obj;
 }
 
-/****u Allocator/test.allocate
- * NAME
- * allocate -- Allocate an object 
- *****/
+/*! Test: Allocate an object
+ */
 static void allocate(testval_tag_t tag)
 {
     simple_type *st = new_simple_type(tag);
-    
+
     ASSERT_NOT_NULL(st);
     ASSERT_EQ(bits, st->tag, tag);
     ASSERT_EQ(unsigned, track_simple_type, 1);
     free_simple_type(st);
 }
 
-/****u Allocator/test.allocate_and_free
- * NAME
- * allocate_and_free -- Allocate and free an object 
- *****/
+/*! Test: Allocate and free an object
+ */
 static void allocate_and_free(testval_tag_t tag)
 {
     simple_type *st = new_simple_type(tag);
-    
+
     free_simple_type(st);
     ASSERT_EQ(ptr, freelist_simple_type, (void *)st);
     ASSERT_EQ(unsigned, st->state, STATE_FINALIZED);
     ASSERT_EQ(unsigned, track_simple_type, 0);
 }
 
-/* testcase: Allocate and free an object and allocate another */
+/*! Test: Allocate and free an object and allocate another
+ */
 static void allocate_free_allocate(testval_tag_t tag)
 {
     simple_type *st = new_simple_type(tag);
     simple_type *st1;
-    
+
     free_simple_type(st);
     st1 = new_simple_type(~tag);
     ASSERT_EQ(ptr, st, st1);
@@ -258,7 +248,8 @@ ALLOC_TYPE *copy_TYPE(const ALLOC_TYPE *_orig)
     return _copy;
 }
 
-/* testcase: Copy */
+/*! Test: Copy
+ */
 static void test_copy(testval_tag_t tag)
 {
     simple_type *st = new_simple_type(tag);
@@ -274,7 +265,8 @@ static void test_copy(testval_tag_t tag)
     ASSERT_EQ(unsigned, track_simple_type, 0);
 }
 
-/* testcase: Deallocate and copy */
+/*! Test: Deallocate and copy
+ */
 static void deallocate_and_copy(testval_tag_t tag)
 {
     simple_type *st = new_simple_type(tag);
@@ -296,7 +288,7 @@ void free_TYPE(ALLOC_TYPE *_obj)
         PROBE(free_null);
         return;
     }
-    
+
 #if TYPE_IS_REFCNTED
     assert(_obj->refcnt > 0);
     if (--_obj->refcnt > 0)
@@ -324,13 +316,14 @@ void free_TYPE(ALLOC_TYPE *_obj)
     freelist_TYPE = (freelist_t *)_obj;
 }
 
-/* testcase: Allocate and free an object and allocate two more */
+/*! Test: Allocate and free an object and allocate two more
+ */
 static void allocate_free_allocate2(testval_tag_t tag)
 {
     simple_type *st = new_simple_type(tag);
     simple_type *st1;
     simple_type *st2;
-    
+
     free_simple_type(st);
     st1 = new_simple_type(~tag);
     ASSERT_EQ(ptr, st, st1);
@@ -342,7 +335,8 @@ static void allocate_free_allocate2(testval_tag_t tag)
     ASSERT_EQ(unsigned, track_simple_type, 0);
 }
 
-/* testcase: Free NULL */
+/*! Test: Free NULL
+ */
 static void free_null(void)
 {
     freelist_t *prev = freelist_simple_type;
@@ -362,12 +356,13 @@ static void free_null(void)
 #include "allocator_impl.c"
 /* end */
 
-/* testcase: Allocate and free a small object */
+/*! Test: Allocate and free a small object
+ */
 static void alloc_small(void)
 {
     short *sm;
     short *sm1;
-    
+
     sm = new_short();
     ASSERT_EQ(int, *sm, (int)STATE_INITIALIZED);
     free_short(sm);
@@ -432,7 +427,8 @@ typedef struct refcnt_type {
 #include "allocator_impl.c"
 /* end */
 
-/* testcase: Allocate refcounted */
+/*! Test: Allocate refcounted
+ */
 static void allocate_refcnted(testval_tag_t tag)
 {
     refcnt_type *rt = new_refcnt_type(tag);
@@ -445,7 +441,8 @@ static void allocate_refcnted(testval_tag_t tag)
     free_refcnt_type(rt);
 }
 
-/* testcase: Allocate and free refcounted */
+/*! Test: Allocate and free refcounted
+ */
 static void allocate_free_refcnted(testval_tag_t tag)
 {
     refcnt_type *rt = new_refcnt_type(tag);
@@ -457,7 +454,8 @@ static void allocate_free_refcnted(testval_tag_t tag)
     ASSERT_EQ(ptr, freelist_refcnt_type, rt);
 }
 
-/* testcase: Allocate, free and reallocate refcounted */
+/*! Test: Allocate, free and reallocate refcounted
+ */
 static void allocate_free_allocate2_refcnted(testval_tag_t tag)
 {
     refcnt_type *rt = new_refcnt_type(tag);
@@ -473,7 +471,8 @@ static void allocate_free_allocate2_refcnted(testval_tag_t tag)
     ASSERT_EQ(unsigned, rt1->state, STATE_FINALIZED);
 }
 
-/* testcase: Allocate, use and free refcounted */
+/*! Test: Allocate, use and free refcounted
+ */
 static void allocate_use_free_refcnt(testval_tag_t tag)
 {
     refcnt_type *rt = new_refcnt_type(tag);
@@ -488,7 +487,8 @@ static void allocate_use_free_refcnt(testval_tag_t tag)
     ASSERT_EQ(unsigned, use->state, STATE_FINALIZED);
 }
 
-/* testcase: Copy refcounted */
+/*! Test: Copy refcounted
+ */
 static void copy_refcnted(testval_tag_t tag)
 {
     refcnt_type *rt = new_refcnt_type(tag);
@@ -606,7 +606,7 @@ void allocator_prealloc(allocator_t *alloc, size_t n)
     void *objs = malloc(n * alloc->object_size);
     void *next;
     void *iter;
-    
+
     assert(alloc->object_size >= sizeof(freelist_t));
     for (i = 0, iter = objs; i < n - 1; i++, iter = next)
     {
@@ -650,15 +650,15 @@ void allocator_prealloc(allocator_t *alloc, size_t n)
 #define REFCNT_REQUIRED_FIELDS unsigned refcnt
 
 
-/** 
- * Generates a declaration for a function to pre-allocate a free-list 
- * - `void preallocate_<_type>s(size_t size)` 
+/**
+ * Generates a declaration for a function to pre-allocate a free-list
+ * - `void preallocate_<_type>s(size_t size)`
  */
 #define DECLARE_TYPE_PREALLOC(_scope, _type)                            \
     GENERATED_DECL_##_scope void preallocate_##_type##s(size_t size)
 
 /**
- * Generate declarations for free-list based array allocations 
+ * Generate declarations for free-list based array allocations
  */
 #define DECLARE_ARRAY_ALLOCATOR(_scope, _name, _type)                   \
     GENERATED_DECL_##_scope _type *new_##_name(size_t n)                \
@@ -701,7 +701,7 @@ void allocator_prealloc(allocator_t *alloc, size_t n)
         assign_##_type(base + idx, val);                                \
     }                                                                   \
     struct fake
-    
+
 
 
 /**
@@ -730,7 +730,7 @@ void allocator_prealloc(allocator_t *alloc, size_t n)
  * refcnt_array *rt = new_refcnt_array(sz);
  * @endcode
  * - Verify that it is allocated `ASSERT_PTR_NEQ(rt, NULL);`
- * - Verify that it is initialized 
+ * - Verify that it is initialized
  *   `ASSERT_UINT_EQ(rt->tag, STATE_INITIALIZED);`
  * - Verify that the number of elements is correct
  *   `ASSERT_UINT_EQ(rt->nelts, sz);`
@@ -738,12 +738,12 @@ void allocator_prealloc(allocator_t *alloc, size_t n)
  *   `ASSERT_UINT_EQ(rt->refcnt, 1);`
  * - Cleanup: `free_refcnt_array(rt);`
  *
- * @test 
+ * @test
  * Allocate, use and free refcounted array
  * - Given a fresh array
  * @code
  * unsigned sz = ARBITRARY(unsigned, 1, 4);
- * refcnt_array *rt = new_refcnt_array(sz); 
+ * refcnt_array *rt = new_refcnt_array(sz);
  * @endcode
  * - When it is used
  * `refcnt_array *use = use_refcnt_array(rt);`
@@ -793,7 +793,7 @@ void allocator_prealloc(allocator_t *alloc, size_t n)
 /**
  * Generates definitions for allocator functions declared per
  * DECLARE_TYPE_ALLOCATOR() and family
- * 
+ *
  */
 #define DEFINE_TYPE_ALLOC_COMMON(_scope, _type, _args, _init,           \
                                  _clone,                                \
@@ -847,7 +847,7 @@ void allocator_prealloc(allocator_t *alloc, size_t n)
 /** @endcond */
 
 
-/** 
+/**
  * Generates definitions for allocator functions declared per
  * DECLARE_TYPE_ALLOCATOR()
  */
@@ -871,7 +871,7 @@ void allocator_prealloc(allocator_t *alloc, size_t n)
 /** @endcond */
 
 
-/** 
+/**
  * Generates definitions for allocator functions declared per
  * DECLARE_REFCNT_ALLOCATOR()
  */
@@ -889,7 +889,7 @@ void allocator_prealloc(allocator_t *alloc, size_t n)
                              _fini);                                    \
     DEFINE_REFCNT_FREE(_scope, _type)
 
-/** 
+/**
  * Generates definition for the preallocated declared by
  * DECLARE_TYPE_PREALLOC()
  */
@@ -906,10 +906,10 @@ void allocator_prealloc(allocator_t *alloc, size_t n)
         }                                                               \
         ((freelist_t *)&objs[size - 1])->chain = freelist_##_type;      \
         freelist_##_type = (freelist_t *)objs;                          \
-    }    
+    }
 
 /** @cond DEV */
-/** 
+/**
  * Generates definitions for allocator functions declared per
  * DECLARE_ARRAY_ALLOCATOR() and family
  */
@@ -1072,7 +1072,7 @@ void allocator_prealloc(allocator_t *alloc, size_t n)
  * freelist_t object
  */
 ATTR_MALLOC ATTR_RETURNS_NONNULL
-static inline void *frlmalloc(size_t sz) 
+static inline void *frlmalloc(size_t sz)
 {
     void *result = malloc(sz > sizeof(freelist_t) ? sz : sizeof(freelist_t));
     assert(result != NULL);
@@ -1083,7 +1083,7 @@ static inline void *frlmalloc(size_t sz)
 #define linear_size(_x) (_x)
 
 /**
- * @test 
+ * @test
  *  Verify that the logarithmic order is correct
  * `ASSERT_UINT_EQ(log2_order(x), expected);`
  * @testvar{unsigned,x,u}  | @testvar{unsigned,expected}
@@ -1102,7 +1102,7 @@ static inline unsigned log2_order(unsigned x)
                 count_leading_zeroes(x - 1)) : 0;
 }
 
-/** 
+/**
  * The inverse of log2_order()
  */
 #define log2_size(_x) (1u << (_x))
@@ -1115,7 +1115,7 @@ static inline unsigned log2_order(unsigned x)
  * DEFINE_LINEAR_SCALE(2);
  * DECLARE_ARRAY_TYPE(simple_linear2_array, void *ptr; unsigned tag;, unsigned);
  * DECLARE_ARRAY_ALLOCATOR(simple_linear2_array);
- * 
+ *
  * DEFINE_ARRAY_ALLOCATOR(simple_linear2_array, linear2, 4, arr, i,
  *                        {arr->tag = STATE_INITIALIZED;},
  *                        {arr->elts[i] = i; },
@@ -1128,7 +1128,7 @@ static inline unsigned log2_order(unsigned x)
  *                        {arr->elts[i] = STATE_FINALIZED; });
  * @endcode
  *
- * @test 
+ * @test
  *  Verify that the linear scaled order is correct
  * `ASSERT_UINT_EQ(linear2_order(x), expected);`
  * @testvar{unsigned,x,u}  | @testvar{unsigned,expected}
@@ -1200,7 +1200,7 @@ static inline unsigned log2_order(unsigned x)
  * - And the number of elements is correct:
  *   `ASSERT_UINT_EQ(arr1->nelts, (sz + 1) * 2);`
  * - And the extra elements are initialized:
- *   `ASSERT_UINT_EQ(arr1->elts[sz * 2 + 1], sz * 2 + 1);` 
+ *   `ASSERT_UINT_EQ(arr1->elts[sz * 2 + 1], sz * 2 + 1);`
  * - Cleanup: `free_simple_linear2_array(arr1);`
  */
 #define DEFINE_LINEAR_SCALE(_n)                                 \
@@ -1215,7 +1215,7 @@ static inline unsigned log2_order(unsigned x)
     }                                                           \
     struct fake
 
-        
+
 #if defined(TEST_ALLOCATOR) || defined(__DOXYGEN__)
 
 
@@ -1232,7 +1232,7 @@ typedef short small_type;
  * small_type *sm1;
  * sm = new_small_type();
  * ~~~~~
- * - *Verify* it is initialized: 
+ * - *Verify* it is initialized:
  * ~~~~~
  * ASSERT_INT_EQ(*sm, (short)STATE_INITIALIZED);
  * ~~~~~
@@ -1267,7 +1267,7 @@ typedef struct refcnt_type {
 
 /** @fn new_refcnt_type(unsigned)
  * @test Allocate refcounted
- * - *Given* a fresh refcounted object 
+ * - *Given* a fresh refcounted object
  * ~~~~~
  * unsigned thetag = ARBITRARY(unsigned, 1, 0xfffff);
  * refcnt_type *rt = new_refcnt_type(thetag);
@@ -1280,15 +1280,15 @@ typedef struct refcnt_type {
  * ~~~~~
  * ASSERT_UINT_EQ(rt->tag, thetag);
  * ~~~~~
- * - *And* its ref counter is `1`: 
+ * - *And* its ref counter is `1`:
  * ~~~~~
  * ASSERT_UINT_EQ(rt->refcnt, 1);
  * ~~~~~
- * - *And* the allocated object count is one: 
+ * - *And* the allocated object count is one:
  * ~~~~~
  * ASSERT_UINT_EQ(track_alloc_refcnt_type, 1);
  * ~~~~~
- * - Cleanup: 
+ * - Cleanup:
  * ~~~~~
  * free_refcnt_type(rt);
  * ~~~~~
@@ -1381,7 +1381,7 @@ typedef struct refcnt_type {
  * ~~~~~
  * ASSERT_UINT_EQ(use->tag, thetag);
  * ~~~~~
- * - When the object is freed again: 
+ * - When the object is freed again:
  * ~~~~~
  * free_refcnt_type(use);
  * ~~~~~
@@ -1534,7 +1534,7 @@ DECLARE_REFCNT_ALLOCATOR(EXTERN, refcnt_type, (unsigned tag));
  * ~~~~~
  * free_simple_type2(st);
  * free_simple_type2(st1);
- * free_simple_type2(st2);   
+ * free_simple_type2(st2);
  * ASSERT_UINT_EQ(track_alloc_simple_type, 0);
  * ~~~~~
  *
@@ -1611,7 +1611,7 @@ DECLARE_TYPE_PREALLOC(EXTERN, simple_type);
  * ~~~~~
  * - *And* the elements are initialized:
  * ~~~~~
- * for (j = 0; j < size; j++) 
+ * for (j = 0; j < size; j++)
  *    ASSERT_UINT_EQ(arr[j], j);
  * ~~~~~
  * - *When* it is destroyed:
@@ -1622,7 +1622,7 @@ DECLARE_TYPE_PREALLOC(EXTERN, simple_type);
  * ~~~~~
  * if (size != 4)
  * ~~~~~
- *   + *Then* the elements are finalized: 
+ *   + *Then* the elements are finalized:
  * ~~~~~
  * for(j = 0; j < size; j++)
  *   ASSERT_UINT_EQ(arr[j], STATE_FINALIZED);
@@ -1643,7 +1643,7 @@ DECLARE_TYPE_PREALLOC(EXTERN, simple_type);
  * simple_array *arr = new_simple_array(size);
  * simple_array *arr1;
  * ~~~~~
- * - *When* it is freed: 
+ * - *When* it is freed:
  * ~~~~~
  * free_simple_array(arr, size);
  * ~~~~~
@@ -1677,13 +1677,13 @@ DECLARE_TYPE_PREALLOC(EXTERN, simple_type);
  * ~~~~~
  * simple_array *arr1 = copy_simple_array(arr);
  * ~~~~~
- * - *Then* the memory is not shared: 
+ * - *Then* the memory is not shared:
  * ~~~~~
  * ASSERT_PTR_NEQ(arr, arr1);
  * ~~~~~
- * - And the items are initialized: 
+ * - And the items are initialized:
  * ~~~~~
- * for(j = 0; j < size; j++) 
+ * for(j = 0; j < size; j++)
  *     ASSERT_UINT_EQ(arr1->elts[j], arr->elts[j] | STATE_CLONED);
  * ~~~~~
  * - *When* the copy is freed:
@@ -1692,7 +1692,7 @@ DECLARE_TYPE_PREALLOC(EXTERN, simple_type);
  * ~~~~~
  * - Then the original is untouched:
  * ~~~~~
- * for(j = 0; j < size; j++) 
+ * for(j = 0; j < size; j++)
  *     ASSERT_UINT_EQ(arr->elts[j], j);
  * ~~~~~
  * - Cleanup:
@@ -1706,7 +1706,7 @@ DECLARE_TYPE_PREALLOC(EXTERN, simple_type);
  */
 /** @fn resize_simple_array(simple_type **, size_t *, size_t)
  *@test Resize Null
- * - *When* a NULL pointer to an array is resized 
+ * - *When* a NULL pointer to an array is resized
  * ~~~~~
  * size_t size = 0;
  * simple_array *arr = NULL;
@@ -1727,7 +1727,7 @@ DECLARE_TYPE_PREALLOC(EXTERN, simple_type);
  * ~~~~~
  * - *And* the elements are initialized:
  * ~~~~~
- * for (j = 0; j < 3; j++) 
+ * for (j = 0; j < 3; j++)
  *    ASSERT_UINT_EQ(arr[j], j);
  * ~~~~~
  * - Cleanup:
@@ -1815,7 +1815,7 @@ DECLARE_TYPE_PREALLOC(EXTERN, simple_type);
  * ~~~~~
  * ASSERT_UINT_EQ(sz, origsz + 1 + delta);
  * ~~~~~
- * - Cleanup: 
+ * - Cleanup:
  * ~~~~~
  * free_simple_array(arr1);
  * ~~~~~
@@ -1970,7 +1970,7 @@ static inline void small_type_init(small_type *obj)
     *obj = (short)STATE_INITIALIZED;
 }
 
-DEFINE_TYPE_ALLOCATOR(EXTERN, small_type, (), 
+DEFINE_TYPE_ALLOCATOR(EXTERN, small_type, (),
                       OBJHOOK0(small_type_init),
                       trivial_hook, trivial_hook);
 
@@ -1991,7 +1991,7 @@ static inline void refcnt_type_fini(refcnt_type *obj)
 }
 
 
-DEFINE_REFCNT_ALLOCATOR(EXTERN, refcnt_type, (unsigned tag), 
+DEFINE_REFCNT_ALLOCATOR(EXTERN, refcnt_type, (unsigned tag),
                         OBJHOOK(refcnt_type_init, tag),
                         refcnt_type_clone,
                         refcnt_type_fini);
@@ -2055,4 +2055,3 @@ static void test_resize_larger_n(size_t n)
 #endif // defined(ALLOCATOR_IMP)
 
 #endif // 0
-

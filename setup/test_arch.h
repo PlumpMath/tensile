@@ -4,8 +4,17 @@
 #else
 "amd64"
 #endif
-#elif defined(__i386__)
+#endif
+#if defined(__i386__)
+#if defined(__i686__)
+"i686"
+#elif defined(__i586__)
+"i586"
+#elif defined(__i486__)
+"i486"
+#else
 "i386"
+#endif
 #elif defined(__ia64__)
 "ia64"
 #elif defined(__powerpc64__)

@@ -140,14 +140,14 @@ function dump_public_section(  decl, def) {
     next
 }
 
-!in_tests && !in_public && (/^\s*\/\*{4}[cdfmstv*]/ || /^\s*\/\*\s*public\s*\*\/\s*$/) {
+!in_tests && !in_public && (/^\s*\/\*!\s*$/ || /^\s*\/\*\s*public\s*\*\/\s*$/) {
     sub(/^\s*\/\*\s*public\s*\*\//, "");
     in_public = "start"
     public_section = ""
     public_section_start = FNR
 }
 
-!in_public && /^\s*\/\*{4}u/ {
+!in_public && /^\s*\/\*!\s*Test\s*:/ {
     printf "#line %d \"%s\"\n", FNR + 1, FILENAME >tests_file
     testdef = $0 "\n"
     while (getline > 0) {
@@ -155,17 +155,17 @@ function dump_public_section(  decl, def) {
         if (/{/)
             break;
     }
-    test_descr = gensub(/^.*\n\s*\*\s*NAME\s+\*\s*([^\n]*\S)\n.*$/, "\\1", "1", testdef);
+    test_descr = gensub(/^\s*\/\*!\s*Test\s*:\s*([^\n]*\S)\s*\n.*$/, "\\1", "1", testdef);
     printf "%s", testdef >tests_file
 
     gsub(/\/\*([^*]+|\*+[^*/])*\*+\//, " ", testdef);
-    
-    test_condition = ""    
+
+    test_condition = ""
     if (testdef ~ /^\s*#\s*if/) {
         test_condition = gensub(/^([^\n]+).*$/, "\\1", "1", testdef);
         sub(/^[^\n]+\n/, "", testdef);
     }
-    
+
     gsub(/\s+/, " ", testdef);
     gsub(/^ | $/, "", testdef);
     gsub(/ ?, ?/, ",", testdef);
@@ -225,7 +225,7 @@ function dump_public_section(  decl, def) {
         }
         sub(/,$/, "", test_call_args);
     }
-    
+
     sub(/@@@/, test_call_args, current_case);
     current_case = sprintf("TEST_START(\"%s\");\n%s\nTEST_END;\n",
                            gensub(/"/, "\\\\\"", "g", test_descr),
@@ -237,7 +237,7 @@ function dump_public_section(  decl, def) {
                                current_case,
                                gensub(/"/, "\\\\\"", "g", test_descr));
     }
-    
+
     testcases = testcases current_case "\n"
     if (!in_tests) {
         while (getline > 0) {
@@ -256,7 +256,7 @@ function dump_public_section(  decl, def) {
 
 do_instantiate && /^\s*#\s*define/ {
     macro_name = gensub(/^\s*#\s*define\s+(\w+).*$/, "\\1", "1");
-    instantiate_args = instantiate_args "\n#undef " macro_name 
+    instantiate_args = instantiate_args "\n#undef " macro_name
 }
 
 instantiate_args && /^\s*\/\*\s*end\s*\*\/\s*$/ {

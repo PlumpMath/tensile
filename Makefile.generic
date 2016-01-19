@@ -18,7 +18,6 @@ FLEX = flex
 ETAGS = etags
 NM = nm
 AWK = gawk
-ROBODOC = robodoc
 
 PLATFORM_ARCH_SYMBOL := $(subst :,_,$(subst .,_,$(subst -,_,$(subst +,_,$(PLATFORM_ARCH)))))
 PLATFORM_OS_SYMBOL := $(subst :,_,$(subst .,_,$(subst -,_,$(subst +,_,$(PLATFORM_OS)))))
@@ -32,7 +31,7 @@ endif
 TEST_CPPFLAGS = -DTEST_REPEAT_ARBITRARY=2
 
 LDFLAGS = -Wl,-export-dynamic
-LDLIBS = -lm -lfl -lunistring -ltre
+LDLIBS = -lm -lunistring -ltre
 MFLAGS = -MM -MT $(<:.c=.o)
 
 -include $(TOPDIR)/setup/$(PLATFORM_OS).mk
@@ -56,6 +55,9 @@ IMPL_SOURCES += tensile.tab.c lex.yy.c
 
 GENERATED_FILES = $(IMPL_SOURCES) $(C_SOURCES:.c=_api.h)
 GENERATED_FILES += $(GENERIC_C_SOURCES:.c=_impl.c) $(GENERIC_C_SOURCES:.c=_api.h)
+
+DOC_SOURCES = $(C_SOURCES) $(GENERIC_C_SOURCES)
+DOC_SOURCES += compiler.h
 
 TESTABLES = bitops allocator
 
@@ -89,6 +91,9 @@ tests/% : CFLAGS += $(TEST_CFLAGS)
 
 tests/%_ts.c : %_impl.c ;
 
+$(TOPDIR)/doc/%.md : % $(TOPDIR)/extract_doc.awk
+	$(AWK) -f $(filter %.awk,$^) $< >$@
+
 ifneq ($(MAKECMDGOALS),clean)
 Makefile : $(GENERATED_FILES)
 
@@ -104,8 +109,8 @@ check : $(addprefix tests/,$(TESTABLES))
 	done
 
 .PHONY : doc
-doc :
-	cd $(TOPDIR); $(ROBODOC)
+doc : $(patsubst %,$(TOPDIR)/doc/%.md,$(DOC_SOURCES))
+
 
 TAGS : $(C_SOURCES)
 	$(ETAGS) $^
