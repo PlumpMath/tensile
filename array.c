@@ -1,5 +1,5 @@
-/*!= Generic allocator routines
- * (c) 2015-2016  Artem V. Andreev
+/*!= Generic array allocator routines
+ * (c) 2016  Artem V. Andreev
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
@@ -27,13 +27,7 @@
 #define ALLOC_NAME ALLOC_TYPE
 
 /* parameter */
-#define TYPE_IS_REFCNTED false
-
-/* parameter */
 #define TRACK_ALLOCATOR false
-
-/* parameter */
-#define ALLOC_CONSTRUCTOR_ARGS void
 
 /* parameter */
 #define ALLOC_CONSTRUCTOR_CODE(_obj) {}
@@ -45,13 +39,6 @@
 /* local */
 #define ALLOC_PREFIX(_name) QNAME(_name, ALLOC_NAME)
 
-/* local */
-#define freelists_TYPE ALLOC_PREFIX(freelists)
-
-/* local */
-#define tracks_TYPE ALLOC_PREFIX(tracks)
-
-
 /* parameter */
 #define USE_ALLOC_POOL false
 /* parameter */
@@ -59,19 +46,28 @@
 /* parameter */
 #define ALLOC_POOL_SIZE NULL
 
+/* parameter */
+#define MAX_BUCKET /* required */
+
+/* parameter */
+#define BUCKET_SIZE 1
+
+/* parameter */
+#define BUCKET_LOG2_SCALE false
+
 /* local */
 #define freelist_TYPE ALLOC_PREFIX(freelist)
 /* local */
 #define track_TYPE ALLOC_PREFIX(track)
 
-static freelist_t *freelist_TYPE;
+static freelist_t *freelist_TYPE[MAX_BUCKET];
 #if TRACK_ALLOCATOR
-static size_t track_TYPE;
+static size_t track_TYPE[MAX_BUCKET];
 #endif
 
 /* TESTS */
 #include "assertions.h"
-#define TESTSUITE "Allocator"
+#define TESTSUITE "Array allocator"
 
 enum object_state {
     STATE_INITIALIZED = STATIC_ARBITRARY(16),
@@ -80,24 +76,18 @@ enum object_state {
 };
 
 typedef struct simple_type {
-    void *placeholder;
-    testval_tag_t tag;
     enum object_state state;
 } simple_type;
 
 /* instantiate */
 #define ALLOC_TYPE simple_type
 #define TRACK_ALLOCATOR true
-#define ALLOC_CONSTRUCTOR_ARGS testval_tag_t tag
 #define ALLOC_CONSTRUCTOR_CODE(_obj)            \
-    do {                                        \
-        (_obj)->tag = tag;                      \
-        (_obj)->state = STATE_INITIALIZED;      \
-    } while(0)
+    (_obj)->state = STATE_INITIALIZED
 #define ALLOC_COPY_CODE(_obj) (_obj)->state = STATE_COPIED
 #define ALLOC_DESTRUCTOR_CODE(_obj) (_obj)->state = STATE_FINALIZED
-#include "allocator_api.h"
-#include "allocator_impl.c"
+#include "array_api.h"
+#include "array_impl.c"
 /* end */
 
 /* END */
@@ -109,6 +99,10 @@ static returns(not_null) returns(fresh_pointer) returns(important)
 ALLOC_TYPE *alloc_TYPE(void)
 {
     ALLOC_TYPE *obj;
+#if USE_ALLOC_POOL
+    static const size_t pool_incr = (sizeof(*obj) + sizeof(double) - 1) /
+        sizeof(double) * sizeof(double);
+#endif
 
 #if TRACK_ALLOCATOR
     track_TYPE++;
@@ -116,9 +110,15 @@ ALLOC_TYPE *alloc_TYPE(void)
 
 #if USE_ALLOC_POOL
     assert(ALLOC_POOL_PTR != NULL);
-    obj = pool_alloc(&ALLOC_POOL_PTR, &ALLOC_POOL_SIZE, sizeof(*obj));
-    if (obj != NULL)
+    if (ALLOC_POOL_SIZE >= pool_incr)
+    {
+        obj = (ALLOC_TYPE *)ALLOC_POOL_PTR;
+        ALLOC_POOL_PTR = (uint8_t *)ALLOC_POOL_PTR + pool_incr;
+        ALLOC_POOL_SIZE -= pool_incr;
+        PROBE(alloc_from_pool);
+
         return obj;
+    }
 #endif
 
     if (freelist_TYPE != NULL)
@@ -281,10 +281,11 @@ void free_TYPE(ALLOC_TYPE *_obj)
     track_TYPE--;
 #endif
 #if USE_ALLOC_POOL
-    if (pool_maybe_free(&ALLOC_POOL_PTR, &ALLOC_POOL_SIZE,
-                        _obj, sizeof(*_obj)))
+    if ((uint8_t *)_obj + sizeof(*_obj) == ALLOC_POOL_PTR)
     {
         PROBE(free_to_pool);
+        ALLOC_POOL_PTR = (void *)_obj;
+        ALLOC_POOL_SIZE += sizeof(*_obj);
         return;
     }
 #endif
@@ -325,6 +326,7 @@ static void free_null(void)
 /* TESTS */
 
 /* instantiate */
+#define REQUIRE_SINGLE_ALLOCATOR true
 #define ALLOC_TYPE short
 #define TRACK_ALLOCATOR true
 #define ALLOC_CONSTRUCTOR_CODE(_obj) *(_obj) = (short)STATE_INITIALIZED
@@ -355,6 +357,7 @@ static void *shared_pool_ptr;
 static size_t shared_pool_size;
 
 /* instantiate */
+#define REQUIRE_SINGLE_ALLOCATOR true
 #define ALLOC_TYPE simple_type
 #define ALLOC_NAME pool_simple_type
 #define USE_ALLOC_POOL true
@@ -379,7 +382,7 @@ static void alloc_from_pool(testval_tag_t tag)
 {
     simple_type *st;
     void *pool_base;
-
+    
     pool_base = shared_pool_ptr = malloc(sizeof(simple_type));
     shared_pool_size = sizeof(simple_type);
 
@@ -403,9 +406,9 @@ static void alloc_from_pool(testval_tag_t tag)
 static void alloc_from_pool_and_malloc(testval_tag_t tag)
 {
     simple_type *st;
-    simple_type *st1;
+    simple_type *st1;    
     void *pool_base;
-
+    
     pool_base = shared_pool_ptr = malloc(sizeof(simple_type));
     shared_pool_size = sizeof(simple_type);
 
@@ -421,6 +424,7 @@ static void alloc_from_pool_and_malloc(testval_tag_t tag)
 
 
 /* END */
+
 
 /* public */
 #if TYPE_IS_REFCNTED
@@ -445,7 +449,7 @@ ALLOC_TYPE *use_TYPE(ALLOC_TYPE *val)
 /* local */
 #define maybe_copy_TYPE ALLOC_PREFIX(maybe_copy)
 
-static inline returns(important)
+static inline
 ALLOC_TYPE *maybe_copy_TYPE(ALLOC_TYPE *val)
 {
     if (val == NULL || val->refcnt == 1)
@@ -456,7 +460,7 @@ ALLOC_TYPE *maybe_copy_TYPE(ALLOC_TYPE *val)
     else
     {
         ALLOC_TYPE *result = copy_TYPE(val);
-
+        
         PROBE(maybe_copy_copy);
         free_TYPE(val);
         return result;
@@ -498,6 +502,7 @@ typedef struct refcnt_type {
 } refcnt_type;
 
 /* instantiate */
+#define REQUIRE_SINGLE_ALLOCATOR true
 #define TYPE_IS_REFCNTED true
 #define ALLOC_TYPE refcnt_type
 #define TRACK_ALLOCATOR true
@@ -616,7 +621,7 @@ static void assign_to_self(testval_tag_t tag)
     ASSERT_EQ(unsigned, rt->refcnt, 1);
     ASSERT_NEQ(unsigned, rt->state, STATE_FINALIZED);
     free_refcnt_type(rt);
-    ASSERT_EQ(unsigned, rt->state, STATE_FINALIZED);
+    ASSERT_EQ(unsigned, rt->state, STATE_FINALIZED);    
     ASSERT_EQ(unsigned, track_refcnt_type, 0);
 }
 
@@ -631,46 +636,12 @@ static void assign_null(testval_tag_t tag)
     ASSERT_EQ(unsigned, rt->state, STATE_FINALIZED);
     ASSERT_EQ(unsigned, track_refcnt_type, 0);
 }
-
-/*! Test: Maybe copy
- */
-static void maybe_copy(testval_tag_t tag)
-{
-    refcnt_type *rt = new_refcnt_type(tag);
-    refcnt_type *rtc = maybe_copy_refcnt_type(rt);
-
-    ASSERT_EQ(ptr, rt, rtc);
-    ASSERT_EQ(unsigned, rt->refcnt, 1);
-
-    use_refcnt_type(rt);
-    rtc = maybe_copy_refcnt_type(rt);
-    ASSERT_NEQ(ptr, rt, rtc);
-    ASSERT_EQ(unsigned, rt->refcnt, 1);
-    ASSERT_EQ(unsigned, rtc->state, STATE_COPIED);
-    free_refcnt_type(rtc);
-    free_refcnt_type(rt);
-    ASSERT_EQ(unsigned, track_refcnt_type, 0);
-}
-
-/*! Test: Move
- */
-static void move_refcnt(testval_tag_t tag)
-{
-    refcnt_type *rt = new_refcnt_type(tag);
-    refcnt_type *rt1 = new_refcnt_type(~tag);
-
-    move_refcnt_type(&rt1, rt);
-    ASSERT_EQ(ptr, rt1, rt);
-    ASSERT_EQ(unsigned, rt1->refcnt, 1);
-    ASSERT_EQ(unsigned, rt1->state, STATE_INITIALIZED);
-    ASSERT_EQ(unsigned, rt1->tag, tag);
-    free_refcnt_type(rt1);
-    ASSERT_EQ(unsigned, track_refcnt_type, 0);
-}
-
 /* END */
 
 #endif /* TYPE_IS_REFCNTED */
+
+
+#endif /* REQUIRE_SINGLE_ALLOCATOR */
 
 #if 0
 

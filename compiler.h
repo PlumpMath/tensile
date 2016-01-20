@@ -118,7 +118,7 @@ extern "C"
  *   the y'th argument
  */
 #if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3)
-#define ANNOTATION_ARGUMENT_storage_size_AT(...)    \
+#define ANNOTATION_ARGUMENT_storage_size(...)       \
     __attribute__((__alloc_size__(__VA_ARGS__)))
 #else
 #define ANNOTATION_ARGUMENT_storage_size(...)

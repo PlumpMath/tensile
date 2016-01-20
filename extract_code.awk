@@ -113,7 +113,7 @@ function dump_public_section(  decl, def) {
     if (!(probe_name in TESTPROBES)) {
         TESTPROBES[probe_name] = FNR;
     } else {
-        printf "Probe '%s' already defined at line %d\n", probe_name, TESTPROBES[probe_name] > "/dev/stderr"
+        printf "%s:%d: Probe '%s' already defined at line %d\n", FILENAME, FNR, probe_name, TESTPROBES[probe_name] > "/dev/stderr"
         exit 1
     }
 }

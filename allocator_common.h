@@ -1,5 +1,5 @@
 /****ih Library/AllocatorInternal
- * COPYRIGHT 
+ * COPYRIGHT
  * (c) 2016  Artem V. Andreev
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,14 +35,55 @@ extern "C"
 typedef struct freelist_t {
     struct freelist_t * chain;
 } freelist_t;
-  
+
 static inline
 returns(fresh_pointer) returns(not_null) returns(important)
-void *frlmalloc(size_t sz) 
+void *frlmalloc(size_t sz)
 {
     void *result = malloc(sz > sizeof(freelist_t) ? sz : sizeof(freelist_t));
     assert(result != NULL);
     return result;
+}
+
+static inline global_state(none) returns(important)
+size_t pool_size_aligned(size_t sz)
+{
+    return (sz + sizeof(double) - 1) /
+        sizeof(double) * sizeof(double);
+}
+
+static inline
+returns(important) arguments(not_null) argument(storage_size,3)
+void *pool_alloc(void * restrict * restrict pool,
+                 size_t * restrict pool_size,
+                 size_t objsize)
+{
+    size_t alloc_size = pool_size_aligned(objsize);
+    void *result;
+
+    if (*pool_size < alloc_size)
+        return NULL;
+    result = *pool;
+    *pool = (uint8_t *)*pool + alloc_size;
+    *pool_size -= alloc_size;
+
+    return result;
+}
+
+static inline arguments(not_null) returns(important)
+bool pool_maybe_free(void ** restrict pool,
+                     size_t * restrict pool_size,
+                     void *obj, size_t objsize)
+{
+    size_t alloc_size = pool_size_aligned(objsize);
+
+    if (*pool == (uint8_t *)obj + alloc_size)
+    {
+        *pool = obj;
+        *pool_size += alloc_size;
+        return true;
+    }
+    return false;
 }
 
 
