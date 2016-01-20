@@ -148,7 +148,7 @@ function dump_public_section(  decl, def) {
 }
 
 !in_public && /^\s*\/\*!\s*Test\s*:/ {
-    printf "#line %d \"%s\"\n", FNR + 1, FILENAME >tests_file
+    printf "#line %d \"%s\"\n", FNR, FILENAME >tests_file
     testdef = $0 "\n"
     while (getline > 0) {
         testdef = testdef $0 "\n"
