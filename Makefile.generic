@@ -28,7 +28,7 @@ ifneq ($(PLATFORM_VARIANT),)
 CPPFLAGS += -DPLATFORM_VARIANT_IS_$(PLATFORM_VARIANT)=1
 endif
 
-TEST_CPPFLAGS = -DTEST_REPEAT_ARBITRARY=2
+TEST_CPPFLAGS = -DTEST_REPEAT_ARBITRARY=2 -DUSE_ANSI_TERM_STRINGS=1
 
 LDFLAGS = -Wl,-export-dynamic
 LDLIBS = -lm -lunistring -ltre
@@ -48,7 +48,7 @@ endif
 
 C_SOURCES = bitops.c
 
-GENERIC_C_SOURCES = allocator.c
+GENERIC_C_SOURCES = allocator.c #array.c
 
 IMPL_SOURCES = $(C_SOURCES:.c=_impl.c)
 IMPL_SOURCES += tensile.tab.c lex.yy.c

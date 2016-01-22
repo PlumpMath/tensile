@@ -32,7 +32,7 @@ function header(n,  result) {
             gsub(/\/\*([^*]+|\*+[^*/])*\*+\//, " ", decl);
             gsub(/\s+/, " ", decl);
             sub(/ ?[;{=].*$/, "", decl);
-            is_func = sub(/ ?\([^)]*\)$/, "", decl);
+            is_func = sub(/ ?\(([^()]+|\([^()]*\))*\)$/, "", decl);
             sub(/ ?\[[^]]*\]$/, "", decl);
             decl_name = gensub(/^.*\<(\w+)$/, "\\1", "1", decl);
             if (is_func)

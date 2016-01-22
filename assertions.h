@@ -45,12 +45,21 @@ static bool testcase_failed = false;
 #define ASSERT_FAIL (assert_failure_count++)
 #endif
 
+#if USE_ANSI_TERM_STRINGS
+#define TEST_MSG_HIGHLIGHT(_msg) "\033[1m" _msg "\033[0m"
+#define TEST_MSG_ALERT(_msg) "\033[3m" _msg "\033[0m"
+#else
+#define TEST_MSG_HIGHLIGHT(_msg) _msg
+#define TEST_MSG_ALERT(_msg) _msg
+#endif
+
 #define ASSERT(_expr)                                                   \
     do {                                                                \
         if (!(_expr))                                                   \
         {                                                               \
             fprintf(stderr,                                             \
-                    "Assertion " #_expr " failed at %s[%s:%u]\n",       \
+                    TEST_MSG_ALERT("Assertion " #_expr                  \
+                                   " failed at %s[%s:%u]\n"),           \
                     __FUNCTION__, __FILE__, __LINE__);                  \
             ASSERT_FAIL;                                                \
         }                                                               \
@@ -66,12 +75,13 @@ static bool testcase_failed = false;
         if (!_comparator(__var1, __var2))                               \
         {                                                               \
             fprintf(stderr,                                             \
-                    "Assertion " #_expr1 " " _cmpname " " #_expr2       \
-                    " failed at %s[%s:%u]: expected " _fmt              \
-                    ", got " _fmt "\n",                                 \
-                    __FUNCTION__, __FILE__, __LINE__,                   \
-                    __var2, __var1);                                    \
-            ASSERT_FAIL;                                                \
+                    TEST_MSG_ALERT("Assertion " #_expr1 " " _cmpname    \
+                                   " " #_expr2                          \
+                                   " failed at %s[%s:%u]: expected "    \
+                                   _fmt ", got " _fmt "\n"),            \
+                                   __FUNCTION__, __FILE__, __LINE__,    \
+                                   __var2, __var1);                     \
+                    ASSERT_FAIL;                                        \
         }                                                               \
     } while(0)
 
@@ -195,15 +205,17 @@ static inline unsigned long long large_rand(unsigned maxbit)
         srand(seed);                                    \
     } while(0)
 
-#define TEST_START_MSG(_msg)                    \
-    do {                                        \
-        fputs(_msg, stderr);                    \
-        fputs("...", stderr);                   \
-        fflush(stderr);                         \
+#define TEST_START_MSG(_msg)                        \
+    do {                                            \
+        fputs(TEST_MSG_HIGHLIGHT(_msg), stderr);    \
+        fputs("...", stderr);                       \
+        fflush(stderr);                             \
     } while(0)
 
-#define TEST_OK_MSG  fputs(" OK\n", stderr)
-#define TEST_FAIL_MSG fputs(" FAIL\n", stderr)
+#define TEST_OK_MSG                                     \
+    fputs(" " TEST_MSG_HIGHLIGHT("OK") "\n", stderr)
+#define TEST_FAIL_MSG                           \
+    fputs(" " TEST_MSG_ALERT("FAIL") "\n", stderr)
 
 #if NONFATAL_ASSERTIONS
 #define TEST_START(_msg)                        \
@@ -273,6 +285,10 @@ static inline unsigned long long large_rand(unsigned maxbit)
 
 typedef unsigned testval_small_uint_t;
 typedef int testval_small_int_t;
+
+#define TESTVAL_SMALL_INT_MAX 4
+#define TESTVAL_SMALL_INT_MIN -4
+#define TESTVAL_SMALL_UINT_MAX
 
 #define TESTVAL_GENERATE__testval_small_uint_t 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
 #define TESTVAL_GENERATE__testval_small_int_t 0, 1, -1, 2, -2, 3, -3, 4, -4

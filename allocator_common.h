@@ -31,6 +31,7 @@ extern "C"
 #endif
 
 #include "compiler.h"
+#include "bitops_api.h"
 
 typedef struct freelist_t {
     struct freelist_t * chain;
@@ -46,19 +47,18 @@ void *frlmalloc(size_t sz)
 }
 
 static inline global_state(none) returns(important)
-size_t pool_size_aligned(size_t sz)
+size_t pool_size_aligned(size_t sz, size_t align)
 {
-    return (sz + sizeof(double) - 1) /
-        sizeof(double) * sizeof(double);
+    return (sz + align - 1) / align * align;
 }
 
 static inline
 returns(important) arguments(not_null) argument(storage_size,3)
 void *pool_alloc(void * restrict * restrict pool,
                  size_t * restrict pool_size,
-                 size_t objsize)
+                 size_t objsize, size_t align)
 {
-    size_t alloc_size = pool_size_aligned(objsize);
+    size_t alloc_size = pool_size_aligned(objsize, align);
     void *result;
 
     if (*pool_size < alloc_size)
@@ -73,9 +73,9 @@ void *pool_alloc(void * restrict * restrict pool,
 static inline arguments(not_null) returns(important)
 bool pool_maybe_free(void ** restrict pool,
                      size_t * restrict pool_size,
-                     void *obj, size_t objsize)
+                     void *obj, size_t objsize, size_t align)
 {
-    size_t alloc_size = pool_size_aligned(objsize);
+    size_t alloc_size = pool_size_aligned(objsize, align);
 
     if (*pool == (uint8_t *)obj + alloc_size)
     {
@@ -86,6 +86,25 @@ bool pool_maybe_free(void ** restrict pool,
     return false;
 }
 
+static inline global_state(none) returns(important)
+size_t alloc_calculate_bucket(size_t n, size_t bucket_size, bool log_scale)
+{
+    assert(n > 0);
+    n = (n - 1) / bucket_size;
+    if (log_scale)
+        n = sizeof(n) * CHAR_BIT - count_leading_zeroes(n);
+    return n;
+}
+
+static inline global_state(none) returns(important)
+size_t alloc_bucket_size(size_t n_bucket, size_t bucket_size, bool log_scale)
+{
+    if (log_scale)
+        n_bucket = 1u << n_bucket;
+    else
+        n_bucket++;
+    return n_bucket * bucket_size;
+}
 
 #ifdef __cplusplus
 }

@@ -209,6 +209,16 @@ extern "C"
 #endif
 
 /*!<
+ * - conformant(_n)
+ */
+#if (__STDC_VERSION__ >= 199901L && !__STDC_NO_VLA__) ||    \
+    (defined(__GNUC__) && !__STRICT_ANSI__)
+#define conformant(_x) _x
+#else
+#define conformant(_x)
+#endif
+    
+/*!<
  * - noreturn: For C11 systems, it is defined in a new header
  *   <stdnoreturn.h>. For GCC in non-C11 mode define it via noreturn
  *   attribute
