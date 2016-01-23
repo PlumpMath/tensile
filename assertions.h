@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2015  Artem V. Andreev
+/*!= Assertion macros
+ * (c) 2015-2016  Artem V. Andreev
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
@@ -15,11 +15,6 @@
  * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301, USA.
  *
- */
-/** @file
- * @brief auxiliary assertion macros
- *
- * @author Artem V. Andreev <artem@AA5779.spb.edu>
  */
 #ifndef ASSERTIONS_H
 #define ASSERTIONS_H 1
@@ -288,7 +283,7 @@ typedef int testval_small_int_t;
 
 #define TESTVAL_SMALL_INT_MAX 4
 #define TESTVAL_SMALL_INT_MIN -4
-#define TESTVAL_SMALL_UINT_MAX
+#define TESTVAL_SMALL_UINT_MAX 9
 
 #define TESTVAL_GENERATE__testval_small_uint_t 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
 #define TESTVAL_GENERATE__testval_small_int_t 0, 1, -1, 2, -2, 3, -3, 4, -4
@@ -455,12 +450,12 @@ typedef unsigned testval_tag_t;
     TESTVAL_GENERATE_ARBITRARY(testval_tag_t, 1, UINT_MAX - 1)
 #define TESTVAL_LOG_FMT_testval_tag_t "%x"
 
+#undef PROBE
 #define PROBE(_name)                                    \
     do {                                                \
         extern unsigned testprobe_##_name;              \
         testprobe_##_name++;                            \
     } while(0)
-
 
 #ifdef __cplusplus
 }

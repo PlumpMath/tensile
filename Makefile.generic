@@ -48,7 +48,7 @@ endif
 
 C_SOURCES = bitops.c
 
-GENERIC_C_SOURCES = allocator.c #array.c
+GENERIC_C_SOURCES = allocator.c array.c
 
 IMPL_SOURCES = $(C_SOURCES:.c=_impl.c)
 IMPL_SOURCES += tensile.tab.c lex.yy.c
@@ -59,7 +59,7 @@ GENERATED_FILES += $(GENERIC_C_SOURCES:.c=_impl.c) $(GENERIC_C_SOURCES:.c=_api.h
 DOC_SOURCES = $(C_SOURCES) $(GENERIC_C_SOURCES)
 DOC_SOURCES += compiler.h
 
-TESTABLES = bitops allocator
+TESTABLES = bitops allocator array
 
 APPLICATION = tensile
 

@@ -86,6 +86,7 @@ function dump_public_section(  decl, def) {
     }
     if (decl)
     {
+        gsub(/PROBE\([^)]+\);/, "/* & */", decl)
         initialize_header();
         printf "#line %d \"%s\"\n%s", public_section_start, FILENAME, decl >header_file
     }
