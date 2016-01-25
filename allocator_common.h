@@ -71,7 +71,7 @@ void *pool_alloc(void * restrict * restrict pool,
 }
 
 static inline arguments(not_null) returns(important)
-bool pool_maybe_free(void ** restrict pool,
+bool pool_maybe_free(void * restrict * restrict pool,
                      size_t * restrict pool_size,
                      void *obj, size_t objsize, size_t align)
 {

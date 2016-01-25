@@ -120,11 +120,11 @@ ALLOC_TYPE *alloc_TYPE(size_t n)
         return obj;
 #endif
 
-    if (n < MAX_BUCKET && freelist_TYPE[n] != NULL)
+    if (n_bucket < MAX_BUCKET && freelist_TYPE[n_bucket] != NULL)
     {
         PROBE(alloc_from_freelist);
-        obj = (ALLOC_TYPE *)freelist_TYPE[n];
-        freelist_TYPE[n] = freelist_TYPE[n]->chain;
+        obj = (ALLOC_TYPE *)freelist_TYPE[n_bucket];
+        freelist_TYPE[n_bucket] = freelist_TYPE[n_bucket]->chain;
 
         return obj;
     }
@@ -168,7 +168,7 @@ static void allocate_zero(void)
 #define free_TYPE ALLOC_PREFIX(free)
 
 /* public */
-void free_TYPE(size_t _nelem, ALLOC_TYPE _obj[conformant(_nelem)])
+void free_TYPE(size_t _nelem, ALLOC_TYPE _obj[var_size(_nelem)])
 {
     size_t _i;
     size_t _n_bucket;
@@ -256,42 +256,38 @@ static void allocate_free_allocate(testval_small_uint_t n)
         free_simple_type(n, st);
         st1 = new_simple_type(n);
         ASSERT_EQ(ptr, st, st1);
-        ASSERT_NULL(freelist_simple_type[n]);
+        ASSERT_NULL(freelist_simple_type[n - 1]);
         for (i = 0; i < n; i++)
             ASSERT_EQ(unsigned, st1[i].state, STATE_INITIALIZED);
-        ASSERT_EQ(unsigned, track_simple_type[n], 1);
+        ASSERT_EQ(unsigned, track_simple_type[n - 1], 1);
         free_simple_type(n, st1);
     }
 }
 
 #if 0
 /* local */
-#define unshare_TYPE ALLOC_PREFIX(unshare)
-
-static inline arguments(not_null)
-void unshare_TYPE(unused ALLOC_TYPE *_obj)
-{
-#if TYPE_IS_REFCNTED
-    PROBE(unshare_refcnt);
-    _obj->refcnt = 1;
-#endif
-    PROBE(unshare_object);
-    ALLOC_COPY_CODE(_obj);
-}
-
-/* local */
 #define copy_TYPE ALLOC_PREFIX(copy)
 
-returns(not_null) returns(important) arguments(not_null)
-ALLOC_TYPE *copy_TYPE(const ALLOC_TYPE *_orig)
+returns(important)
+ALLOC_TYPE *copy_TYPE(size_t _nelem,
+                      const ALLOC_TYPE _orig[var_size(_nelem)])
 {
-    ALLOC_TYPE *_copy = alloc_TYPE();
+    if (_nelem == 0)
+        return NULL;
+    else
+    {
+        ALLOC_TYPE *_copy = alloc_TYPE(_nelem);
+        size_t _i;
 
-    assert(_orig != NULL);
-    PROBE(do_copy);
-    memcpy(_copy, _orig, sizeof(*_copy));
-    unshare_TYPE(_copy);
-    return _copy;
+        assert(_orig != NULL);
+        PROBE(do_copy);
+        memcpy(_copy, _orig, sizeof(*_copy) * _nelem);
+        for (_i = 0; _i < _nelem; _i++)
+        {
+            ALLOC_COPY_CODE((&_copy[_i]));
+        }
+        return _copy;
+    }
 }
 
 /* Test: Copy

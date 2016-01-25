@@ -209,13 +209,13 @@ extern "C"
 #endif
 
 /*!<
- * - conformant(_n)
+ * - var_size(_n)
  */
 #if (__STDC_VERSION__ >= 199901L && !__STDC_NO_VLA__) ||    \
     (defined(__GNUC__) && !__STRICT_ANSI__)
-#define conformant(_x) _x
+#define var_size(_x) _x
 #else
-#define conformant(_x)
+#define var_size(_x)
 #endif
     
 /*!<

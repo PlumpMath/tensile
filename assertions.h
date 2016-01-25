@@ -450,12 +450,10 @@ typedef unsigned testval_tag_t;
     TESTVAL_GENERATE_ARBITRARY(testval_tag_t, 1, UINT_MAX - 1)
 #define TESTVAL_LOG_FMT_testval_tag_t "%x"
 
+static void testcase_hit_probe(const char *fname, unsigned line);
+
 #undef PROBE
-#define PROBE(_name)                                    \
-    do {                                                \
-        extern unsigned testprobe_##_name;              \
-        testprobe_##_name++;                            \
-    } while(0)
+#define PROBE(_name) testcase_hit_probe(__FILE__, __LINE__)
 
 #ifdef __cplusplus
 }

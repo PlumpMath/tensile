@@ -48,10 +48,12 @@ function initialize_header( hdef) {
     header_initialized = 1
 }
 
-function dump_public_section(  decl, def) {
-    sub(/\/\*([^*]+|\*+[^*/])*\*+\//, " ", public_section);
+function dump_public_section(  decl, def, header) {
+    header = gensub(/^(\s*(\/\*([^*]+|\*+[^*/])*\*+\/)?\s*).*$/, "\\1", "1", public_section);
+    public_section = substr(public_section, length(header) + 1);
+    
     if (in_public == "define" ||
-        in_public == "include" || public_section ~ /^\s*static\>/)
+        in_public == "include" || public_section ~ /^static\>/)
     {
         decl = public_section
         def = ""
@@ -66,7 +68,7 @@ function dump_public_section(  decl, def) {
         decl = gensub(/(#\s*include\s+[<"][^>"]+)_impl\.c([>"])/, "\\1_api.h\\2", "g", public_section);
         def = public_section
     }
-    else if (public_section ~ /^\stypedef\>/)
+    else if (public_section ~ /^typedef\>/)
     {
         if (public_section !~ /\/\*\s*abstract\s*\*\//)
         {
@@ -76,7 +78,7 @@ function dump_public_section(  decl, def) {
         else
         {
             decl = gensub(/^([^{]*)\{.*\}([^}]*)$/, "\\1\\2", "1", public_section);
-            def = gensub(/^\s*typedef\s*(.*\})([^}]*)$/, "\\1;\n", "1", public_section);
+            def = gensub(/^typedef\s*(.*\})([^}]*)$/, "\\1;\n", "1", public_section);
         }
     }
     else
@@ -86,13 +88,12 @@ function dump_public_section(  decl, def) {
     }
     if (decl)
     {
-        gsub(/PROBE\([^)]+\);/, "/* & */", decl)
         initialize_header();
-        printf "#line %d \"%s\"\n%s", public_section_start, FILENAME, decl >header_file
+        printf "#line %d \"%s\"\n%s%s", public_section_start, FILENAME, header, decl >header_file
     }
     if (def)
     {
-        printf "#line %d \"%s\"\n%s", public_section_start, FILENAME, def
+        printf "#line %d \"%s\"\n%s%s", public_section_start, FILENAME, header, def
     }
     public_section = ""
     in_public = ""
@@ -107,6 +108,7 @@ function dump_public_section(  decl, def) {
     printf "#line %d \"%s\"\n%s", start_fnr, FILENAME, macro_def >header_file
     printf "#line %d \"%s\"\n%s", start_fnr, FILENAME, macro_def
     printf "#line %d \"%s\"\n", FNR + 1, FILENAME
+    next
 }
 
 !in_tests && /^\s*PROBE\(\w+\);\s*$/ {
@@ -337,11 +339,24 @@ END {
             printf "#undef %s\n", header_guard >header_file
     }
     if (testcases) {
-        for (probe_name in TESTPROBES)
-            print "unsigned testprobe_" probe_name " = 0;" >tests_file
         print "#line 1 \"extract_code.all.c\"" >tests_file
+        print "static struct { const char *name; unsigned count; } testprobes[] = {" >tests_file
+        for (probe_name in TESTPROBES)
+        {
+            printf "[%d] = {.name = \"%s\",},\n", TESTPROBES[probe_name], probe_name >tests_file
+        }
+        print "};" >tests_file
+        print "" > tests_file        
+        print "static void testcase_hit_probe(const char *fname, unsigned line)" >tests_file
+        print "{" >tests_file
+        printf "if (strcmp(\"%s\", fname) != 0) { return; }\n", FILENAME >tests_file
+        print "if (line >= sizeof(testprobes) / sizeof(*testprobes) || testprobes[line].name == NULL) { fprintf(stderr, \"alien probe line: %u\\n\", line); return; };" >tests_file
+        print "testprobes[line].count++;" >tests_file
+        print "}" >tests_file
+        print "" >tests_file
         print "int main(void)" >tests_file
         print "{" >tests_file
+        print "unsigned i;" >tests_file        
         print "SET_RANDOM_SEED();" >tests_file
         print "#ifdef TESTSUITE\n" >tests_file
         print "fprintf(stderr, \"%s:\\n\", TESTSUITE);" >tests_file
@@ -355,10 +370,10 @@ END {
         print "}" >tests_file
         print "#endif" >tests_file
         print "fputs(\"Probes not hit:\\n\", stderr);" >tests_file
-        for (probe_name in TESTPROBES) {
-            printf "if (!testprobe_%s) fputs(\"- %s\\n\", stderr);\n",
-                probe_name, probe_name > tests_file;
-        }
+        print "for (i = 0; i < sizeof(testprobes) / sizeof(*testprobes); i++)" >tests_file
+        print "{" >tests_file
+        print "if (testprobes[i].name != NULL && testprobes[i].count == 0) fprintf(stderr, \"- %s\\n\", testprobes[i].name);" >tests_file
+        print "}" >tests_file
         print "return 0;" >tests_file
         print "}" >tests_file
     }
