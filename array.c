@@ -124,7 +124,7 @@ ALLOC_TYPE *alloc_TYPE(size_t n)
     {
         PROBE(try_pool_alloc);
         obj = pool_alloc(&ALLOC_POOL_PTR, &ALLOC_POOL_SIZE,
-                         sizeof(*obj) * n, sizeof(ALLOC_POOL_ALIGN_AS));        
+                         sizeof(*obj) * n, sizeof(ALLOC_POOL_ALIGN_AS));
         if (obj != NULL)
         {
             PROBE(pool_alloc);
@@ -183,7 +183,7 @@ static arguments(not_null)
 void dispose_TYPE(size_t nelem, ALLOC_TYPE obj[var_size(nelem)])
 {
     size_t n_bucket = alloc_calculate_bucket(nelem, BUCKET_SIZE,
-                                             BUCKET_LOG2_SCALE);   
+                                             BUCKET_LOG2_SCALE);
 
 #if TRACK_ALLOCATOR
     assert(track_TYPE[n_bucket > MAX_BUCKET ? MAX_BUCKET : n_bucket] > 0);
@@ -196,7 +196,7 @@ void dispose_TYPE(size_t nelem, ALLOC_TYPE obj[var_size(nelem)])
         free(obj);
         return;
     }
-    
+
 #if USE_ALLOC_POOL
     nelem = alloc_bucket_size(n_bucket, BUCKET_SIZE, BUCKET_LOG2_SCALE);
     if (pool_maybe_free(&ALLOC_POOL_PTR, &ALLOC_POOL_SIZE,
@@ -241,7 +241,7 @@ static void free_null(void)
 {
     freelist_t *prev = freelist_simple_type[0];
     free_simple_type(0, NULL);
-    ASSERT_EQ(ptr, freelist_simple_type[0], prev);    
+    ASSERT_EQ(ptr, freelist_simple_type[0], prev);
     ASSERT_EQ(unsigned, track_simple_type[0], 0);
 }
 
@@ -419,7 +419,7 @@ static void alloc_from_pool(testval_small_uint_t n)
         ASSERT_NEQ(ptr, st, current_pool);
         free_pool_short(n + 1, st);
     }
-        
+
     ASSERT_EQ(unsigned, (uintptr_t)st % sizeof(double), 0);
 
     if (n == TESTVAL_SMALL_UINT_MAX)
@@ -449,7 +449,7 @@ static void alloc_from_pool_and_return(testval_small_uint_t n)
     free_pool_short(n + 1, st);
     ASSERT_EQ(unsigned, shared_pool_size, 3 * sizeof(double));
     ASSERT_NULL(freelist_pool_short[n]);
-    
+
     if (n == TESTVAL_SMALL_UINT_MAX)
     {
         free(pool_base);
@@ -463,7 +463,7 @@ static void alloc_not_from_pool(testval_small_uint_t n)
 {
     void *pool_base;
     short *st;
-    
+
     shared_pool_size = sizeof(short) * (n + 1) - 1;
     shared_pool_ptr = pool_base = malloc(shared_pool_size);
     st = new_pool_short(n + 1);
@@ -485,13 +485,16 @@ static void alloc_not_from_pool(testval_small_uint_t n)
 #define grow_TYPE ALLOC_PREFIX(grow)
 
 /* public */
-arguments(not_null) 
+arguments(not_null)
 ALLOC_TYPE *grow_TYPE(size_t * restrict nelem,
                       ALLOC_TYPE * restrict * restrict items,
                       size_t incr)
 {
-    asserts(items != NULL);
-    
+    assert(items != NULL);
+    size_t old_bucket;
+    size_t new_bucket;
+    size_t i;
+
     if (incr == 0)
     {
         PROBE(no_grow);
@@ -499,9 +502,183 @@ ALLOC_TYPE *grow_TYPE(size_t * restrict nelem,
     }
     if (*items == NULL)
     {
-        *i
+        PROBE(grow_from_null);
+        *items = new_TYPE(incr);
+        *nelem = incr;
+        return *items;
     }
+    old_bucket = alloc_calculate_bucket(*nelem, BUCKET_SIZE,
+                                        BUCKET_LOG2_SCALE);
+    new_bucket = alloc_calculate_bucket(*nelem + incr, BUCKET_SIZE,
+                                        BUCKET_LOG2_SCALE);
+    assert(new_bucket >= old_bucket);
+    if (old_bucket >= MAX_BUCKET || old_bucket != new_bucket)
+    {
+        ALLOC_TYPE *new_items = alloc_TYPE(*nelem + incr);
+
+        memcpy(new_items, *items, sizeof(**items) * *nelem);
+        dispose_TYPE(*nelem, *items);
+        *items = new_items;
+        PROBE(grow_new_bucket);
+    }
+    for (i = 0; i < *nelem + incr; i++)
+    {
+        ALLOC_CONSTRUCTOR_CODE((&(*items)[i]));
+    }
+    PROBE(do_grow);
+    *nelem += incr;
+    return *items + *nelem - incr;
 }
+
+/*! Test: Grow with zero increment
+ */
+static void grow_by_zero(testval_small_uint_t n)
+{
+    size_t sz = n;
+    simple_type *st = new_simple_type(n);
+    simple_type *gst = st;
+    simple_type *gst2 = grow_simple_type(&sz, &gst, 0);
+
+    ASSERT_EQ(ptr, gst, st);
+    ASSERT_EQ(ptr, gst, gst2);
+
+    free_simple_type(n, gst);
+}
+
+/*! Test: Grow by one
+ */
+static void grow_by_one(testval_small_uint_t n)
+{
+    size_t sz = n;
+    simple_type *st = new_simple_type(n);
+    simple_type *gst = st;
+    simple_type *gst2 = grow_simple_type(&sz, &gst, 1);
+    size_t i;
+
+    ASSERT_NOT_NULL(gst);
+    ASSERT_NEQ(ptr, gst, st);
+    ASSERT_EQ(unsigned, sz, n + 1);
+    ASSERT_EQ(ptr, gst2, gst + n);
+
+    if (n != 0)
+        ASSERT_EQ(ptr, freelist_simple_type[n - 1], st);
+    for (i = 0; i < sz; i++)
+    {
+        ASSERT_EQ(unsigned, gst[i].tag, SIMPLE_TYPE_TAG);
+        ASSERT_EQ(unsigned, gst[i].state, STATE_INITIALIZED);
+    }
+    free_simple_type(sz, gst);
+    if (n != TESTVAL_SMALL_UINT_MAX)
+        ASSERT_EQ(ptr, freelist_simple_type[n], gst);
+}
+
+/* local */
+#define ensure_TYPE_size QNAME(ALLOC_PREFIX(ensure), size)
+
+/* public */
+static inline arguments(not_null)
+ALLOC_TYPE *ensure_TYPE_size(size_t * restrict nelem,
+                             ALLOC_TYPE * restrict * restrict items,
+                             size_t req_size,
+                             size_t reserve)
+{
+    if (*nelem >= req_size)
+    {
+        PROBE(no_need_to_grow);
+        return *items;
+    }
+    PROBE(need_to_grow);
+    grow_TYPE(nelem, items, req_size - *nelem + reserve);
+    return *items;
+}
+
+/*! Test: Ensure size
+ */
+static void test_ensure_size(testval_small_uint_t n)
+{
+    size_t sz = n;
+    simple_type *st = new_simple_type(n);
+    simple_type *gst = st;
+    simple_type *gst2 = ensure_simple_type_size(&sz, &gst, n + 1, 1);
+
+    ASSERT_EQ(unsigned, sz, n + 2);
+    ASSERT_EQ(ptr, gst, gst2);
+    ASSERT_NEQ(ptr, st, gst);
+
+    st = gst;
+    gst2 = ensure_simple_type_size(&sz, &gst, n + 2, 1);
+    ASSERT_EQ(unsigned, sz, n + 2);
+    ASSERT_EQ(ptr, gst2, gst);
+    ASSERT_EQ(ptr, gst, st);
+
+    gst2 = ensure_simple_type_size(&sz, &gst, n, 1);
+    ASSERT_EQ(unsigned, sz, n + 2);
+    ASSERT_EQ(ptr, gst2, gst);
+    ASSERT_EQ(ptr, gst, st);
+
+    free_simple_type(sz, gst);
+}
+
+/* TESTS */
+#define SIMPLE_TYPE_BUCKET_SIZE 1024
+
+/* instantiate */
+#define ALLOC_TYPE simple_type
+#define ALLOC_NAME simple_type_page
+#define TRACK_ALLOCATOR true
+#define ALLOC_CONSTRUCTOR_CODE(_obj)                        \
+    do {                                                    \
+        (_obj)->state = STATE_INITIALIZED;                  \
+        (_obj)->tag = SIMPLE_TYPE_TAG;                      \
+    } while(0)
+#define ALLOC_COPY_CODE(_obj) (_obj)->state = STATE_COPIED
+#define ALLOC_DESTRUCTOR_CODE(_obj) (_obj)->state = STATE_FINALIZED
+#define BUCKET_SIZE SIMPLE_TYPE_BUCKET_SIZE
+#define MAX_BUCKET (TESTVAL_SMALL_UINT_MAX + 1)
+#include "array_api.h"
+#include "array_impl.c"
+/* end */
+
+/*! Test: Grow by one
+ */
+static void alloc_and_grow_by_page(testval_small_uint_t n)
+{
+    size_t initial_sz = (n + 1) * SIMPLE_TYPE_BUCKET_SIZE;
+    size_t sz = initial_sz;
+    simple_type *st = new_simple_type_page(sz);
+    simple_type *gst = st;
+    simple_type *gst2;
+    size_t i;
+
+    ASSERT_NOT_NULL(st);
+
+    gst2 = grow_simple_type_page(&sz, &gst, 1);
+    ASSERT_EQ(ptr, gst, st);
+    ASSERT_EQ(unsigned, sz, initial_sz + 1);
+    ASSERT_EQ(ptr, gst2, gst + initial_sz);
+
+    gst2 = grow_simple_type_page(&sz, &gst, SIMPLE_TYPE_BUCKET_SIZE - 2);
+    ASSERT_EQ(ptr, gst, st);
+    ASSERT_EQ(unsigned, sz, initial_sz + SIMPLE_TYPE_BUCKET_SIZE - 1);
+    ASSERT_EQ(ptr, gst2, gst + initial_sz + 1);
+
+    gst2 = grow_simple_type_page(&sz, &gst, 1);
+    ASSERT_NEQ(ptr, gst, st);
+    ASSERT_EQ(unsigned, sz, initial_sz + SIMPLE_TYPE_BUCKET_SIZE);
+    ASSERT_EQ(ptr, gst2, gst + initial_sz + SIMPLE_TYPE_BUCKET_SIZE - 1);
+    ASSERT_EQ(ptr, freelist_simple_type[n], st);
+
+    for (i = 0; i < sz; i++)
+    {
+        ASSERT_EQ(unsigned, gst[i].tag, SIMPLE_TYPE_TAG);
+        ASSERT_EQ(unsigned, gst[i].state, STATE_INITIALIZED);
+    }
+    free_simple_type_page(sz, gst);
+    if (n != TESTVAL_SMALL_UINT_MAX)
+        ASSERT_EQ(ptr, freelist_simple_type[n + 1], gst);
+}
+
+
 
 #if 0
 
@@ -1479,4 +1656,3 @@ static void test_resize_larger_n(size_t n)
 
 
 #endif // defined(ALLOCATOR_IMP)
-
