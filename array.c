@@ -79,13 +79,19 @@ enum object_state {
 
 typedef struct simple_type {
     enum object_state state;
+    unsigned tag;
 } simple_type;
+
+#define SIMPLE_TYPE_TAG STATIC_ARBITRARY(32)
 
 /* instantiate */
 #define ALLOC_TYPE simple_type
 #define TRACK_ALLOCATOR true
-#define ALLOC_CONSTRUCTOR_CODE(_obj)            \
-    (_obj)->state = STATE_INITIALIZED
+#define ALLOC_CONSTRUCTOR_CODE(_obj)                        \
+    do {                                                    \
+        (_obj)->state = STATE_INITIALIZED;                  \
+        (_obj)->tag = SIMPLE_TYPE_TAG;                      \
+    } while(0)
 #define ALLOC_COPY_CODE(_obj) (_obj)->state = STATE_COPIED
 #define ALLOC_DESTRUCTOR_CODE(_obj) (_obj)->state = STATE_FINALIZED
 #define MAX_BUCKET (TESTVAL_SMALL_UINT_MAX)
@@ -114,10 +120,17 @@ ALLOC_TYPE *alloc_TYPE(size_t n)
 
 #if USE_ALLOC_POOL
     assert(ALLOC_POOL_PTR != NULL);
-    obj = pool_alloc(&ALLOC_POOL_PTR, &ALLOC_POOL_SIZE,
-                     sizeof(*obj) * n, sizeof(ALLOC_POOL_ALIGN_AS));
-    if (obj != NULL)
-        return obj;
+    if (n_bucket < MAX_BUCKET)
+    {
+        PROBE(try_pool_alloc);
+        obj = pool_alloc(&ALLOC_POOL_PTR, &ALLOC_POOL_SIZE,
+                         sizeof(*obj) * n, sizeof(ALLOC_POOL_ALIGN_AS));        
+        if (obj != NULL)
+        {
+            PROBE(pool_alloc);
+            return obj;
+        }
+    }
 #endif
 
     if (n_bucket < MAX_BUCKET && freelist_TYPE[n_bucket] != NULL)
@@ -163,6 +176,43 @@ static void allocate_zero(void)
     ASSERT_NULL(new_simple_type(0));
 }
 
+/* local */
+#define dispose_TYPE ALLOC_PREFIX(dispose)
+
+static arguments(not_null)
+void dispose_TYPE(size_t nelem, ALLOC_TYPE obj[var_size(nelem)])
+{
+    size_t n_bucket = alloc_calculate_bucket(nelem, BUCKET_SIZE,
+                                             BUCKET_LOG2_SCALE);   
+
+#if TRACK_ALLOCATOR
+    assert(track_TYPE[n_bucket > MAX_BUCKET ? MAX_BUCKET : n_bucket] > 0);
+    track_TYPE[n_bucket > MAX_BUCKET ? MAX_BUCKET : n_bucket]--;
+#endif
+
+    if (n_bucket >= MAX_BUCKET)
+    {
+        PROBE(free_large);
+        free(obj);
+        return;
+    }
+    
+#if USE_ALLOC_POOL
+    nelem = alloc_bucket_size(n_bucket, BUCKET_SIZE, BUCKET_LOG2_SCALE);
+    if (pool_maybe_free(&ALLOC_POOL_PTR, &ALLOC_POOL_SIZE,
+                        obj, sizeof(*obj) * nelem,
+                        sizeof(ALLOC_POOL_ALIGN_AS)))
+    {
+        PROBE(free_to_pool);
+        return;
+    }
+    PROBE(fail_free_to_pool);
+#endif
+    PROBE(free_to_list);
+    ((freelist_t *)obj)->chain = freelist_TYPE[n_bucket];
+    freelist_TYPE[n_bucket] = (freelist_t *)obj;
+}
+
 
 /* local */
 #define free_TYPE ALLOC_PREFIX(free)
@@ -171,7 +221,6 @@ static void allocate_zero(void)
 void free_TYPE(size_t _nelem, ALLOC_TYPE _obj[var_size(_nelem)])
 {
     size_t _i;
-    size_t _n_bucket;
 
     if (_obj == NULL) {
         PROBE(free_null);
@@ -183,35 +232,17 @@ void free_TYPE(size_t _nelem, ALLOC_TYPE _obj[var_size(_nelem)])
         ALLOC_DESTRUCTOR_CODE((&_obj[_i]));
     }
 
-    _n_bucket = alloc_calculate_bucket(_nelem, BUCKET_SIZE,
-                                       BUCKET_LOG2_SCALE);
+    dispose_TYPE(_nelem, _obj);
+}
 
-
-#if TRACK_ALLOCATOR
-    assert(track_TYPE[_n_bucket > MAX_BUCKET ? MAX_BUCKET : _n_bucket] > 0);
-    track_TYPE[_n_bucket > MAX_BUCKET ? MAX_BUCKET : _n_bucket]--;
-#endif
-#if USE_ALLOC_POOL
-    _nelem = alloc_bucket_size(_n_bucket, BUCKET_SIZE, BUCKET_LOG2_SCALE);
-    if (pool_maybe_free(&ALLOC_POOL_PTR, &ALLOC_POOL_SIZE,
-                        _obj, sizeof(*_obj) * _nelem,
-                        sizeof(ALLOC_POOL_ALIGN_AS)))
-    {
-        PROBE(free_to_pool);
-        return;
-    }
-#endif
-    if (_n_bucket < MAX_BUCKET)
-    {
-        PROBE(free_to_list);
-        ((freelist_t *)_obj)->chain = freelist_TYPE[_n_bucket];
-        freelist_TYPE[_n_bucket] = (freelist_t *)_obj;
-    }
-    else
-    {
-        PROBE(free_large);
-        free(_obj);
-    }
+/*! Test: Free NULL
+ */
+static void free_null(void)
+{
+    freelist_t *prev = freelist_simple_type[0];
+    free_simple_type(0, NULL);
+    ASSERT_EQ(ptr, freelist_simple_type[0], prev);    
+    ASSERT_EQ(unsigned, track_simple_type[0], 0);
 }
 
 
@@ -225,17 +256,22 @@ static void allocate_and_free(testval_small_uint_t n)
     ASSERT_NOT_NULL(st);
     ASSERT_EQ(unsigned, track_simple_type[n], 1);
     for (i = 0; i < n + 1; i++)
+    {
+        ASSERT_EQ(unsigned, st[i].tag, SIMPLE_TYPE_TAG);
         ASSERT_EQ(unsigned, st[i].state, STATE_INITIALIZED);
+    }
 
     free_simple_type(n + 1, st);
     if (n != TESTVAL_SMALL_UINT_MAX)
-        ASSERT_EQ(ptr, freelist_simple_type[n], (void *)st);
-    for (i = (sizeof(void *) + sizeof(simple_type) - 1) /
-             sizeof(simple_type);
-         i < n + 1;
-         i++)
     {
-        ASSERT_EQ(unsigned, st[i].state, STATE_FINALIZED);
+        ASSERT_EQ(ptr, freelist_simple_type[n], (void *)st);
+        for (i = (sizeof(void *) + sizeof(simple_type) - 1) /
+                 sizeof(simple_type);
+             i < n + 1;
+             i++)
+        {
+            ASSERT_EQ(unsigned, st[i].state, STATE_FINALIZED);
+        }
     }
     ASSERT_EQ(unsigned, track_simple_type[n], 0);
 }
@@ -302,7 +338,10 @@ static void test_copy(testval_small_uint_t n)
     ASSERT_NEQ(ptr, st, st1);
 
     for (i = 0; i < n + 1; i++)
+    {
+        ASSERT_EQ(unsigned, st1[i].tag, SIMPLE_TYPE_TAG);
         ASSERT_EQ(unsigned, st1[i].state, STATE_COPIED);
+    }
     ASSERT_EQ(unsigned, track_simple_type[n], 2);
     free_simple_type(n + 1, st);
     free_simple_type(n + 1, st1);
@@ -337,72 +376,132 @@ static void *shared_pool_ptr;
 static size_t shared_pool_size;
 
 /* instantiate */
-#define ALLOC_TYPE simple_type
-#define ALLOC_NAME pool_simple_type
+#define ALLOC_TYPE short
+#define ALLOC_NAME pool_short
 #define USE_ALLOC_POOL true
 #define ALLOC_POOL_PTR shared_pool_ptr
 #define ALLOC_POOL_SIZE shared_pool_size
 #define TRACK_ALLOCATOR true
-#define ALLOC_CONSTRUCTOR_ARGS testval_tag_t tag
-#define ALLOC_CONSTRUCTOR_CODE(_obj)            \
-    do {                                        \
-        (_obj)->tag = tag;                      \
-        (_obj)->state = STATE_INITIALIZED;      \
-    } while(0)
-#define ALLOC_COPY_CODE(_obj) (_obj)->state = STATE_COPIED
-#define ALLOC_DESTRUCTOR_CODE(_obj) (_obj)->state = STATE_FINALIZED
-#include "allocator_api.h"
-#include "allocator_impl.c"
+#define ALLOC_CONSTRUCTOR_CODE(_obj) (*(_obj) = (short)STATE_INITIALIZED)
+#define MAX_BUCKET (TESTVAL_SMALL_UINT_MAX)
+#include "array_api.h"
+#include "array_impl.c"
 /* end */
 
-/* Test: Allocate from pool
+/*! Test: Allocate from pool
  */
-static void alloc_from_pool(testval_tag_t tag)
+static void alloc_from_pool(testval_small_uint_t n)
 {
-    simple_type *st;
-    void *pool_base;
+    short *st;
+    static void *pool_base;
+    void *current_pool;
+    unsigned i;
 
-    pool_base = shared_pool_ptr = malloc(sizeof(simple_type));
-    shared_pool_size = sizeof(simple_type);
+    if (n == 0)
+    {
+        /* that's the space for arrays up to 10 short's +
+         * double-boundary alignment
+         */
+        shared_pool_size = 4 * sizeof(double) + 4 * 2 * sizeof(double) +
+            3 * sizeof(double);
+        pool_base = shared_pool_ptr = malloc(shared_pool_size);
+    }
 
-    st = new_pool_simple_type(tag);
+    current_pool = shared_pool_ptr;
+    st = new_pool_short(n + 1);
     ASSERT_NOT_NULL(st);
-    ASSERT_EQ(unsigned, st->state, STATE_INITIALIZED);
-    ASSERT_EQ(unsigned, st->tag, tag);
-    ASSERT_EQ(ptr, st, pool_base);
-    ASSERT_EQ(unsigned, shared_pool_size, 0);
-    ASSERT_EQ(ptr, (uint8_t *)shared_pool_ptr,
-              (uint8_t *)pool_base + sizeof(simple_type));
-    free_pool_simple_type(st);
-    ASSERT_EQ(ptr, shared_pool_ptr, pool_base);
-    ASSERT_EQ(unsigned, shared_pool_size, sizeof(simple_type));
-    ASSERT_NULL(freelist_pool_simple_type);
-    free(pool_base);
+    for (i = 0; i < n + 1; i++)
+        ASSERT_EQ(int, st[i], (short)STATE_INITIALIZED);
+    if (n < TESTVAL_SMALL_UINT_MAX)
+        ASSERT_EQ(ptr, st, current_pool);
+    else
+    {
+        ASSERT_NEQ(ptr, st, current_pool);
+        free_pool_short(n + 1, st);
+    }
+        
+    ASSERT_EQ(unsigned, (uintptr_t)st % sizeof(double), 0);
+
+    if (n == TESTVAL_SMALL_UINT_MAX)
+    {
+        ASSERT_EQ(unsigned, shared_pool_size, 0);
+        free(pool_base);
+        pool_base = NULL;
+    }
 }
 
-/* Test: Allocate from pool and then malloc
+/*! Test: Allocate from pool and immediately free
  */
-static void alloc_from_pool_and_malloc(testval_tag_t tag)
+static void alloc_from_pool_and_return(testval_small_uint_t n)
 {
-    simple_type *st;
-    simple_type *st1;
-    void *pool_base;
+    short *st;
+    static void *pool_base;
 
-    pool_base = shared_pool_ptr = malloc(sizeof(simple_type));
-    shared_pool_size = sizeof(simple_type);
 
-    st = new_pool_simple_type(tag);
-    st1 = new_pool_simple_type(~tag);
-    ASSERT_NEQ(ptr, st, st1);
-    ASSERT_EQ(unsigned, shared_pool_size, 0);
-    ASSERT_NEQ(ptr, st1, (uint8_t *)pool_base + sizeof(simple_type));
-    ASSERT_EQ(ptr, shared_pool_ptr, (uint8_t *)pool_base + sizeof(simple_type));
-    free_pool_simple_type(st1);
-    free(pool_base);
+    if (n == 0)
+    {
+        shared_pool_size = 3 * sizeof(double);
+        pool_base = shared_pool_ptr = malloc(shared_pool_size);
+    }
+    st = new_pool_short(n + 1);
+    if (n < TESTVAL_SMALL_UINT_MAX)
+        ASSERT_EQ(ptr, st, pool_base);
+    free_pool_short(n + 1, st);
+    ASSERT_EQ(unsigned, shared_pool_size, 3 * sizeof(double));
+    ASSERT_NULL(freelist_pool_short[n]);
+    
+    if (n == TESTVAL_SMALL_UINT_MAX)
+    {
+        free(pool_base);
+        pool_base = NULL;
+    }
 }
 
+/*! Test: Malloc when no space in the pool
+ */
+static void alloc_not_from_pool(testval_small_uint_t n)
+{
+    void *pool_base;
+    short *st;
+    
+    shared_pool_size = sizeof(short) * (n + 1) - 1;
+    shared_pool_ptr = pool_base = malloc(shared_pool_size);
+    st = new_pool_short(n + 1);
+    ASSERT_NOT_NULL(st);
+    ASSERT_NEQ(ptr, st, pool_base);
+    ASSERT_EQ(ptr, pool_base, shared_pool_ptr);
+    ASSERT_EQ(unsigned, shared_pool_size, sizeof(short) * (n + 1) - 1);
+    free_pool_short(n + 1, st);
+    ASSERT_EQ(ptr, pool_base, shared_pool_ptr);
+    ASSERT_EQ(unsigned, shared_pool_size, sizeof(short) * (n + 1) - 1);
+    if (n < TESTVAL_SMALL_UINT_MAX)
+        ASSERT_EQ(ptr, freelist_pool_short[n], st);
+    free(pool_base);
+}
 
 /* END */
+
+/* local */
+#define grow_TYPE ALLOC_PREFIX(grow)
+
+/* public */
+arguments(not_null) 
+ALLOC_TYPE *grow_TYPE(size_t * restrict nelem,
+                      ALLOC_TYPE * restrict * restrict items,
+                      size_t incr)
+{
+    asserts(items != NULL);
+    
+    if (incr == 0)
+    {
+        PROBE(no_grow);
+        return *items;
+    }
+    if (*items == NULL)
+    {
+        *i
+    }
+}
 
 #if 0
 
@@ -1381,5 +1480,3 @@ static void test_resize_larger_n(size_t n)
 
 #endif // defined(ALLOCATOR_IMP)
 
-#endif // 0
-#endif // 0

@@ -53,8 +53,8 @@ static bool testcase_failed = false;
         if (!(_expr))                                                   \
         {                                                               \
             fprintf(stderr,                                             \
-                    TEST_MSG_ALERT("Assertion " #_expr                  \
-                                   " failed at %s[%s:%u]\n"),           \
+                    TEST_MSG_ALERT("Assertion %s failed at %s[%s:%u]\n"), \
+                    #_expr                                              \
                     __FUNCTION__, __FILE__, __LINE__);                  \
             ASSERT_FAIL;                                                \
         }                                                               \
@@ -70,12 +70,12 @@ static bool testcase_failed = false;
         if (!_comparator(__var1, __var2))                               \
         {                                                               \
             fprintf(stderr,                                             \
-                    TEST_MSG_ALERT("Assertion " #_expr1 " " _cmpname    \
-                                   " " #_expr2                          \
+                    TEST_MSG_ALERT("Assertion %s " _cmpname  " %s "     \
                                    " failed at %s[%s:%u]: expected "    \
                                    _fmt ", got " _fmt "\n"),            \
-                                   __FUNCTION__, __FILE__, __LINE__,    \
-                                   __var2, __var1);                     \
+                    #_expr1, #_expr2,                                   \
+                    __FUNCTION__, __FILE__, __LINE__,                   \
+                    __var2, __var1);                                    \
                     ASSERT_FAIL;                                        \
         }                                                               \
     } while(0)

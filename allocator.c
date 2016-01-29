@@ -118,10 +118,15 @@ ALLOC_TYPE *alloc_TYPE(void)
 
 #if USE_ALLOC_POOL
     assert(ALLOC_POOL_PTR != NULL);
+
     obj = pool_alloc(&ALLOC_POOL_PTR, &ALLOC_POOL_SIZE,
                      sizeof(*obj), sizeof(ALLOC_POOL_ALIGN_AS));
     if (obj != NULL)
+    {
+        PROBE(pool_alloc);
         return obj;
+    }
+    PROBE(fail_pool_alloc);
 #endif
 
     if (freelist_TYPE != NULL)
@@ -421,6 +426,37 @@ static void alloc_from_pool_and_malloc(testval_tag_t tag)
     ASSERT_EQ(ptr, shared_pool_ptr, (uint8_t *)pool_base + sizeof(simple_type));
     free_pool_simple_type(st1);
     free(pool_base);
+}
+
+/*! Test: Allocate from pool and free in reverse order
+ */
+static void alloc_from_pool_and_reverse_free(testval_tag_t tag)
+{
+    simple_type *st;
+    simple_type *st1;
+    void *pool_base;
+    static const size_t pool_item_size =
+        (sizeof(simple_type) + sizeof(double) - 1) / sizeof(double) *
+        sizeof(double);
+
+    shared_pool_size = 2 * pool_item_size;
+    pool_base = shared_pool_ptr = malloc(shared_pool_size);
+
+    st = new_pool_simple_type(tag);
+    st1 = new_pool_simple_type(~tag);
+    ASSERT_EQ(ptr, st, pool_base);
+    ASSERT_EQ(ptr, (uint8_t *)st1, (uint8_t *)st + pool_item_size);
+    ASSERT_EQ(unsigned, shared_pool_size, 0);
+    free_pool_simple_type(st);
+    ASSERT_EQ(unsigned, shared_pool_size, 0);
+    ASSERT_EQ(ptr, shared_pool_ptr,
+              (uint8_t *)pool_base + 2 * pool_item_size);
+    free_pool_simple_type(st1);
+    ASSERT_EQ(ptr, freelist_pool_simple_type, st);
+    ASSERT_EQ(ptr, shared_pool_ptr,
+              (uint8_t *)pool_base + pool_item_size);    
+    /* no call to free(pool_base) as the memory remains in the freelist */
+    shared_pool_ptr = NULL;
 }
 
 /* instantiate */

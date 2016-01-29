@@ -56,6 +56,7 @@ IMPL_SOURCES += tensile.tab.c lex.yy.c
 GENERATED_FILES = $(IMPL_SOURCES) $(C_SOURCES:.c=_api.h)
 GENERATED_FILES += $(GENERIC_C_SOURCES:.c=_impl.c) $(GENERIC_C_SOURCES:.c=_api.h)
 
+
 DOC_SOURCES = $(C_SOURCES) $(GENERIC_C_SOURCES)
 DOC_SOURCES += compiler.h
 
@@ -91,11 +92,14 @@ tests/% : CFLAGS += $(TEST_CFLAGS)
 
 tests/%_ts.c : %_impl.c ;
 
+
 $(TOPDIR)/doc/%.md : % $(TOPDIR)/extract_doc.awk
 	$(AWK) -f $(filter %.awk,$^) $< >$@
 
+tests/array_ts.d : bitops_api.h
+
 ifneq ($(MAKECMDGOALS),clean)
-Makefile : $(GENERATED_FILES)
+Makefile Makefile.generic : $(GENERATED_FILES)
 
 include $(C_SOURCES:.c=_impl.d)
 include $(patsubst %,tests/%_ts.d,$(TESTABLES))
