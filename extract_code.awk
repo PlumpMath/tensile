@@ -212,7 +212,7 @@ function dump_public_section(  decl, def, header) {
                                    "TESTVAL_CLEANUP__%s(*%s);\n"        \
                                    "#endif\n"                           \
                                    "}\n"                                \
-                                   "}",
+                                   "}\n",
                                    test_name, i,
                                    arg_type, arg_name, arg_type_id,
                                    arg_type, arg_name,
@@ -280,7 +280,7 @@ instantiate_args && /^\s*\/\*\s*end\s*\*\/\s*$/ {
 
 in_tests && /STATIC_ARBITRARY\([0-9]+\)/ {
     bitness = gensub(/^.*STATIC_ARBITRARY\(([0-9]+)\).*$/, "\\1", "1") + 0;
-    sub(/STATIC_ARBITRARY\([0-9]+\)/, int(rand() * (2 ** bitness)) "");
+    sub(/STATIC_ARBITRARY\([0-9]+\)/, int(rand() * (2 ** bitness)) "U");
 }
 
 {
@@ -331,6 +331,16 @@ in_public == "instantiate" && /^\s*\/\*\s*end\s*\*\/\s*/ {
 }
 
 END {
+    if (in_tests)
+    {
+        print FILENAME ": tests section is not properly closed" >"/dev/stderr"
+        exit 1
+    }
+    if (do_instantiate)
+    {
+        print FILENAME ": unterminated instantiation specification" >"/dev/stderr"
+        exit 1
+    }
     if (header_initialized)
     {
         printf "%s", aftermath

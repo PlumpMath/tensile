@@ -42,7 +42,9 @@ returns(fresh_pointer) returns(not_null) returns(important)
 void *frlmalloc(size_t sz)
 {
     void *result = malloc(sz > sizeof(freelist_t) ? sz : sizeof(freelist_t));
-    assert(result != NULL);
+    if (result == NULL)
+        abort();
+    
     return result;
 }
 
