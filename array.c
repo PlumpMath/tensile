@@ -1,5 +1,5 @@
 /*!= Generic array allocator routines
- * (c) 2016  Artem V. Andreev
+ * Copyright (c) 2016  Artem V. Andreev
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
@@ -309,7 +309,7 @@ static void allocate_free_allocate(testval_small_uint_t n)
 
 /* public */
 static inline arguments(not_null)
-void unshare_TYPE(size_t _nelem, unused ALLOC_TYPE *_obj)
+void unshare_TYPE(size_t _nelem, unused ALLOC_TYPE _obj[var_size(_nelem)])
 {
     size_t _i;
 
@@ -799,7 +799,7 @@ static void alloc_and_grow_by_pageorder(testval_small_uint_t n)
 /* public */
 argument(not_null,1,2)
 void append_TYPE(size_t * restrict dest_sz, ALLOC_TYPE ** restrict dest,
-                 size_t app_sz, const ALLOC_TYPE *app)
+                 size_t app_sz, const ALLOC_TYPE app[var_size(app_sz)])
 {
     ALLOC_TYPE *tail;
     
@@ -899,8 +899,10 @@ static void do_append(testval_small_uint_t n, testval_small_uint_t m)
 
 /* public */
 argument(not_null,5) returns(important)
-ALLOC_TYPE *concat_TYPE(size_t first_sz, const ALLOC_TYPE *first,
-                        size_t second_sz, const ALLOC_TYPE *second,
+ALLOC_TYPE *concat_TYPE(size_t first_sz,
+                        const ALLOC_TYPE first[var_size(first_sz)],
+                        size_t second_sz,
+                        const ALLOC_TYPE second[var_size(second_sz)],
                         size_t * restrict dest_sz)
 {
     ALLOC_TYPE *conc;
