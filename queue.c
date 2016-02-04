@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2015  Artem V. Andreev
+/*!= Generic queues
+ * Copyright (c) 2015-2016  Artem V. Andreev
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
@@ -16,34 +16,198 @@
  * Boston, MA 02110-1301, USA.
  *
  */
-/** @file
- * @brief queue operations
- *
- * @author Artem V. Andreev <artem@AA5779.spb.edu>
- * @test Background:
- * @code
- * #define IMPLEMENT_QUEUE 1
- * @endcode
- */
-#ifndef QUEUE_H
-#define QUEUE_H 1
 
-#ifdef __cplusplus
-extern "C"
+/* HEADER */
+#include "compiler.h"
+#include <string.h>
+/* END */
+
+/* parameter */
+#define QUEUE_TYPE /* required */
+/* parameter */
+#define QUEUE_NAME QUEUE_TYPE
+/* parameter */
+#define ELEMENT_TYPE /* required */
+/* parameter */
+#define ALLOC_NAME ELEMENT_TYPE
+/* parameter */
+#define ELTS_FIELD data
+/* parameter */
+#define SIZE_FIELD size
+/* parameter */
+#define TOP_FIELD top
+/* parameter */
+#define BOTTOM_FIELD bottom
+/* parameter */
+#define GROW_RESERVE 0
+
+/* parameter */
+#define DEQUEUE_CLEANUP_CODE(_obj) {}
+
+/* TESTS */
+#include "assertions.h"
+#define TESTSUITE "Queues"
+
+typedef struct simple_queue {
+    size_t size;
+    size_t top;
+    size_t bottom;
+    unsigned *data;
+} simple_queue;
+
+#define QUEUE_TAG STATIC_ARBITRARY(16)
+
+/* instantiate */
+#define QUEUE_TYPE simple_queue
+#define ELEMENT_TYPE unsigned
+#define ALLOC_TYPE ELEMENT_TYPE
+#define DEQUEUE_CLEANUP_CODE(_obj) (*(_obj) = QUEUE_TAG)
+#define ALLOC_CONSTRUCTOR_CODE(_obj) (*(_obj) = QUEUE_TAG)
+#define MAX_BUCKET (TESTVAL_SMALL_UINT_MAX)
+#include "array_api.h"
+#include "array_impl.c"
+#include "queue_api.h"
+#include "queue_impl.c"
+/* end */
+
+/* END */
+
+/* local */
+#define init_queue_TYPE QNAME(init_queue, QUEUE_NAME)
+
+/* public */
+static inline arguments(not_null)
+void init_queue_TYPE(QUEUE_TYPE *q)
 {
-#endif
+    assert(q != NULL);
+    q->ELTS_FIELD = NULL;
+    q->SIZE_FIELD = 0;
+    q->TOP_FIELD = 0;
+    q->BOTTOM_FIELD = 0;
+    PROBE(init_queue);
+}
 
-#if defined(IMPLEMENT_QUEUE) && !defined(IMPLEMENT_ALLOCATOR)
-#define IMPLEMENT_ALLOCATOR 1
-#endif
+/* local */
+#define TYPE_size QNAME(QUEUE_NAME, size)
 
-#include "allocator.h"
+/* public */
+static inline global_state(none) arguments(not_null) returns(important)
+size_t TYPE_size(const QUEUE_NAME *q)
+{
+    return q->TOP_FIELD - q->BOTTOM_FIELD;
+}
 
-/**
- * Declares a queue type
- */
-#define DECLARE_QUEUE_TYPE(_type, _eltype)                              \
-    DECLARE_ARRAY_TYPE(_type, unsigned top; unsigned bottom;, _eltype)
+/* local */
+#define enqueue_front_TYPE QNAME(enqueue_front, QUEUE_NAME)
+
+/* public */
+arguments(not_null) returns(not_null) returns(important)
+ELEMENT_TYPE *enqueue_front_TYPE(QUEUE_TYPE *q, size_t n)
+{
+    ELEMENT_TYPE *result;
+    
+    assert(q != NULL);
+    assert(n > 0);
+    
+    if (q->TOP_FIELD + n >= q->SIZE_FIELD)
+    {
+        size_t decr = q->BOTTOM_FIELD >= n ? n : q->BOTTOM_FIELD;
+        
+        PROBE(enqueue_front_need_reloc);
+        memmove(q->ELTS_FIELD + q->BOTTOM_FIELD - decr,
+                q->ELTS_FIELD + q->BOTTOM_FIELD,
+                sizeof(ELEMENT_TYPE) * TYPE_size(q));
+        q->TOP_FIELD -= decr;
+        q->BOTTOM_FIELD -= decr;
+        if (q->TOP_FIELD + n >= q->SIZE_FIELD)
+        {
+            PROBE(enqueue_front_resize);
+            QNAME(QNAME(ensure, ALLOC_NAME), size)(&q->SIZE_FIELD,
+                                                   &q->ELTS_FIELD,
+                                                   q->TOP_FIELD + n);
+        }
+        assert(q->TOP_FIELD > q->BOTTOM_FIELD);
+    }
+    PROBE(enqueue_front);
+    result = q->ELTS_FIELD + q->TOP_FIELD;
+    q->TOP_FIELD += n;
+    return result;
+}
+
+/* local */
+#define dequeue_front_TYPE QNAME(dequeue_front, QUEUE_NAME)
+
+/* public */
+static inline arguments(not_null) returns(important)
+ELEMENT_TYPE dequeue_front_TYPE(QUEUE_TYPE *q)
+{
+    ELEMENT_TYPE result;
+    
+    assert(q != NULL);
+    assert(q->TOP_FIELD > q->BOTTOM_FIELD);
+
+    q->TOP_FIELD--;
+    result = q->ELTS_FIELD[q->TOP_FIELD];
+    DEQUEUE_CLEANUP_CODE((&q->ELTS_FIELD[q->TOP_FIELD]));
+    PROBE(dequeue_front);
+    return result;
+}
+
+/* local */
+#define enqueue_back_TYPE QNAME(enqueue_back, QUEUE_NAME)
+
+/* public */
+arguments(not_null) returns(not_null) returns(important)
+ELEMENT_TYPE *enqueue_back_TYPE(QUEUE_TYPE *q, size_t n)
+{
+    ELEMENT_TYPE *result;
+    
+    assert(q != NULL);
+    assert(n > 0);
+    
+    if (q->BOTTOM_FIELD < n)
+    {
+        size_t incr = n - q->BOTTOM_FIELD;
+        PROBE(enqueue_back_need_reloc);
+
+        QNAME(QNAME(ensure, ALLOC_NAME), size)(&q->SIZE_FIELD,
+                                               &q->ELTS_FIELD,
+                                               q->TOP_FIELD + incr);
+
+        memmove(q->ELTS_FIELD + q->BOTTOM_FIELD + incr,
+                q->ELTS_FIELD + q->BOTTOM_FIELD,
+                sizeof(ELEMENT_TYPE) * TYPE_size(q));
+        q->TOP_FIELD += incr;
+        q->BOTTOM_FIELD += incr;
+
+        assert(q->TOP_FIELD > q->BOTTOM_FIELD);
+    }
+    PROBE(enqueue_back);
+    q->BOTTOM_FIELD -= n;    
+    result = q->ELTS_FIELD + q->BOTTOM_FIELD;
+    return result;
+}
+
+
+/* local */
+#define dequeue_back_TYPE QNAME(dequeue_back, QUEUE_NAME)
+
+/* public */
+static inline arguments(not_null) returns(important)
+ELEMENT_TYPE dequeue_back_TYPE(QUEUE_TYPE *q)
+{
+    ELEMENT_TYPE result;
+    
+    assert(q != NULL);
+    assert(q->TOP_FIELD > q->BOTTOM_FIELD);
+
+    result = q->ELTS_FIELD[q->BOTTOM_FIELD];    
+    DEQUEUE_CLEANUP_CODE((&q->ELTS_FIELD[q->BOTTOM_FIELD]));
+    q->BOTTOM_FIELD++;
+    PROBE(dequeue_back);
+    return result;
+}
+
 
 /** Declare queue operations
  *  - `void clear_<_type>(_type *)`

@@ -41,9 +41,6 @@
 /* parameter */
 #define POP_CLEANUP_CODE(_obj) {}
 
-/* local */
-#define init_stack_TYPE QNAME(init_stack, STACK_NAME)
-
 /* TESTS */
 #include "assertions.h"
 #define TESTSUITE "Stacks"
@@ -70,6 +67,10 @@ typedef struct simple_stack {
 /* end */
 
 /* END */
+
+
+/* local */
+#define init_stack_TYPE QNAME(init_stack, STACK_NAME)
 
 /* public */
 static inline arguments(not_null)
@@ -142,8 +143,10 @@ static inline arguments(not_null) returns(important)
 ELEMENT_TYPE pop_TYPE(STACK_TYPE *stack)
 {
     ELEMENT_TYPE result;
+    
     assert(stack != NULL);
     assert(stack->TOP_FIELD > 0);
+    
     stack->TOP_FIELD--;
     result = stack->ELTS_FIELD[stack->TOP_FIELD];
     POP_CLEANUP_CODE((&stack->ELTS_FIELD[stack->TOP_FIELD]));
