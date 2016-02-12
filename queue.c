@@ -104,14 +104,14 @@ arguments(not_null) returns(not_null) returns(important)
 ELEMENT_TYPE *enqueue_front_TYPE(QUEUE_TYPE *q, size_t n)
 {
     ELEMENT_TYPE *result;
-    
+
     assert(q != NULL);
     assert(n > 0);
-    
+
     if (q->TOP_FIELD + n >= q->SIZE_FIELD)
     {
         size_t decr = q->BOTTOM_FIELD >= n ? n : q->BOTTOM_FIELD;
-        
+
         memmove(q->ELTS_FIELD + q->BOTTOM_FIELD - decr,
                 q->ELTS_FIELD + q->BOTTOM_FIELD,
                 sizeof(ELEMENT_TYPE) * TYPE_size(q));
@@ -138,7 +138,7 @@ static inline arguments(not_null) returns(important)
 ELEMENT_TYPE dequeue_front_TYPE(QUEUE_TYPE *q)
 {
     ELEMENT_TYPE result;
-    
+
     assert(q != NULL);
     assert(q->TOP_FIELD > q->BOTTOM_FIELD);
 
@@ -156,10 +156,10 @@ arguments(not_null) returns(not_null) returns(important)
 ELEMENT_TYPE *enqueue_back_TYPE(QUEUE_TYPE *q, size_t n)
 {
     ELEMENT_TYPE *result;
-    
+
     assert(q != NULL);
     assert(n > 0);
-    
+
     if (q->BOTTOM_FIELD < n)
     {
         size_t incr = n - q->BOTTOM_FIELD;
@@ -176,7 +176,7 @@ ELEMENT_TYPE *enqueue_back_TYPE(QUEUE_TYPE *q, size_t n)
 
         assert(q->TOP_FIELD > q->BOTTOM_FIELD);
     }
-    q->BOTTOM_FIELD -= n;    
+    q->BOTTOM_FIELD -= n;
     result = q->ELTS_FIELD + q->BOTTOM_FIELD;
     return result;
 }
@@ -190,11 +190,11 @@ static inline arguments(not_null) returns(important)
 ELEMENT_TYPE dequeue_back_TYPE(QUEUE_TYPE *q)
 {
     ELEMENT_TYPE result;
-    
+
     assert(q != NULL);
     assert(q->TOP_FIELD > q->BOTTOM_FIELD);
 
-    result = q->ELTS_FIELD[q->BOTTOM_FIELD];    
+    result = q->ELTS_FIELD[q->BOTTOM_FIELD];
     DEQUEUE_CLEANUP_CODE((&q->ELTS_FIELD[q->BOTTOM_FIELD]));
     q->BOTTOM_FIELD++;
     return result;
@@ -288,7 +288,7 @@ ELEMENT_TYPE dequeue_back_TYPE(QUEUE_TYPE *q)
  *     simple_queue *q1 = q;
  *     unsigned x;
  *     enqueue_simple_queue(&q, thetag1);
- *     enqueue_simple_queue(&q, thetag2);    
+ *     enqueue_simple_queue(&q, thetag2);
  * @endcode
  * - Then the queue is not reallocated:
  *   `ASSERT_PTR_EQ(q, q1);`
@@ -338,7 +338,7 @@ ELEMENT_TYPE dequeue_back_TYPE(QUEUE_TYPE *q)
  *   `ASSERT_UINT_EQ(q->bottom, sz - 2);`
  * - Cleanup: `free_simple_queue(q);`
  *
- * @test Enqueue, dequeue and enqueue at the front 
+ * @test Enqueue, dequeue and enqueue at the front
  * - When two elements are enqueued:
  * @code
  *     unsigned thetag3 = ARBITRARY(unsigned, 1, 0xffff);
@@ -409,7 +409,7 @@ ELEMENT_TYPE dequeue_back_TYPE(QUEUE_TYPE *q)
  * - Then it is the last element enqueued:
  *   `ASSERT_UINT_EQ(x, thetag3);`
  * - Cleanup: `free_simple_queue(q);`
- * 
+ *
  * @test Enqueue at the front and grow:
  * - When two elements are enqueued at the front:
  * @code
@@ -484,7 +484,7 @@ ELEMENT_TYPE dequeue_back_TYPE(QUEUE_TYPE *q)
                                                                     \
     ATTR_NONNULL_1ST                                                \
     GENERATED_DECL void enqueue_front_##_type(_type **q, _eltype item)
-    
+
 #define trivial_dequeue(_x) (*(_x))
 #define trivial_enqueue(_x, _y) ((void)(*(_x) = *(_y)))
 
@@ -497,11 +497,11 @@ ELEMENT_TYPE dequeue_back_TYPE(QUEUE_TYPE *q)
  *     unsigned refcnt;
  *     unsigned value;
  * } queued_refcnt;
- * 
+ *
  * DECLARE_REFCNT_ALLOCATOR(queued_refcnt, (unsigned val));
  * DECLARE_QUEUE_TYPE(refcnt_queue, queued_refcnt *);
  * DECLARE_QUEUE_REFCNT_OPS(refcnt_queue, queued_refcnt);
- * 
+ *
  * DEFINE_REFCNT_ALLOCATOR(queued_refcnt, (unsigned val), obj,
  *                         { obj->value = val;},
  *                         { NEW(obj)->value = OLD(obj)->value + 1; },
@@ -541,7 +541,7 @@ ELEMENT_TYPE dequeue_back_TYPE(QUEUE_TYPE *q)
  * @code
  * free_queued_refcnt(obj);
  * free_queued_refcnt(obj1);
- * free_queued_refcnt(obj2);    
+ * free_queued_refcnt(obj2);
  * free_refcnt_queue(q);
  * @endcode
  *
@@ -604,7 +604,7 @@ ELEMENT_TYPE dequeue_back_TYPE(QUEUE_TYPE *q)
  */
 #define DECLARE_QUEUE_REFCNT_OPS(_type, _eltype)            \
     DECLARE_QUEUE_OPS(_type, _eltype *, trivial_dequeue)
-    
+
 #if IMPLEMENT_QUEUE
 
 #define DEFINE_QUEUE_OPS(_type, _eltype, _scale, _maxsize, _var, _idxvar, \

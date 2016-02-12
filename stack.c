@@ -91,7 +91,7 @@ static inline returns(not_null) arguments(not_null) returns(important)
 ELEMENT_TYPE *push_TYPE(STACK_TYPE *stack, size_t n)
 {
     ELEMENT_TYPE *result;
-    
+
     assert(stack != NULL);
     assert(n > 0);
     QNAME(QNAME(ensure, ALLOC_NAME), size)(&stack->SIZE_FIELD,
@@ -141,10 +141,10 @@ static inline arguments(not_null) returns(important)
 ELEMENT_TYPE pop_TYPE(STACK_TYPE *stack)
 {
     ELEMENT_TYPE result;
-    
+
     assert(stack != NULL);
     assert(stack->TOP_FIELD > 0);
-    
+
     stack->TOP_FIELD--;
     result = stack->ELTS_FIELD[stack->TOP_FIELD];
     POP_CLEANUP_CODE((&stack->ELTS_FIELD[stack->TOP_FIELD]));
@@ -158,7 +158,7 @@ static void test_push_pop(testval_small_uint_t n, testval_tag_t tag)
     simple_stack stk;
     unsigned result;
     unused unsigned *topmost = NULL;
-    
+
     init_stack_simple_stack(&stk);
     if (n > 0)
         topmost = push_simple_stack(&stk, n);
@@ -183,5 +183,3 @@ void clear_TYPE(STACK_TYPE *stack)
     QNAME(free, ALLOC_NAME)(stack->SIZE_FIELD, stack->ELTS_FIELD);
     init_stack_TYPE(stack);
 }
-
-
