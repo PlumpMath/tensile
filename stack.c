@@ -80,7 +80,6 @@ void init_stack_TYPE(STACK_TYPE *stack)
     stack->ELTS_FIELD = NULL;
     stack->SIZE_FIELD = 0;
     stack->TOP_FIELD = 0;
-    PROBE(init_stack);
 }
 
 
@@ -101,7 +100,6 @@ ELEMENT_TYPE *push_TYPE(STACK_TYPE *stack, size_t n)
                                            GROW_RESERVE);
     result = stack->ELTS_FIELD + stack->TOP_FIELD;
     stack->TOP_FIELD += n;
-    PROBE(push);
     return result;
 }
 
@@ -150,7 +148,6 @@ ELEMENT_TYPE pop_TYPE(STACK_TYPE *stack)
     stack->TOP_FIELD--;
     result = stack->ELTS_FIELD[stack->TOP_FIELD];
     POP_CLEANUP_CODE((&stack->ELTS_FIELD[stack->TOP_FIELD]));
-    PROBE(pop);
     return result;
 }
 
@@ -185,7 +182,6 @@ void clear_TYPE(STACK_TYPE *stack)
     assert(stack != NULL);
     QNAME(free, ALLOC_NAME)(stack->SIZE_FIELD, stack->ELTS_FIELD);
     init_stack_TYPE(stack);
-    PROBE(clear);
 }
 
 

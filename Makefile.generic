@@ -55,7 +55,7 @@ endif
 
 C_SOURCES = bitops.c
 
-GENERIC_C_SOURCES = allocator.c array.c stack.c queue.c
+GENERIC_C_SOURCES = allocator.c array.c stack.c #queue.c
 
 IMPL_SOURCES = $(C_SOURCES:.c=_impl.c)
 IMPL_SOURCES += tensile.tab.c lex.yy.c
@@ -67,7 +67,7 @@ GENERATED_FILES += $(GENERIC_C_SOURCES:.c=_impl.c) $(GENERIC_C_SOURCES:.c=_api.h
 DOC_SOURCES = $(C_SOURCES) $(GENERIC_C_SOURCES)
 DOC_SOURCES += compiler.h
 
-TESTABLES = bitops allocator array stack queue
+TESTABLES = bitops allocator array stack #queue
 
 APPLICATION = tensile
 
@@ -91,19 +91,16 @@ lex.yy.o lex.yy.d : lex.yy.c tensile.tab.h
 %_impl.c : %.c $(TOPDIR)/extract_code.awk
 	$(AWK) -f $(filter %.awk,$^) $< $(patsubst %_impl.c,%_api.h,$@) $(patsubst %_impl.c,tests/%_ts.c,$@) >$@
 
-tests/% : CPPFLAGS += $(TEST_CPPFLAGS)
-tests/% : CFLAGS += $(TEST_CFLAGS)
-
-% : %_ts.o
-	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS)
+tests/%.o : CPPFLAGS += $(TEST_CPPFLAGS)
+tests/%_ts : CFLAGS += $(TEST_CFLAGS)
 
 tests/%_ts.c : %_impl.c ;
 
+%_ts : %_ts.o
+	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS)
 
 $(TOPDIR)/doc/%.md : % $(TOPDIR)/extract_doc.awk
 	$(AWK) -f $(filter %.awk,$^) $< >$@
-
-tests/array_ts.d : bitops_api.h
 
 ifneq ($(MAKECMDGOALS),clean)
 Makefile Makefile.generic : $(GENERATED_FILES)
@@ -113,11 +110,25 @@ include $(patsubst %,tests/%_ts.d,$(TESTABLES))
 endif
 
 .PHONY : check
-check : $(addprefix tests/,$(TESTABLES))
-	@set -e; \
-	for t in $(filter tests/%,$^); do \
-		$(CHECK_TOOL) ./$$t;		\
-	done
+check : $(addsuffix .c.gcov,$(TESTABLES))
+
+ifneq ($(GCOV),)
+
+%.c.gcov : tests/%_ts.gcda %.c
+	$(GCOV) -r -l -s $(TOPDIR) -o $(patsubst %.gcda,%.o,$(filter %.gcda,$^)) $(filter %.c,$^)
+
+%_ts.gcda : %_ts
+	$(RM) $@
+	$(abspath $<)
+
+else
+
+%.c.gcov : tests/%_ts
+	@$(abspath $<)
+	@echo "No coverage" >$@
+
+endif
+
 
 .PHONY : doc
 doc : $(patsubst %,$(TOPDIR)/doc/%.md,$(DOC_SOURCES))
@@ -131,6 +142,7 @@ TAGS : $(C_SOURCES)
 clean :
 	$(RM) *.o
 	$(RM) *.d
+	$(RM) *.gcov
 	$(RM) tests/*
 	$(RM) $(APPLICATION)
 	$(RM) $(GENERATED_FILES)
@@ -138,7 +150,7 @@ clean :
 %.o : %.c
 	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $<
 
-%.d : %.c
+%.d : %.c | $(GENERATED_FILES)
 	@set -e; $(RM) $@; \
 	$(CC) $(MFLAGS) $(CPPFLAGS) $< > $@.$$$$; \
 	$(SED) 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \

@@ -111,16 +111,6 @@ function dump_public_section(  decl, def, header) {
     next
 }
 
-!in_tests && /^\s*PROBE\(\w+\);\s*$/ {
-    probe_name = gensub(/^\s*PROBE\((\w+)\);\s*$/, "\\1", "1");
-    if (!(probe_name in TESTPROBES)) {
-        TESTPROBES[probe_name] = FNR;
-    } else {
-        printf "%s:%d: Probe '%s' already defined at line %d\n", FILENAME, FNR, probe_name, TESTPROBES[probe_name] > "/dev/stderr"
-        exit 1
-    }
-}
-
 !in_tests && !in_public && /^\s*\/\*\s*parameter\s*\*\/\s*$/ {
     is_generic = 1;
     start_fnr = FNR + 1
@@ -195,7 +185,7 @@ function dump_public_section(  decl, def, header) {
             gsub(/ /, "_", arg_type_id);
             test_call_args = test_call_args "*" arg_name ","
 
-            current_case = sprintf("#line 1 \"extract_code.%s%d.c\"\n"  \
+            current_case = sprintf("#line 1 \"//extract_code.%s%d.c\"\n"  \
                                    "{\n"                                \
                                    "%s %s__values[] = {TESTVAL_GENERATE__%s};\n" \
                                    "%s *%s;\n"                          \
@@ -349,24 +339,9 @@ END {
             printf "#undef %s\n", header_guard >header_file
     }
     if (testcases) {
-        print "#line 1 \"extract_code.all.c\"" >tests_file
-        print "static struct { const char *name; unsigned count; } testprobes[] = {" >tests_file
-        for (probe_name in TESTPROBES)
-        {
-            printf "[%d] = {.name = \"%s\",},\n", TESTPROBES[probe_name], probe_name >tests_file
-        }
-        print "};" >tests_file
-        print "" > tests_file        
-        print "static void testcase_hit_probe(const char *fname, unsigned line)" >tests_file
-        print "{" >tests_file
-        printf "if (strcmp(\"%s\", fname) != 0) { return; }\n", FILENAME >tests_file
-        print "if (line >= sizeof(testprobes) / sizeof(*testprobes) || testprobes[line].name == NULL) { fprintf(stderr, \"alien probe line: %u\\n\", line); return; };" >tests_file
-        print "testprobes[line].count++;" >tests_file
-        print "}" >tests_file
-        print "" >tests_file
+        print "#line 1 \"//extract_code.all.c\"" >tests_file
         print "int main(void)" >tests_file
         print "{" >tests_file
-        print "unsigned i;" >tests_file        
         print "SET_RANDOM_SEED();" >tests_file
         print "#ifdef TESTSUITE\n" >tests_file
         print "fprintf(stderr, \"%s:\\n\", TESTSUITE);" >tests_file
@@ -379,11 +354,6 @@ END {
         print "return 1;" >tests_file
         print "}" >tests_file
         print "#endif" >tests_file
-        print "fputs(\"Probes not hit:\\n\", stderr);" >tests_file
-        print "for (i = 0; i < sizeof(testprobes) / sizeof(*testprobes); i++)" >tests_file
-        print "{" >tests_file
-        print "if (testprobes[i].name != NULL && testprobes[i].count == 0) fprintf(stderr, \"- %s\\n\", testprobes[i].name);" >tests_file
-        print "}" >tests_file
         print "return 0;" >tests_file
         print "}" >tests_file
     }

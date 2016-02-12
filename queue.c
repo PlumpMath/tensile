@@ -84,7 +84,6 @@ void init_queue_TYPE(QUEUE_TYPE *q)
     q->SIZE_FIELD = 0;
     q->TOP_FIELD = 0;
     q->BOTTOM_FIELD = 0;
-    PROBE(init_queue);
 }
 
 /* local */
@@ -113,7 +112,6 @@ ELEMENT_TYPE *enqueue_front_TYPE(QUEUE_TYPE *q, size_t n)
     {
         size_t decr = q->BOTTOM_FIELD >= n ? n : q->BOTTOM_FIELD;
         
-        PROBE(enqueue_front_need_reloc);
         memmove(q->ELTS_FIELD + q->BOTTOM_FIELD - decr,
                 q->ELTS_FIELD + q->BOTTOM_FIELD,
                 sizeof(ELEMENT_TYPE) * TYPE_size(q));
@@ -121,14 +119,12 @@ ELEMENT_TYPE *enqueue_front_TYPE(QUEUE_TYPE *q, size_t n)
         q->BOTTOM_FIELD -= decr;
         if (q->TOP_FIELD + n >= q->SIZE_FIELD)
         {
-            PROBE(enqueue_front_resize);
             QNAME(QNAME(ensure, ALLOC_NAME), size)(&q->SIZE_FIELD,
                                                    &q->ELTS_FIELD,
                                                    q->TOP_FIELD + n);
         }
         assert(q->TOP_FIELD > q->BOTTOM_FIELD);
     }
-    PROBE(enqueue_front);
     result = q->ELTS_FIELD + q->TOP_FIELD;
     q->TOP_FIELD += n;
     return result;
@@ -149,7 +145,6 @@ ELEMENT_TYPE dequeue_front_TYPE(QUEUE_TYPE *q)
     q->TOP_FIELD--;
     result = q->ELTS_FIELD[q->TOP_FIELD];
     DEQUEUE_CLEANUP_CODE((&q->ELTS_FIELD[q->TOP_FIELD]));
-    PROBE(dequeue_front);
     return result;
 }
 
@@ -168,7 +163,6 @@ ELEMENT_TYPE *enqueue_back_TYPE(QUEUE_TYPE *q, size_t n)
     if (q->BOTTOM_FIELD < n)
     {
         size_t incr = n - q->BOTTOM_FIELD;
-        PROBE(enqueue_back_need_reloc);
 
         QNAME(QNAME(ensure, ALLOC_NAME), size)(&q->SIZE_FIELD,
                                                &q->ELTS_FIELD,
@@ -182,7 +176,6 @@ ELEMENT_TYPE *enqueue_back_TYPE(QUEUE_TYPE *q, size_t n)
 
         assert(q->TOP_FIELD > q->BOTTOM_FIELD);
     }
-    PROBE(enqueue_back);
     q->BOTTOM_FIELD -= n;    
     result = q->ELTS_FIELD + q->BOTTOM_FIELD;
     return result;
@@ -204,7 +197,6 @@ ELEMENT_TYPE dequeue_back_TYPE(QUEUE_TYPE *q)
     result = q->ELTS_FIELD[q->BOTTOM_FIELD];    
     DEQUEUE_CLEANUP_CODE((&q->ELTS_FIELD[q->BOTTOM_FIELD]));
     q->BOTTOM_FIELD++;
-    PROBE(dequeue_back);
     return result;
 }
 

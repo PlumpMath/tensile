@@ -33,28 +33,23 @@ unsigned count_leading_zeroes(size_t i)
 {
 #if __GNUC__ >= 4
     if (i == 0u) {
-        PROBE(clz_zero);
         return sizeof(i) * CHAR_BIT;
     }
-    PROBE(clz_nonzero);
     return (unsigned)__builtin_clzl(i);
 #else
     unsigned j;
 
     if (i == 0)
     {
-        PROBE(clz_zero_nobi);
         return sizeof(i) * CHAR_BIT;
     }
     for (j = sizeof(i) * CHAR_BIT - 1; j > 0; j--)
     {
         if ((i & (1ul << j)) != 0)
         {
-            PROBE(clz_nonzero_nobi);
             return (unsigned)sizeof(i) * CHAR_BIT - 1 - j;
         }
     }
-    PROBE(clz_first_bit_nobi);
     return sizeof(i) * CHAR_BIT - 1;
 #endif
 }

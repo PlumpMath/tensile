@@ -336,10 +336,6 @@ extern "C"
 #define _QNAME(_prefix, _name) _prefix##_##_name
 #define QNAME(_prefix, _name) _QNAME(_prefix, _name)
 
-#ifndef PROBE
-#define PROBE(_name) ((void)0)
-#endif
-
 #ifdef __cplusplus
 }
 #endif

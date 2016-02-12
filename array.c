@@ -126,12 +126,10 @@ ALLOC_TYPE *alloc_TYPE(size_t n)
     assert(ALLOC_POOL_PTR != NULL);
     if (n_bucket < MAX_BUCKET)
     {
-        PROBE(try_pool_alloc);
         obj = pool_alloc(&ALLOC_POOL_PTR, &ALLOC_POOL_SIZE,
                          sizeof(*obj) * n, sizeof(ALLOC_POOL_ALIGN_AS));
         if (obj != NULL)
         {
-            PROBE(pool_alloc);
             return obj;
         }
     }
@@ -139,14 +137,12 @@ ALLOC_TYPE *alloc_TYPE(size_t n)
 
     if (n_bucket < MAX_BUCKET && freelist_TYPE[n_bucket] != NULL)
     {
-        PROBE(alloc_from_freelist);
         obj = (ALLOC_TYPE *)freelist_TYPE[n_bucket];
         freelist_TYPE[n_bucket] = freelist_TYPE[n_bucket]->chain;
 
         return obj;
     }
 
-    PROBE(alloc_malloc);
     return frlmalloc(sizeof(*obj) * n);
 }
 
@@ -164,7 +160,6 @@ ALLOC_TYPE *new_TYPE(size_t _nelem)
         ALLOC_TYPE *_obj = alloc_TYPE(_nelem);
         size_t _i;
 
-        PROBE(initialize_object);
         for (_i = 0; _i < _nelem; _i++)
         {
             ALLOC_CONSTRUCTOR_CODE((&_obj[_i]));
@@ -196,7 +191,6 @@ void dispose_TYPE(size_t nelem, ALLOC_TYPE obj[var_size(nelem)])
 
     if (n_bucket >= MAX_BUCKET)
     {
-        PROBE(free_large);
         free(obj);
         return;
     }
@@ -207,12 +201,9 @@ void dispose_TYPE(size_t nelem, ALLOC_TYPE obj[var_size(nelem)])
                         obj, sizeof(*obj) * nelem,
                         sizeof(ALLOC_POOL_ALIGN_AS)))
     {
-        PROBE(free_to_pool);
         return;
     }
-    PROBE(fail_free_to_pool);
 #endif
-    PROBE(free_to_list);
     ((freelist_t *)obj)->chain = freelist_TYPE[n_bucket];
     freelist_TYPE[n_bucket] = (freelist_t *)obj;
 }
@@ -227,7 +218,6 @@ void free_TYPE(size_t _nelem, ALLOC_TYPE _obj[var_size(_nelem)])
     size_t _i;
 
     if (_obj == NULL) {
-        PROBE(free_null);
         return;
     }
 
@@ -313,7 +303,6 @@ void unshare_TYPE(size_t _nelem, unused ALLOC_TYPE _obj[var_size(_nelem)])
 {
     size_t _i;
 
-    PROBE(unshare_object);
     for (_i = 0; _i < _nelem; _i++)
     {
         ALLOC_COPY_CODE((&_obj[_i]));
@@ -335,7 +324,6 @@ ALLOC_TYPE *copy_TYPE(size_t _nelem,
         ALLOC_TYPE *_copy = alloc_TYPE(_nelem);
 
         assert(_orig != NULL);
-        PROBE(do_copy);
         memcpy(_copy, _orig, sizeof(*_copy) * _nelem);
         unshare_TYPE(_nelem, _copy);
         return _copy;
@@ -513,12 +501,10 @@ ALLOC_TYPE *grow_TYPE(size_t * restrict nelem,
 
     if (incr == 0)
     {
-        PROBE(no_grow);
         return *items;
     }
     if (*items == NULL)
     {
-        PROBE(grow_from_null);
         *items = new_TYPE(incr);
         *nelem = incr;
         return *items;
@@ -535,13 +521,11 @@ ALLOC_TYPE *grow_TYPE(size_t * restrict nelem,
         memcpy(new_items, *items, sizeof(**items) * *nelem);
         dispose_TYPE(*nelem, *items);
         *items = new_items;
-        PROBE(grow_new_bucket);
     }
     for (i = 0; i < *nelem + incr; i++)
     {
         ALLOC_CONSTRUCTOR_CODE((&(*items)[i]));
     }
-    PROBE(do_grow);
     *nelem += incr;
     return *items + *nelem - incr;
 }
@@ -600,10 +584,8 @@ ALLOC_TYPE *ensure_TYPE_size(size_t * restrict nelem,
 {
     if (*nelem >= req_size)
     {
-        PROBE(no_need_to_grow);
         return *items;
     }
-    PROBE(need_to_grow);
     grow_TYPE(nelem, items, req_size - *nelem + reserve);
     return *items;
 }
@@ -805,21 +787,18 @@ void append_TYPE(size_t * restrict dest_sz, ALLOC_TYPE ** restrict dest,
     
     if (app_sz == 0)
     {
-        PROBE(append_zero);
         return;
     }
     
     assert(app != NULL);
     if (app == *dest)
     {
-        PROBE(append_duplicate);
         assert(app_sz <= *dest_sz);
         tail = grow_TYPE(dest_sz, dest, app_sz);
         memcpy(tail, *dest, app_sz * sizeof(ALLOC_TYPE));
     }
     else
     {
-        PROBE(append_normal);
         tail = grow_TYPE(dest_sz, dest, app_sz);
         memcpy(tail, app, app_sz * sizeof(ALLOC_TYPE));
     }
@@ -909,15 +888,11 @@ ALLOC_TYPE *concat_TYPE(size_t first_sz,
     
     if (first_sz == 0)
     {
-        PROBE(conc_first_null);
-        
         *dest_sz = second_sz;
         return copy_TYPE(second_sz, second);
     }
     if (second_sz == 0)
     {
-        PROBE(conc_second_null);
-        
         *dest_sz = first_sz;
         return copy_TYPE(first_sz, first);
     }
@@ -925,8 +900,6 @@ ALLOC_TYPE *concat_TYPE(size_t first_sz,
     assert(first != NULL);
     assert(second != NULL);
 
-    PROBE(conc_two);
-    
     conc = alloc_TYPE(first_sz + second_sz);
     memcpy(conc, first, first_sz * sizeof(ALLOC_TYPE));
     memcpy(conc + first_sz, second, second_sz * sizeof(ALLOC_TYPE));

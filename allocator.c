@@ -123,22 +123,18 @@ ALLOC_TYPE *alloc_TYPE(void)
                      sizeof(*obj), sizeof(ALLOC_POOL_ALIGN_AS));
     if (obj != NULL)
     {
-        PROBE(pool_alloc);
         return obj;
     }
-    PROBE(fail_pool_alloc);
 #endif
 
     if (freelist_TYPE != NULL)
     {
-        PROBE(alloc_from_freelist);
         obj = (ALLOC_TYPE *)freelist_TYPE;
         freelist_TYPE = freelist_TYPE->chain;
 
         return obj;
     }
 
-    PROBE(alloc_malloc);
     return frlmalloc(sizeof(*obj));
 }
 
@@ -152,10 +148,8 @@ ALLOC_TYPE *new_TYPE(ALLOC_CONSTRUCTOR_ARGS)
     ALLOC_TYPE *_obj = alloc_TYPE();
 
 #if TYPE_IS_REFCNTED
-    PROBE(init_refcnt);
     _obj->refcnt = 1;
 #endif
-    PROBE(initialize_object);
     ALLOC_CONSTRUCTOR_CODE(_obj);
     return _obj;
 }
@@ -208,10 +202,8 @@ static inline arguments(not_null)
 void unshare_TYPE(unused ALLOC_TYPE *_obj)
 {
 #if TYPE_IS_REFCNTED
-    PROBE(unshare_refcnt);
     _obj->refcnt = 1;
 #endif
-    PROBE(unshare_object);
     ALLOC_COPY_CODE(_obj);
 }
 
@@ -225,7 +217,6 @@ ALLOC_TYPE *copy_TYPE(const ALLOC_TYPE *_orig)
     ALLOC_TYPE *_copy = alloc_TYPE();
 
     assert(_orig != NULL);
-    PROBE(do_copy);
     memcpy(_copy, _orig, sizeof(*_copy));
     unshare_TYPE(_copy);
     return _copy;
@@ -271,7 +262,6 @@ static void deallocate_and_copy(testval_tag_t tag)
 void free_TYPE(ALLOC_TYPE *_obj)
 {
     if (_obj == NULL) {
-        PROBE(free_null);
         return;
     }
 
@@ -279,7 +269,6 @@ void free_TYPE(ALLOC_TYPE *_obj)
     assert(_obj->refcnt > 0);
     if (--_obj->refcnt > 0)
     {
-        PROBE(decr_refcnt);
         return;
     }
 #endif
@@ -293,11 +282,9 @@ void free_TYPE(ALLOC_TYPE *_obj)
                         _obj, sizeof(*_obj),
                         sizeof(ALLOC_POOL_ALIGN_AS)))
     {
-        PROBE(free_to_pool);
         return;
     }
 #endif
-    PROBE(free_to_list);
     ((freelist_t *)_obj)->chain = freelist_TYPE;
     freelist_TYPE = (freelist_t *)_obj;
 }
@@ -513,11 +500,9 @@ ALLOC_TYPE *use_TYPE(ALLOC_TYPE *val)
 {
     if (val == NULL)
     {
-        PROBE(use_null);
         return NULL;
     }
     val->refcnt++;
-    PROBE(use_normal);
     return val;
 }
 
@@ -529,14 +514,12 @@ ALLOC_TYPE *maybe_copy_TYPE(ALLOC_TYPE *val)
 {
     if (val == NULL || val->refcnt == 1)
     {
-        PROBE(maybe_copy_nocopy);
         return val;
     }
     else
     {
         ALLOC_TYPE *result = copy_TYPE(val);
 
-        PROBE(maybe_copy_copy);
         free_TYPE(val);
         return result;
     }
@@ -549,7 +532,6 @@ ALLOC_TYPE *maybe_copy_TYPE(ALLOC_TYPE *val)
 static inline argument(not_null, 1)
 void assign_TYPE(ALLOC_TYPE **loc, ALLOC_TYPE *val)
 {
-    PROBE(assign);
     assert(loc != NULL);
     use_TYPE(val);
     free_TYPE(*loc);
@@ -563,7 +545,6 @@ void assign_TYPE(ALLOC_TYPE **loc, ALLOC_TYPE *val)
 static inline argument(not_null, 1)
 void move_TYPE(ALLOC_TYPE **loc, ALLOC_TYPE *val)
 {
-    PROBE(move);
     assign_TYPE(loc, val);
     free_TYPE(val);
 }
