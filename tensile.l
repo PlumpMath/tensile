@@ -24,7 +24,7 @@ YY_DECL;
 ESCAPE \\([abfnrtv\'\"\\]|u\+?[[:xdigit:]]{4}|U\+?[[:xdigit:]]{8}|[uU]\{[^}]+\})
 %%
 _ { return TOK_WILDCARD; }
-[-+*/^!~(){}.@?,;<>:&|#] { return *yytext; }
+[-+*/^!~(){}.@?,;<>:&|$] { return *yytext; }
 [][] { return *yytext; }
 "!~" { return TOK_NOT_MATCH; }
 "~~~" { return TOK_MATCH_BINDING_ALL; }
@@ -47,6 +47,7 @@ _ { return TOK_WILDCARD; }
 "**" { return TOK_INTERSPERSE; }
 "//" { return TOK_SPLIT; }
 "<>" { return TOK_QUEUE; }
+"$$" { return TOK_SUBST_ALL; }
 "/"([^/\\[:space:]]|\\.)+"/" { return TOK_REGEXP; }
 as { return TOK_TYPECAST; }
 assert { return TOK_ASSERT; }

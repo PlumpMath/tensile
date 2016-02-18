@@ -58,7 +58,7 @@
 %right ':'                        
 %left TOK_MAX TOK_MIN 
 %left '+' '-' TOK_APPEND TOK_CHOP TOK_CHOP_HEAD
-%left '*' '/' TOK_DIV TOK_MOD TOK_INTERSPERSE TOK_SPLIT
+%left '*' '/' TOK_DIV TOK_MOD TOK_INTERSPERSE TOK_SPLIT '$' TOK_SUBST_ALL
 %left TOK_TYPECAST
 %left '[' 
 %right '!' TOK_TRACING TOK_PEEK TOK_UMINUS TOK_TYPEOF
@@ -121,6 +121,7 @@ versionconstraint: /*empty*/
 modulecontents:  /*empty*/
         |       modulecontents ';'
         |       modulecontents include ';'
+        |       modulecontents errordef ';'
         |       modulecontents pragma ';'
         |       modulecontents moduleconditional
         |       modulecontents scope declaration
@@ -139,6 +140,9 @@ moduleelse:   /*empty*/
 moduleforeign: TOK_FOREIGN TOK_STRING
                 ;
 
+errordef:       TOK_ERROR TOK_ID '=' TOK_STRING
+        ;
+
 scope:          /*empty*/
         |       TOK_PUBLIC
         |       TOK_LOCAL
@@ -148,8 +152,12 @@ declaration:    import ';'
         |       nodedecl
                 ;
 
-import:         TOK_IMPORT TOK_ID versionconstraint importlist importalias
+import:         TOK_IMPORT importpath versionconstraint importlist importalias
                 ;
+
+importpath:     TOK_ID
+        |       importpath '/' TOK_ID
+        ;
 
 importlist:     /*empty*/
         |       '(' idlist0 ')'
@@ -314,7 +322,9 @@ expression: literal
         |       expression TOK_APPEND expression
         |       expression TOK_INTERSPERSE expression
         |       expression TOK_CHOP expression
-        |       expression TOK_CHOP_HEAD expression                
+        |       expression TOK_CHOP_HEAD expression
+        |       expression '$' expression
+        |       expression TOK_SUBST_ALL expression
         |       expression TOK_SPLIT expression
         |       expression TOK_TYPECAST typename
         |       expression TOK_THEN expression                
@@ -413,7 +423,11 @@ assoclist:      assoc
         |       assoclist ',' assoc
                 ;
 
-assoc:          assockey TOK_RULE expression
+assoc:          xassockey TOK_RULE expression
+                ;
+
+xassockey:      assockey
+        |       '~' pattern
                 ;
 
 assockey:       TOK_ID
