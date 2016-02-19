@@ -1,4 +1,4 @@
-/*!= Generic array allocator routines
+/*
  * Copyright (c) 2016  Artem V. Andreev
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,7 +15,11 @@
  * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301, USA.
  */
-
+/** @file
+ * @brief Generic array allocator routines
+ *
+ * @author Artem V. Andreev <artem@AA5779.spb.edu>
+ */
 /* HEADER */
 #include "compiler.h"
 /* END */
@@ -168,8 +172,7 @@ ALLOC_TYPE *new_TYPE(size_t _nelem)
     }
 }
 
-/*! Test: Allocate zero-sized array
- */
+/** @testcase Allocate zero-sized array */
 static void allocate_zero(void)
 {
     ASSERT_NULL(new_simple_type(0));
@@ -229,8 +232,7 @@ void free_TYPE(size_t _nelem, ALLOC_TYPE _obj[var_size(_nelem)])
     dispose_TYPE(_nelem, _obj);
 }
 
-/*! Test: Free NULL
- */
+/** @testcase Free NULL */
 static void free_null(void)
 {
     freelist_t *prev = freelist_simple_type[0];
@@ -240,8 +242,7 @@ static void free_null(void)
 }
 
 
-/*! Test: Allocate and free an object
- */
+/** @testcase Allocate and free an object */
 static void allocate_and_free(testval_small_uint_t n)
 {
     simple_type *st = new_simple_type(n + 1);
@@ -271,8 +272,7 @@ static void allocate_and_free(testval_small_uint_t n)
 }
 
 
-/*! Test: Allocate and free an object and allocate another
- */
+/** @testcase Allocate and free an object and allocate another */
 static void allocate_free_allocate(testval_small_uint_t n)
 {
     if (n == 0)
@@ -330,8 +330,7 @@ ALLOC_TYPE *copy_TYPE(size_t _nelem,
     }
 }
 
-/*! Test: Copy
- */
+/** @testcase Copy */
 static void test_copy(testval_small_uint_t n)
 {
     simple_type *st = new_simple_type(n + 1);
@@ -352,8 +351,7 @@ static void test_copy(testval_small_uint_t n)
     ASSERT_EQ(unsigned, track_simple_type[n], 0);
 }
 
-/*! Test: Deallocate and copy
- */
+/** @testcase Deallocate and copy */
 static void deallocate_and_copy(testval_small_uint_t n)
 {
     if (n == TESTVAL_SMALL_UINT_MAX)
@@ -392,8 +390,7 @@ static size_t shared_pool_size;
 #include "array_impl.c"
 /* end */
 
-/*! Test: Allocate from pool
- */
+/** @testcase Allocate from pool */
 static void alloc_from_pool(testval_small_uint_t n)
 {
     short *st;
@@ -434,8 +431,7 @@ static void alloc_from_pool(testval_small_uint_t n)
     }
 }
 
-/*! Test: Allocate from pool and immediately free
- */
+/** @testcase Allocate from pool and immediately free */
 static void alloc_from_pool_and_return(testval_small_uint_t n)
 {
     short *st;
@@ -461,8 +457,7 @@ static void alloc_from_pool_and_return(testval_small_uint_t n)
     }
 }
 
-/*! Test: Malloc when no space in the pool
- */
+/** @testcase Malloc when no space in the pool */
 static void alloc_not_from_pool(testval_small_uint_t n)
 {
     void *pool_base;
@@ -530,8 +525,7 @@ ALLOC_TYPE *grow_TYPE(size_t * restrict nelem,
     return *items + *nelem - incr;
 }
 
-/*! Test: Grow with zero increment
- */
+/** @testcase Grow with zero increment */
 static void grow_by_zero(testval_small_uint_t n)
 {
     size_t sz = n;
@@ -545,8 +539,7 @@ static void grow_by_zero(testval_small_uint_t n)
     free_simple_type(n, gst);
 }
 
-/*! Test: Grow by one
- */
+/** @testcase Grow by one */
 static void grow_by_one(testval_small_uint_t n)
 {
     size_t sz = n;
@@ -590,8 +583,7 @@ ALLOC_TYPE *ensure_TYPE_size(size_t * restrict nelem,
     return *items;
 }
 
-/*! Test: Ensure size
- */
+/** @testcase Ensure size */
 static void test_ensure_size(testval_small_uint_t n)
 {
     size_t sz = n;
@@ -637,8 +629,7 @@ static void test_ensure_size(testval_small_uint_t n)
 #include "array_impl.c"
 /* end */
 
-/*! Test: Grow by page
- */
+/** @testcase Grow by page */
 static void alloc_and_grow_by_page(testval_small_uint_t n)
 {
     size_t initial_sz = (n + 1) * SIMPLE_TYPE_BUCKET_SIZE - 1;
@@ -682,8 +673,7 @@ static void alloc_and_grow_by_page(testval_small_uint_t n)
         ASSERT_EQ(ptr, freelist_simple_type_page[n + 1], gst);
 }
 
-/*! Test: Grow by page large
- */
+/** @testcase Grow by page large */
 static void alloc_and_grow_by_page_large(void)
 {
     size_t sz = (TESTVAL_SMALL_UINT_MAX + 1) * SIMPLE_TYPE_BUCKET_SIZE + 1;
@@ -723,8 +713,7 @@ static void alloc_and_grow_by_page_large(void)
 /* end */
 
 
-/*! Test: Grow by page logarithmically
- */
+/** @testcase Grow by page logarithmically */
 static void alloc_and_grow_by_pageorder(testval_small_uint_t n)
 {
     size_t initial_sz = (1ul << n) * SIMPLE_TYPE_BUCKET_SIZE;
@@ -805,8 +794,7 @@ void append_TYPE(size_t * restrict dest_sz, ALLOC_TYPE ** restrict dest,
     unshare_TYPE(app_sz, tail);
 }
 
-/*! Test: Do append zero
- */
+/** @testcase Do append zero */
 static void do_append_zero(testval_small_uint_t n)
 {
     size_t sz = n;
@@ -825,8 +813,7 @@ static void do_append_zero(testval_small_uint_t n)
     free_simple_type(sz, st);
 }
 
-/*! Test: Do append itself
- */
+/** @testcase Do append itself */
 static void do_append_itself(testval_small_uint_t n)
 {
     size_t sz = n + 1;
@@ -844,8 +831,7 @@ static void do_append_itself(testval_small_uint_t n)
     free_simple_type(sz, dest);
 }
 
-/*! Test: Do append
- */
+/** @testcase Do append */
 static void do_append(testval_small_uint_t n, testval_small_uint_t m)
 {
     size_t sz = n;
@@ -908,8 +894,7 @@ ALLOC_TYPE *concat_TYPE(size_t first_sz,
     return conc;
 }
 
-/*! Test: Test concatenate
- */
+/** @testcase Test concatenate */
 static void do_concatenate(testval_small_uint_t n, testval_small_uint_t m)
 {
     simple_type *st1 = new_simple_type(n);

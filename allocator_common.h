@@ -1,6 +1,5 @@
-/****ih Library/AllocatorInternal
- * COPYRIGHT
- * (c) 2016  Artem V. Andreev
+/*
+ * Copyright  * (c) 2016  Artem V. Andreev
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
@@ -15,12 +14,11 @@
  * along with this program; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301, USA.
+ */
+/** @file
+ * @brief Type-independent internal allocator code
  *
- * NAME
- * allocator_common.h --- Type-independent internal allocator code
- *
- * AUTHOR
- * Artem V. Andreev <artem@AA5779.spb.edu>
+ * @author Artem V. Andreev <artem@AA5779.spb.edu>
  */
 #ifndef ALLOCATOR_COMMON_H
 #define ALLOCATOR_COMMON_H 1

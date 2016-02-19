@@ -1,5 +1,5 @@
-/*!= Generic allocator routines
- * (c) 2015-2016  Artem V. Andreev
+/* 
+ * Copyright (c) 2015-2016  Artem V. Andreev
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
@@ -15,7 +15,11 @@
  * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301, USA.
  */
-
+/** @file
+ * @brief Generic allocator routines
+ *
+ * @author Artem V. Andreev <artem@AA5779.spb.edu>
+ */
 /* HEADER */
 #include "compiler.h"
 /* END */
@@ -154,8 +158,7 @@ ALLOC_TYPE *new_TYPE(ALLOC_CONSTRUCTOR_ARGS)
     return _obj;
 }
 
-/*! Test: Allocate an object
- */
+/** @testcase Allocate an object  */
 static void allocate(testval_tag_t tag)
 {
     simple_type *st = new_simple_type(tag);
@@ -166,8 +169,7 @@ static void allocate(testval_tag_t tag)
     free_simple_type(st);
 }
 
-/*! Test: Allocate and free an object
- */
+/** @testcase Allocate and free an object */
 static void allocate_and_free(testval_tag_t tag)
 {
     simple_type *st = new_simple_type(tag);
@@ -178,8 +180,7 @@ static void allocate_and_free(testval_tag_t tag)
     ASSERT_EQ(unsigned, track_simple_type, 0);
 }
 
-/*! Test: Allocate and free an object and allocate another
- */
+/** @testcase Allocate and free an object and allocate another */
 static void allocate_free_allocate(testval_tag_t tag)
 {
     simple_type *st = new_simple_type(tag);
@@ -222,8 +223,7 @@ ALLOC_TYPE *copy_TYPE(const ALLOC_TYPE *_orig)
     return _copy;
 }
 
-/*! Test: Copy
- */
+/** @testcase Copy */
 static void test_copy(testval_tag_t tag)
 {
     simple_type *st = new_simple_type(tag);
@@ -239,8 +239,7 @@ static void test_copy(testval_tag_t tag)
     ASSERT_EQ(unsigned, track_simple_type, 0);
 }
 
-/*! Test: Deallocate and copy
- */
+/** @testcase Deallocate and copy */
 static void deallocate_and_copy(testval_tag_t tag)
 {
     simple_type *st = new_simple_type(tag);
@@ -289,8 +288,7 @@ void free_TYPE(ALLOC_TYPE *_obj)
     freelist_TYPE = (freelist_t *)_obj;
 }
 
-/*! Test: Allocate and free an object and allocate two more
- */
+/** @testcase Allocate and free an object and allocate two more */
 static void allocate_free_allocate2(testval_tag_t tag)
 {
     simple_type *st = new_simple_type(tag);
@@ -308,8 +306,7 @@ static void allocate_free_allocate2(testval_tag_t tag)
     ASSERT_EQ(unsigned, track_simple_type, 0);
 }
 
-/*! Test: Free NULL
- */
+/** @testcase Free NULL */
 static void free_null(void)
 {
     freelist_t *prev = freelist_simple_type;
@@ -328,8 +325,7 @@ static void free_null(void)
 #include "allocator_impl.c"
 /* end */
 
-/*! Test: Allocate and free a small object
- */
+/** @testcase Allocate and free a small object */
 static void alloc_small(void)
 {
     short *sm;
@@ -369,8 +365,7 @@ static size_t shared_pool_size;
 #include "allocator_impl.c"
 /* end */
 
-/*! Test: Allocate from pool
- */
+/** @testcase Allocate from pool */
 static void alloc_from_pool(testval_tag_t tag)
 {
     simple_type *st;
@@ -394,8 +389,7 @@ static void alloc_from_pool(testval_tag_t tag)
     free(pool_base);
 }
 
-/*! Test: Allocate from pool and then malloc
- */
+/** @testcase Allocate from pool and then malloc */
 static void alloc_from_pool_and_malloc(testval_tag_t tag)
 {
     simple_type *st;
@@ -415,8 +409,7 @@ static void alloc_from_pool_and_malloc(testval_tag_t tag)
     free(pool_base);
 }
 
-/*! Test: Allocate from pool and free in reverse order
- */
+/** @testcase Allocate from pool and free in reverse order */
 static void alloc_from_pool_and_reverse_free(testval_tag_t tag)
 {
     simple_type *st;
@@ -459,8 +452,7 @@ static void alloc_from_pool_and_reverse_free(testval_tag_t tag)
 #include "allocator_impl.c"
 /* end */
 
-/*! Test: Allocate pool from with alignment
- */
+/** @testcase Allocate pool from with alignment */
 static void alloc_from_pool_align(testval_tag_t tag)
 {
     short *shrt;
@@ -573,8 +565,7 @@ typedef struct refcnt_type {
 #include "allocator_impl.c"
 /* end */
 
-/*! Test: Allocate refcounted
- */
+/** @testcase Allocate refcounted */
 static void allocate_refcnted(testval_tag_t tag)
 {
     refcnt_type *rt = new_refcnt_type(tag);
@@ -587,8 +578,7 @@ static void allocate_refcnted(testval_tag_t tag)
     free_refcnt_type(rt);
 }
 
-/*! Test: Allocate and free refcounted
- */
+/** @testcase Allocate and free refcounted */
 static void allocate_free_refcnted(testval_tag_t tag)
 {
     refcnt_type *rt = new_refcnt_type(tag);
@@ -600,8 +590,7 @@ static void allocate_free_refcnted(testval_tag_t tag)
     ASSERT_EQ(ptr, freelist_refcnt_type, rt);
 }
 
-/*! Test: Allocate, free and reallocate refcounted
- */
+/** @testcase Allocate, free and reallocate refcounted */
 static void allocate_free_allocate2_refcnted(testval_tag_t tag)
 {
     refcnt_type *rt = new_refcnt_type(tag);
@@ -617,8 +606,7 @@ static void allocate_free_allocate2_refcnted(testval_tag_t tag)
     ASSERT_EQ(unsigned, rt1->state, STATE_FINALIZED);
 }
 
-/*! Test: Allocate, use and free refcounted
- */
+/** @testcase Allocate, use and free refcounted */
 static void allocate_use_free_refcnt(testval_tag_t tag)
 {
     refcnt_type *rt = new_refcnt_type(tag);
@@ -633,8 +621,7 @@ static void allocate_use_free_refcnt(testval_tag_t tag)
     ASSERT_EQ(unsigned, use->state, STATE_FINALIZED);
 }
 
-/*! Test: Copy refcounted
- */
+/** @testcase Copy refcounted */
 static void copy_refcnted(testval_tag_t tag)
 {
     refcnt_type *rt = new_refcnt_type(tag);
@@ -649,8 +636,7 @@ static void copy_refcnted(testval_tag_t tag)
     ASSERT_EQ(unsigned, track_refcnt_type, 0);
 }
 
-/*! Test: Assign to NULL
- */
+/** @testcase Assign to NULL */
 static void assign_to_null(testval_tag_t tag)
 {
     refcnt_type *location = NULL;
@@ -664,8 +650,7 @@ static void assign_to_null(testval_tag_t tag)
     ASSERT_EQ(unsigned, track_refcnt_type, 0);
 }
 
-/*! Test: Assign to itself
- */
+/** @testcase Assign to itself */
 static void assign_to_self(testval_tag_t tag)
 {
     refcnt_type *rt = new_refcnt_type(tag);
@@ -680,8 +665,7 @@ static void assign_to_self(testval_tag_t tag)
     ASSERT_EQ(unsigned, track_refcnt_type, 0);
 }
 
-/*! Test: Assign NULL
- */
+/** @testcase Assign NULL */
 static void assign_null(testval_tag_t tag)
 {
     refcnt_type *rt = new_refcnt_type(tag);
@@ -692,8 +676,7 @@ static void assign_null(testval_tag_t tag)
     ASSERT_EQ(unsigned, track_refcnt_type, 0);
 }
 
-/*! Test: Maybe copy
- */
+/** @testcase Maybe copy */
 static void maybe_copy(testval_tag_t tag)
 {
     refcnt_type *rt = new_refcnt_type(tag);
@@ -712,8 +695,7 @@ static void maybe_copy(testval_tag_t tag)
     ASSERT_EQ(unsigned, track_refcnt_type, 0);
 }
 
-/*! Test: Move
- */
+/** @testcase Move */
 static void move_refcnt(testval_tag_t tag)
 {
     refcnt_type *rt = new_refcnt_type(tag);

@@ -19,6 +19,7 @@ ETAGS = etags
 NM = nm
 AWK = gawk
 ICU_CONFIG = icu-config
+DOXYGEN = doxygen
 
 ICU_CPPFLAGS := $(shell $(ICU_CONFIG) --cppflags)
 ICU_CFLAGS := $(shell $(ICU_CONFIG) --cflags)
@@ -63,10 +64,6 @@ IMPL_SOURCES += tensile.tab.c lex.yy.c
 GENERATED_FILES = $(IMPL_SOURCES) $(C_SOURCES:.c=_api.h)
 GENERATED_FILES += $(GENERIC_C_SOURCES:.c=_impl.c) $(GENERIC_C_SOURCES:.c=_api.h)
 
-
-DOC_SOURCES = $(C_SOURCES) $(GENERIC_C_SOURCES)
-DOC_SOURCES += compiler.h
-
 TESTABLES = bitops allocator array stack #queue
 
 APPLICATION = tensile
@@ -99,9 +96,6 @@ tests/%_ts.c : %_impl.c ;
 %_ts : %_ts.o
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS)
 
-$(TOPDIR)/doc/%.md : % $(TOPDIR)/extract_doc.awk
-	$(AWK) -f $(filter %.awk,$^) $< >$@
-
 ifneq ($(MAKECMDGOALS),clean)
 Makefile Makefile.generic : $(GENERATED_FILES)
 
@@ -131,7 +125,8 @@ endif
 
 
 .PHONY : doc
-doc : $(patsubst %,$(TOPDIR)/doc/%.md,$(DOC_SOURCES))
+doc :
+	cd $(TOPDIR); $(DOXYGEN) Doxyfile
 
 
 TAGS : $(C_SOURCES)

@@ -133,14 +133,15 @@ function dump_public_section(  decl, def, header) {
     next
 }
 
-!in_tests && !in_public && (/^\s*\/\*!\s*$/ || /^\s*\/\*\s*public\s*\*\/\s*$/) {
+!in_tests && !in_public && ((/^\s*\/\*\*.*\*\/\s*$/ && !/^\s*\/\*\*\s*@testcase\>/) || /^\s*\/\*\s*public\s*\*\/\s*$/) {
     sub(/^\s*\/\*\s*public\s*\*\//, "");
+    sub(/^\s*\/\*\*.*\*\/\s*$/, "");
     in_public = "start"
     public_section = ""
     public_section_start = FNR
 }
 
-!in_public && /^\s*\/\*!\s*Test\s*:/ {
+!in_public && /^\s*\/\*\*\s*@testcase\>/ {
     printf "#line %d \"%s\"\n", FNR, FILENAME >tests_file
     testdef = $0 "\n"
     while (getline > 0) {
@@ -148,7 +149,7 @@ function dump_public_section(  decl, def, header) {
         if (/{/)
             break;
     }
-    test_descr = gensub(/^\s*\/\*!\s*Test\s*:\s*([^\n]*\S)\s*\n.*$/, "\\1", "1", testdef);
+    test_descr = gensub(/^\s*\/\*\*\s*@testcase\s*([^\n]*\S)\s*\n.*$/, "\\1", "1", testdef);
     printf "%s", testdef >tests_file
 
     gsub(/\/\*([^*]+|\*+[^*/])*\*+\//, " ", testdef);

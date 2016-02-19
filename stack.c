@@ -1,4 +1,4 @@
-/*!= Generic stack routines
+/*
  * Copyright (c) 2015-2016  Artem V. Andreev
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,11 @@
  * Boston, MA 02110-1301, USA.
  *
  */
-
+/** @file
+ * @brief Generic stack routines
+ *
+ * @author Artem V. Andreev <artem@AA5779.spb.edu>
+ */
 /* HEADER */
 #include "compiler.h"
 /* END */
@@ -103,8 +107,7 @@ ELEMENT_TYPE *push_TYPE(STACK_TYPE *stack, size_t n)
     return result;
 }
 
-/*! Test: Push & push
- */
+/** @testcase Push & push */
 static void test_push(testval_small_uint_t n)
 {
     simple_stack stk;
@@ -151,8 +154,7 @@ ELEMENT_TYPE pop_TYPE(STACK_TYPE *stack)
     return result;
 }
 
-/*! Test: Push & pop
- */
+/** @testcase Push & pop */
 static void test_push_pop(testval_small_uint_t n, testval_tag_t tag)
 {
     simple_stack stk;

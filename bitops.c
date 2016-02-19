@@ -1,5 +1,5 @@
-/*!= Bit operatons
- * (c) 2016  Artem V. Andreev
+/* 
+ * Copyright (c) 2016  Artem V. Andreev
  *
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,17 +16,20 @@
  * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301, USA.
  */
-
+/** @file
+ * @brief Bitwise operations
+ *
+ * @author Artem V. Andreev <artem@AA5779.spb.edu>
+ */
 /* HEADER */
 #include "compiler.h"
 /* END */
 #include "bitops_api.h"
 
 
-/*!
- * Count leading zeroes
- *
- * Return value: The number of upper zero bits before the first 1
+/** Count leading */
+/**
+ * @return The number of upper zero bits before the first 1
  */
 static inline global_state(none)
 unsigned count_leading_zeroes(size_t i)
@@ -59,22 +62,19 @@ unsigned count_leading_zeroes(size_t i)
 #include "bitops_impl.c"
 #define TESTSUITE "Bit operations"
 
-/*! Test: Count leading zeroes in 0
- */
+/** @testcase Count leading zeroes in 0 */
 static void test_zero(void)
 {
     ASSERT_EQ(unsigned, count_leading_zeroes(0), sizeof(size_t) * CHAR_BIT);
 }
 
-/*! Test: Count leading zeroes in all ones
- */
+/** @testcase Count leading zeroes in all ones */
 static void test_all_ones(void)
 {
     ASSERT_EQ(unsigned, count_leading_zeroes(SIZE_MAX), 0);
 }
 
-/*! Test: Leading zeroes for a single bit
- */
+/** @testcase Leading zeroes for a single bit */
 static void test_one_bit(testval_bitnum_size_t bit)
 {
     ASSERT_EQ(unsigned,
