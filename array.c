@@ -17,56 +17,57 @@
  */
 /** @file
  * @brief Generic array allocator routines
+ * @generic
  *
  * @author Artem V. Andreev <artem@AA5779.spb.edu>
  */
-/* HEADER */
+/** @cond HEADER */
 #include "compiler.h"
-/* END */
+/** @endcond */
 #include "allocator_common.h"
 
-/* parameter */
-#define ALLOC_TYPE /* required */
-/* parameter */
+/** @public */
+#define ALLOC_TYPE ALLOC_TYPE
+/** @public */
 #define ALLOC_NAME ALLOC_TYPE
 
-/* parameter */
+/** @public */
 #define TRACK_ALLOCATOR false
 
-/* parameter */
+/** @public */
 #define ALLOC_CONSTRUCTOR_CODE(_obj) {}
-/* parameter */
+/** @public */
 #define ALLOC_DESTRUCTOR_CODE(_obj) {}
-/* parameter */
+/** @public */
 #define ALLOC_COPY_CODE(_obj) {}
 
-/* local */
+/** @private */
 #define ALLOC_PREFIX(_name) QNAME(_name, ALLOC_NAME)
 
-/* parameter */
+/** @public */
 #define USE_ALLOC_POOL false
-/* parameter */
+/** @public */
 #define ALLOC_POOL_PTR NULL
-/* parameter */
+/** @public */
 #define ALLOC_POOL_SIZE NULL
-/* parameter */
+/** @public */
 #define ALLOC_POOL_ALIGN_AS double
 
-/* parameter */
+/** @public */
 #define MAX_BUCKET /* required */
 
-/* parameter */
+/** @public */
 #define BUCKET_SIZE 1
 
-/* parameter */
+/** @public */
 #define BUCKET_LOG2_SCALE false
 
-/* parameter */
+/** @public */
 #define IS_MONOID false
 
-/* local */
+/** @private */
 #define freelist_TYPE ALLOC_PREFIX(freelist)
-/* local */
+/** @private */
 #define track_TYPE ALLOC_PREFIX(track)
 
 static freelist_t *freelist_TYPE[MAX_BUCKET];
@@ -74,7 +75,7 @@ static freelist_t *freelist_TYPE[MAX_BUCKET];
 static size_t track_TYPE[MAX_BUCKET + 1];
 #endif
 
-/* TESTS */
+/** @cond TESTS */
 #include "assertions.h"
 #define TESTSUITE "Array allocator"
 
@@ -91,7 +92,7 @@ typedef struct simple_type {
 
 #define SIMPLE_TYPE_TAG STATIC_ARBITRARY(32)
 
-/* instantiate */
+/** @cond GENERIC */
 #define ALLOC_TYPE simple_type
 #define TRACK_ALLOCATOR true
 #define ALLOC_CONSTRUCTOR_CODE(_obj)                        \
@@ -105,11 +106,11 @@ typedef struct simple_type {
 #define IS_MONOID true
 #include "array_api.h"
 #include "array_impl.c"
-/* end */
+/** @endcond */
 
-/* END */
+/** @endcond */
 
-/* local */
+/** @private */
 #define alloc_TYPE ALLOC_PREFIX(alloc)
 
 static returns(not_null) returns(fresh_pointer) returns(important)
@@ -150,10 +151,10 @@ ALLOC_TYPE *alloc_TYPE(size_t n)
     return frlmalloc(sizeof(*obj) * n);
 }
 
-/* local */
+/** @private */
 #define new_TYPE ALLOC_PREFIX(new)
 
-/* public */
+/** @public */
 returns(important)
 ALLOC_TYPE *new_TYPE(size_t _nelem)
 {
@@ -178,7 +179,7 @@ static void allocate_zero(void)
     ASSERT_NULL(new_simple_type(0));
 }
 
-/* local */
+/** @private */
 #define dispose_TYPE ALLOC_PREFIX(dispose)
 
 static arguments(not_null)
@@ -212,10 +213,10 @@ void dispose_TYPE(size_t nelem, ALLOC_TYPE obj[var_size(nelem)])
 }
 
 
-/* local */
+/** @private */
 #define free_TYPE ALLOC_PREFIX(free)
 
-/* public */
+/** @public */
 void free_TYPE(size_t _nelem, ALLOC_TYPE _obj[var_size(_nelem)])
 {
     size_t _i;
@@ -294,10 +295,10 @@ static void allocate_free_allocate(testval_small_uint_t n)
     }
 }
 
-/* local */
+/** @private */
 #define unshare_TYPE ALLOC_PREFIX(unshare)
 
-/* public */
+/** @public */
 static inline arguments(not_null)
 void unshare_TYPE(size_t _nelem, unused ALLOC_TYPE _obj[var_size(_nelem)])
 {
@@ -309,10 +310,10 @@ void unshare_TYPE(size_t _nelem, unused ALLOC_TYPE _obj[var_size(_nelem)])
     }
 }
 
-/* local */
+/** @private */
 #define copy_TYPE ALLOC_PREFIX(copy)
 
-/* public */
+/** @public */
 returns(important)
 ALLOC_TYPE *copy_TYPE(size_t _nelem,
                       const ALLOC_TYPE _orig[var_size(_nelem)])
@@ -372,12 +373,12 @@ static void deallocate_and_copy(testval_small_uint_t n)
 }
 
 
-/* TESTS */
+/** @cond TESTS */
 
 static void *shared_pool_ptr;
 static size_t shared_pool_size;
 
-/* instantiate */
+/** @cond GENERIC */
 #define ALLOC_TYPE short
 #define ALLOC_NAME pool_short
 #define USE_ALLOC_POOL true
@@ -388,7 +389,7 @@ static size_t shared_pool_size;
 #define MAX_BUCKET (TESTVAL_SMALL_UINT_MAX)
 #include "array_api.h"
 #include "array_impl.c"
-/* end */
+/** @endcond */
 
 /** @testcase Allocate from pool */
 static void alloc_from_pool(testval_small_uint_t n)
@@ -478,12 +479,12 @@ static void alloc_not_from_pool(testval_small_uint_t n)
     free(pool_base);
 }
 
-/* END */
+/** @endcond */
 
-/* local */
+/** @private */
 #define grow_TYPE ALLOC_PREFIX(grow)
 
-/* public */
+/** @public */
 arguments(not_null)
 ALLOC_TYPE *grow_TYPE(size_t * restrict nelem,
                       ALLOC_TYPE * restrict * restrict items,
@@ -565,10 +566,10 @@ static void grow_by_one(testval_small_uint_t n)
         ASSERT_EQ(ptr, freelist_simple_type[n], gst);
 }
 
-/* local */
+/** @private */
 #define ensure_TYPE_size QNAME(ALLOC_PREFIX(ensure), size)
 
-/* public */
+/** @public */
 static inline arguments(not_null)
 ALLOC_TYPE *ensure_TYPE_size(size_t * restrict nelem,
                              ALLOC_TYPE * restrict * restrict items,
@@ -609,10 +610,10 @@ static void test_ensure_size(testval_small_uint_t n)
     free_simple_type(sz, gst);
 }
 
-/* TESTS */
+/** @cond TESTS */
 #define SIMPLE_TYPE_BUCKET_SIZE 1024
 
-/* instantiate */
+/** @cond GENERIC */
 #define ALLOC_TYPE simple_type
 #define ALLOC_NAME simple_type_page
 #define TRACK_ALLOCATOR true
@@ -627,7 +628,7 @@ static void test_ensure_size(testval_small_uint_t n)
 #define MAX_BUCKET (TESTVAL_SMALL_UINT_MAX + 1)
 #include "array_api.h"
 #include "array_impl.c"
-/* end */
+/** @endcond */
 
 /** @testcase Grow by page */
 static void alloc_and_grow_by_page(testval_small_uint_t n)
@@ -694,7 +695,7 @@ static void alloc_and_grow_by_page_large(void)
     ASSERT_EQ(unsigned, *tracker, 0);
 }
 
-/* instantiate */
+/** @cond GENERIC */
 #define ALLOC_TYPE simple_type
 #define ALLOC_NAME simple_type_pageorder
 #define TRACK_ALLOCATOR true
@@ -710,7 +711,7 @@ static void alloc_and_grow_by_page_large(void)
 #define MAX_BUCKET (TESTVAL_SMALL_UINT_MAX + 1)
 #include "array_api.h"
 #include "array_impl.c"
-/* end */
+/** @endcond */
 
 
 /** @testcase Grow by page logarithmically */
@@ -759,15 +760,17 @@ static void alloc_and_grow_by_pageorder(testval_small_uint_t n)
         ASSERT_EQ(ptr, freelist_simple_type_pageorder[n + 1], gst);
 }
 
-/* END */
+/** @endcond */
 
-/* public */
 #if IS_MONOID
+/** @cond HEADER */
+#if IS_MONOID
+/** @endcond */
 
-/* local */
+/** @private */
 #define append_TYPE ALLOC_PREFIX(append)
 
-/* public */
+/** @public */
 argument(not_null,1,2)
 void append_TYPE(size_t * restrict dest_sz, ALLOC_TYPE ** restrict dest,
                  size_t app_sz, const ALLOC_TYPE app[var_size(app_sz)])
@@ -859,10 +862,10 @@ static void do_append(testval_small_uint_t n, testval_small_uint_t m)
 }
 
 
-/* local */
+/** @private */
 #define concat_TYPE ALLOC_PREFIX(concat)
 
-/* public */
+/** @public */
 argument(not_null,5) returns(important)
 ALLOC_TYPE *concat_TYPE(size_t first_sz,
                         const ALLOC_TYPE first[var_size(first_sz)],
@@ -930,4 +933,7 @@ static void do_concatenate(testval_small_uint_t n, testval_small_uint_t m)
                                           conc_sz], 0);
 }
 
+/** @cond HEADER */
+#endif
+/** @endcond */
 #endif

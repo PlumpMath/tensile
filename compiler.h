@@ -1,5 +1,5 @@
-/*!= Compiler support
- * (c) 2015-2016  Artem V. Andreev
+/*
+ * Copyright (c) 2015-2016  Artem V. Andreev
  *
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,13 +15,16 @@
  * along with this program; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301, USA.
+ */
+/** @file
+ * @brief Compiler support
  *
  * Compilers offer various extensions over strict C standard, and
  * also implement various versions of ISO C (sometimes, only partially).
  * This file offers compatibility wrappers around some of those extensions.
  *
- * Artem V. Andreev <artem@AA5779.spb.edu>
- *****/
+ * @author Artem V. Andreev <artem@AA5779.spb.edu>
+ */
 #ifndef COMPILER_H
 #define COMPILER_H 1
 
@@ -36,22 +39,23 @@ extern "C"
 #include <inttypes.h>
 #include <assert.h>
 
-/*!== Annotations
+/** @name Annotations
  * Modern compilers, in particular GCC and Clang, support a rich set of
  * annotations to improve code quality.
  * Unfortunately, various versions of those compilers implement various sets
  * of the attributes, hence we need to wrap them into macros, conditioned by
  * the compiler version
  */
+/**@{*/
 
-/*!
+/**
  * Return value annotation
  */
 #define returns(_x) ANNOTATION_RETURNS_##_x
 
-/*!<
- * - fresh_pointer: Indicates that the function returns
- *   a pointer to unaliased uninitalized memory
+/**
+ * Indicates that the function returns
+ * a pointer to unaliased uninitalized memory
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96)
 #define ANNOTATION_RETURNS_fresh_pointer __attribute__((__malloc__))
@@ -59,8 +63,8 @@ extern "C"
 #define ANNOTATION_RETURNS_fresh_pointer
 #endif
 
-/*!<
- * - not_null: Indicates that a function returns a non-NULL pointer
+/**
+ * Indicates that a function returns a non-NULL pointer
  */
 #if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9)
 #define ANNOTATION_RETURNS_not_null __attribute__((__returns_nonnull__))
@@ -68,9 +72,9 @@ extern "C"
 #define ANNOTATION_RETURNS_not_null
 #endif
 
-/*!<
- * - important: Requires a warning if a result value
- *   of the function is thrown away
+/**
+ * Requires a warning if a result value
+ * of the function is thrown away
  */
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
 #define ANNOTATION_RETURNS_important            \
@@ -79,14 +83,14 @@ extern "C"
 #define ANNOTATION_RETURNS_important
 #endif
 
-/*!
+/**
  * Argument list annotations
  */
 #define arguments(_x) ANNOTATION_ARGUMENTS_##_x
 
-/*!<
- * - sentinel: Indicates that a vararg function shall have NULL
- *   at the end of varargs
+/**
+ * Indicates that a vararg function shall have NULL
+ * at the end of varargs
  */
 #if __GNUC__ >= 4
 #define ANNOTATION_ARGUMENTS_sentinel  __attribute__((__sentinel__))
@@ -94,9 +98,9 @@ extern "C"
 #define ANNOTATION_ARGUMENTS_sentinel
 #endif
 
-/*!<
- * - not_null: Indicates that no pointer arguments should
- *   ever be passed NULL
+/**
+ * Indicates that no pointer arguments should
+ * ever be passed NULL
  */
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR >= 3)
 #define ANNOTATION_ARGUMENTS_not_null __attribute__ ((__nonnull__))
@@ -104,18 +108,18 @@ extern "C"
 #define ANNOTATION_ARGUMENTS_not_null
 #endif
 
-/*!
- * specific argument annotations
+/**
+ * Specific argument annotations
  */
 #define argument(_x, ...) ANNOTATION_ARGUMENT_##_x(__VA_ARGS__)
 
-/*!<
- * - storage_size (_x): Indicates that a function returns
- *   a pointer to memory, the size of which is given in its _x'th argument
- * - storage_size (_x, _y): Indicates that a function returns
- *   a pointer to memory, which consists of a number of elements
- *   given in its x'th argument, where each element has the size given in
- *   the y'th argument
+/**
+ * Indicates that a function returns
+ * a pointer to memory, the size of which is given in its _x'th argument.
+ * Indicates that a function returns
+ * a pointer to memory, which consists of a number of elements
+ * given in its x'th argument, where each element has the size given in
+ * the y'th argument
  */
 #if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3)
 #define ANNOTATION_ARGUMENT_storage_size(...)       \
@@ -124,10 +128,10 @@ extern "C"
 #define ANNOTATION_ARGUMENT_storage_size(...)
 #endif
 
-/*!<
- * - printf (_x, _y): Indicates that a function is printf-like,
- *   and the format string is in the _x'th argument, and
- *   the arguments start at _y
+/**
+ * Indicates that a function is printf-like,
+ * and the format string is in the _x'th argument, and
+ * the arguments start at _y
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
 #define ANNOTATION_ARGUMENT_printf(_x, _y)              \
@@ -136,10 +140,10 @@ extern "C"
 #define ANNOTATION_ARGUMENT_printf(_x, _y)
 #endif
 
-/*!<
- * - scanf (_x, _y): Indicates that a function is scanf-like,
- *   and the format string is in the _x'th argument, and
- *   the arguments start at _y
+/**
+ * Indicates that a function is scanf-like,
+ * and the format string is in the _x'th argument, and
+ * the arguments start at _y
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
 #define ANNOTATION_ARGUMENT_scanf(_x, _arg_y)       \
@@ -148,10 +152,10 @@ extern "C"
 #define ANNOTATION_ARGUMENT_scanf(_x, _y)
 #endif
 
-/*!<
- * - format_string (_x): Indicates that a _x'th argument to the function is
- *  a printf/scanf/strftime format string that is transformed in some way
- *  and returned by the function
+/**
+ * Indicates that a _x'th argument to the function is
+ * a printf/scanf/strftime format string that is transformed in some way
+ * and returned by the function
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
 #define ANNONATION_ARGUMENT_format_string(_x) \
@@ -161,9 +165,9 @@ extern "C"
 #endif
 
 
-/*!<
- * - not_null (_args...): Indicates that pointer arguments listed in
- *   `_args` are never `NULL`
+/**
+ * Indicates that pointer arguments listed in
+ * `_args` are never `NULL`
  */
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR >= 3)
 #define ANNOTATION_ARGUMENT_not_null(...) \
@@ -172,79 +176,20 @@ extern "C"
 #define ANNOTATION_ARGUMENT_not_null(...)
 #endif
 
-/*!=== C99/C11 annotations
- * Compilers vary in their support for C99 and C11 features,
- * and the level of support may be altered by command-line switches
- *
- * - restrict: Restricted pointers are supported by GCC even in non-C99 mode
- *   but with an alternative keyword __restrict__
- */
-#if __STDC_VERSION__ < 199901L
-#if __GNUC__
-#define restrict __restrict__
-#else
-#define restrict
-#endif
-#endif
-
-/*!<
- * - static_assert: Defined in <assert.h> by C11-compliant systems.
- *   If not defined, revert to an old trick of using negative array size
- */
-#if !defined(static_assert)
-#define static_assert(_cond, _msg) ((void)sizeof(char[(_cond) ? 1 : -1]))
-#endif
-
-/*!<
- * - at_least(_x): A C99 feature to specify a mininum required number of
- *   array elements when an array is passed as parameter. Supported by GCC
- *   in its default mode if no strict ISO compliance is requested.
- *   Since C99 reuses `static' for this purpose, we need to conditionally
- *   define our own macro
- */
-#if __STDC_VERSION__ >= 199901L || (defined(__GNUC__) && !__STRICT_ANSI__)
-#define at_least(_x) static _x
-#else
-#define at_least(_x) _x
-#endif
-
-/*!<
- * - var_size(_n)
- */
-#if (__STDC_VERSION__ >= 199901L && !__STDC_NO_VLA__) ||    \
-    (defined(__GNUC__) && !__STRICT_ANSI__)
-#define var_size(_x) _x
-#else
-#define var_size(_x)
-#endif
-    
-/*!<
- * - noreturn: For C11 systems, it is defined in a new header
- *   <stdnoreturn.h>. For GCC in non-C11 mode define it via noreturn
- *   attribute
- */
-#if __STDC_VERSION__ >= 201112L
-#include <stdnoreturn.h>
-#elif     __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
-#define noreturn __attribute__((__noreturn__))
-#else
-#define noreturn
-#endif
-
-/*!
+/**
  * Global state affected by the function
  */
 #define global_state(_x) ANNOTATION_GLOBAL_STATE_##_x
 
-/*!<
- * - modify: Global state may be modified. This is the default, so
- *   it is expanded to nothing and is provided only for completeness
+/**
+ * Global state may be modified. This is the default, so
+ * it is expanded to nothing and is provided only for completeness
  */
 #define ANNOTATION_GLOBAL_STATE_modify
 
-/*!<
- * - read: Global state may be read but not modified. In particular,
- *   that means a function cannot produce any observable side effects
+/**
+ * Global state may be read but not modified. In particular,
+ * that means a function cannot produce any observable side effects
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96)
 #define ANNOTATION_GLOBAL_STATE_read __attribute__((__pure__))
@@ -252,10 +197,10 @@ extern "C"
 #define ANNOTATION_GLOBAL_STATE_read
 #endif
 
-/*!<
- * - none: No global state is accessed by the function, and so the
- *   function is genuinely function, its result depending solely on its
- *   arguments
+/**
+ * No global state is accessed by the function, and so the
+ * function is genuinely function, its result depending solely on its
+ * arguments
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
 #define ANNOTATION_GLOBAL_STATE_none  __attribute__((__const__))
@@ -263,14 +208,14 @@ extern "C"
 #define ANNOTATION_GLOBAL_STATE_none
 #endif
 
-/*!
- * linkage(_x) --- Additional linkage modes
+/**
+ * Additional linkage modes
  */
 #define linkage(_x) ANNOTATION_LINKAGE_##_x
 
-/*!<
- * - weak: Weak symbol (a library symbol that may be overriden
- *   by the application
+/**
+ * Weak symbol (a library symbol that may be overriden
+ * by the application
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
 #define ANNOTATION_LINKAGE_weak __attribute__((__weak__))
@@ -278,10 +223,12 @@ extern "C"
 #define ANNOTATION_LINKAGE_weak
 #endif
 
-/*!<
- * - export: A symbol is exported from a shared library
- * - import: A symbol is imported from a shared library
- *   For POSIX systems these two modes are void.
+/** @def ANNOTATION_LINKAGE_export
+ * A symbol is exported from a shared library
+ */
+/** @def ANNOTATION_LINKAGE_import
+ * A symbol is imported from a shared library
+ * For POSIX systems these two modes are void.
  */
 #if __WIN32
 #define ANNOTATION_LINKAGE_export __declspec(dllexport)
@@ -291,12 +238,14 @@ extern "C"
 #define ANNOTATION_LINKAGE_import
 #endif
 
-/*!<
- * - local: A symbol is NOT exported from a shared library
- *   (but unlike static symbols, it is visible to all compilation units
- *   comprising the library itself)
- * - internal: Like `local', but the symbol cannot be accessed by other
- *   modules even indirectly (e.g. through a function pointer)
+/** @def ANNOTATION_LINKAGE_local
+ * symbol is **not** exported from a shared library
+ * (but unlike static symbols, it is visible to all compilation units
+ * comprising the library itself)
+ */
+/**  @def ANNOTATION_LINKAGE_internal
+ * Like `local`, but the symbol cannot be accessed by other
+ * modules even indirectly (e.g. through a function pointer)
  */
 #if (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR >= 3)) && __ELF__
 #define ANNOTATION_LINKAGE_local                \
@@ -309,8 +258,8 @@ extern "C"
 #endif
 
 
-/*!<
- * - deprecated: The symbol should not be used and triggers a warning
+/**
+ * The symbol should not be used and triggers a warning
  */
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)
 #define ANNOTATION_LINKAGE_deprecated __attribute__((__deprecated__))
@@ -318,7 +267,7 @@ extern "C"
 #define ANNOTATION_LINKAGE_deprecated
 #endif
 
-/*!
+/**
  * Marks a symbol as explicitly unused
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
@@ -327,13 +276,91 @@ extern "C"
 #define unused
 #endif
 
-/*!
+/**@}*/
+
+/** @name C99/C11 annotations
+ * Compilers vary in their support for C99 and C11 features,
+ * and the level of support may be altered by command-line switches
+ */
+/**@{*/
+
+/**
+ * Restricted pointers are supported by GCC even in non-C99 mode
+ *  but with an alternative keyword `__restrict__`
+ */
+#if __STDC_VERSION__ < 199901L
+#if __GNUC__
+#define restrict __restrict__
+#else
+#define restrict
+#endif
+#endif
+
+/**
+ * Defined in <assert.h> by C11-compliant systems.
+ * If not defined, revert to an old trick of using negative array size
+ */
+#if !defined(static_assert)
+#define static_assert(_cond, _msg) ((void)sizeof(char[(_cond) ? 1 : -1]))
+#endif
+
+/**
+ * A C99 feature to specify a mininum required number of
+ * array elements when an array is passed as parameter. Supported by GCC
+ * in its default mode if no strict ISO compliance is requested.
+ * Since C99 reuses `static' for this purpose, we need to conditionally
+ * define our own macro
+ */
+#if __STDC_VERSION__ >= 199901L || (defined(__GNUC__) && !__STRICT_ANSI__)
+#define at_least(_x) static _x
+#else
+#define at_least(_x) _x
+#endif
+
+/**
+ * C99 allows arrays to be declared in function declarations
+ * with non-constant dimensions, depending on previous arguments.
+ * It does not affect the produced code and no compile- or run-time
+ * checks are usually performed, but the code intent is more evident 
+ * this way
+ */
+#if (__STDC_VERSION__ >= 199901L && !__STDC_NO_VLA__) ||    \
+    (defined(__GNUC__) && !__STRICT_ANSI__)
+#define var_size(_x) _x
+#else
+#define var_size(_x)
+#endif
+    
+/**
+ * For C11 systems, it is defined in a new header
+ * <stdnoreturn.h>. For GCC in non-C11 mode define it via noreturn
+ * attribute
+ */
+#if __STDC_VERSION__ >= 201112L
+#include <stdnoreturn.h>
+#elif     __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
+#define noreturn __attribute__((__noreturn__))
+#else
+#define noreturn
+#endif
+
+/**@}*/
+
+/**
+ * Make an unexpanded qualifed name
+ *
+ * Produces a symbol composed of _prefix and _name
+ * separated by an underscore, where _prefix and _name
+ * are not macro-expanded
+ */
+#define _QNAME(_prefix, _name) _prefix##_##_name
+
+/**
  * Make a qualifed name
  *
  * Produces a symbol composed of _prefix and _name
  * separated by an underscore
  */
-#define _QNAME(_prefix, _name) _prefix##_##_name
 #define QNAME(_prefix, _name) _QNAME(_prefix, _name)
 
 #ifdef __cplusplus

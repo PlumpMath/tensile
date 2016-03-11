@@ -1,4 +1,4 @@
-/*!= Generic queues
+/*
  * Copyright (c) 2015-2016  Artem V. Andreev
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,35 +16,39 @@
  * Boston, MA 02110-1301, USA.
  *
  */
-
-/* HEADER */
+/** @file
+ * @brief Generic queues
+ * @generic
+ * @author Artem V. Andreev <artem@AA5779.spb.edu>
+ */
+/** @cond HEADER */
 #include "compiler.h"
 #include <string.h>
-/* END */
+/** @endcond */
 
-/* parameter */
+/** @public */
 #define QUEUE_TYPE /* required */
-/* parameter */
+/** @public */
 #define QUEUE_NAME QUEUE_TYPE
-/* parameter */
+/** @public */
 #define ELEMENT_TYPE /* required */
-/* parameter */
+/** @public */
 #define ALLOC_NAME ELEMENT_TYPE
-/* parameter */
+/** @public */
 #define ELTS_FIELD data
-/* parameter */
+/** @public */
 #define SIZE_FIELD size
-/* parameter */
+/** @public */
 #define TOP_FIELD top
-/* parameter */
+/** @public */
 #define BOTTOM_FIELD bottom
-/* parameter */
+/** @public */
 #define GROW_RESERVE 0
 
-/* parameter */
+/** @public */
 #define DEQUEUE_CLEANUP_CODE(_obj) {}
 
-/* TESTS */
+/** @cond TESTS */
 #include "assertions.h"
 #define TESTSUITE "Queues"
 
@@ -57,7 +61,7 @@ typedef struct simple_queue {
 
 #define QUEUE_TAG STATIC_ARBITRARY(16)
 
-/* instantiate */
+/** @cond GENERIC */
 #define QUEUE_TYPE simple_queue
 #define ELEMENT_TYPE unsigned
 #define ALLOC_TYPE ELEMENT_TYPE
@@ -68,14 +72,14 @@ typedef struct simple_queue {
 #include "array_impl.c"
 #include "queue_api.h"
 #include "queue_impl.c"
-/* end */
+/** @endcond */
 
-/* END */
+/** @endcond */
 
-/* local */
+/** @private */
 #define init_queue_TYPE QNAME(init_queue, QUEUE_NAME)
 
-/* public */
+/** @public */
 static inline arguments(not_null)
 void init_queue_TYPE(QUEUE_TYPE *q)
 {
@@ -86,20 +90,20 @@ void init_queue_TYPE(QUEUE_TYPE *q)
     q->BOTTOM_FIELD = 0;
 }
 
-/* local */
+/** @private */
 #define TYPE_size QNAME(QUEUE_NAME, size)
 
-/* public */
+/** @public */
 static inline global_state(none) arguments(not_null) returns(important)
 size_t TYPE_size(const QUEUE_NAME *q)
 {
     return q->TOP_FIELD - q->BOTTOM_FIELD;
 }
 
-/* local */
+/** @private */
 #define enqueue_front_TYPE QNAME(enqueue_front, QUEUE_NAME)
 
-/* public */
+/** @public */
 arguments(not_null) returns(not_null) returns(important)
 ELEMENT_TYPE *enqueue_front_TYPE(QUEUE_TYPE *q, size_t n)
 {
@@ -130,10 +134,10 @@ ELEMENT_TYPE *enqueue_front_TYPE(QUEUE_TYPE *q, size_t n)
     return result;
 }
 
-/* local */
+/** @private */
 #define dequeue_front_TYPE QNAME(dequeue_front, QUEUE_NAME)
 
-/* public */
+/** @public */
 static inline arguments(not_null) returns(important)
 ELEMENT_TYPE dequeue_front_TYPE(QUEUE_TYPE *q)
 {
@@ -148,10 +152,10 @@ ELEMENT_TYPE dequeue_front_TYPE(QUEUE_TYPE *q)
     return result;
 }
 
-/* local */
+/** @private */
 #define enqueue_back_TYPE QNAME(enqueue_back, QUEUE_NAME)
 
-/* public */
+/** @public */
 arguments(not_null) returns(not_null) returns(important)
 ELEMENT_TYPE *enqueue_back_TYPE(QUEUE_TYPE *q, size_t n)
 {
@@ -182,10 +186,10 @@ ELEMENT_TYPE *enqueue_back_TYPE(QUEUE_TYPE *q, size_t n)
 }
 
 
-/* local */
+/** @private */
 #define dequeue_back_TYPE QNAME(dequeue_back, QUEUE_NAME)
 
-/* public */
+/** @public */
 static inline arguments(not_null) returns(important)
 ELEMENT_TYPE dequeue_back_TYPE(QUEUE_TYPE *q)
 {
@@ -605,89 +609,6 @@ ELEMENT_TYPE dequeue_back_TYPE(QUEUE_TYPE *q)
 #define DECLARE_QUEUE_REFCNT_OPS(_type, _eltype)            \
     DECLARE_QUEUE_OPS(_type, _eltype *, trivial_dequeue)
 
-#if IMPLEMENT_QUEUE
-
-#define DEFINE_QUEUE_OPS(_type, _eltype, _scale, _maxsize, _var, _idxvar, \
-                         _inite, _clonee, _finie, _enqfunc, _grow)      \
-    DEFINE_ARRAY_ALLOCATOR(_type, _scale,                               \
-                           _maxsize, _var, _idxvar,                     \
-                           { _var->top = _var->bottom = 0; }, _inite,   \
-                           {}, _clonee, {}, {}, {},                     \
-                           { clear_##_type(_var); }, {});               \
-                                                                        \
-    GENERATED_DEF void clear_##_type(_type *_var)                       \
-    {                                                                   \
-        unsigned _idxvar;                                               \
-                                                                        \
-        for (_idxvar = _var->bottom; _idxvar < _var->top; _idxvar++)    \
-        {                                                               \
-            _finie;                                                     \
-            _inite;                                                     \
-        }                                                               \
-        _var->bottom = _var->top = 0;                                   \
-     }                                                                  \
-                                                                        \
-    GENERATED_DEF void enqueue_##_type(_type **q, _eltype item)         \
-    {                                                                   \
-        if ((*q)->top == (*q)->nelts)                                   \
-        {                                                               \
-            if ((*q)->bottom > 0)                                       \
-            {                                                           \
-                memmove((*q)->elts, &(*q)->elts[(*q)->bottom],          \
-                        ((*q)->top - (*q)->bottom) * sizeof(_eltype));  \
-                (*q)->top -= (*q)->bottom;                              \
-                (*q)->bottom = 0;                                       \
-            }                                                           \
-            else                                                        \
-            {                                                           \
-                *q = resize_##_type(*q, (*q)->nelts + 1 + (_grow));     \
-            }                                                           \
-        }                                                               \
-        _enqfunc(&(*q)->elts[(*q)->top++], &item);                      \
-    }                                                                   \
-                                                                        \
-    GENERATED_DEF void enqueue_front_##_type(_type **q, _eltype item)   \
-    {                                                                   \
-        if ((*q)->top == (*q)->bottom)                                  \
-        {                                                               \
-            (*q)->top++;                                                \
-            _enqfunc(&(*q)->elts[(*q)->bottom], &item);                 \
-        }                                                               \
-        else                                                            \
-        {                                                               \
-            if ((*q)->bottom == 0)                                      \
-            {                                                           \
-                unsigned delta;                                         \
-                                                                        \
-                if ((*q)->top == (*q)->nelts)                           \
-                    *q = resize_##_type(*q, (*q)->nelts + 1 + (_grow)); \
-                delta = (*q)->nelts - (*q)->top;                        \
-                memmove(&(*q)->elts[(*q)->bottom + delta],              \
-                        &(*q)->elts[(*q)->bottom],                      \
-                        ((*q)->top - (*q)->bottom) * sizeof(_eltype));  \
-                (*q)->top = (*q)->nelts;                                \
-                (*q)->bottom += delta;                                  \
-            }                                                           \
-            _enqfunc(&(*q)->elts[--(*q)->bottom], &item);               \
-        }                                                               \
-    }                                                                   \
-    struct fake
-
-#define DEFINE_QUEUE_REFCNT_OPS(_type, _eltype, _scale, _maxsize, _grow) \
-    ATTR_NONNULL                                                        \
-    static inline void do_enqueue_##_type(_eltype **dst, _eltype **src) \
-    {                                                                   \
-        *dst = use_##_eltype(*src);                                     \
-    }                                                                   \
-                                                                        \
-    DEFINE_QUEUE_OPS(_type, _eltype *, _scale, _maxsize, q, i,          \
-                     { q->elts[i] = NULL; },                          \
-                     { NEW(q)->elts[i] =                                \
-                     use_##_eltype(OLD(q)->elts[i]); },                 \
-                     { free_##_eltype(q->elts[i]); },                 \
-                     do_enqueue_##_type, _grow)
-
-#endif
 
 
 #ifdef __cplusplus

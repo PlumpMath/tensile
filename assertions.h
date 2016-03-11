@@ -1,5 +1,5 @@
-/*!= Assertion macros
- * (c) 2015-2016  Artem V. Andreev
+/* 
+ * Copyright (c) 2015-2016  Artem V. Andreev
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
@@ -15,6 +15,10 @@
  * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301, USA.
  *
+ */
+/** @file
+ * @brief @internal Assertion macros
+ * @author Artem V. Andreev <artem@AA5779.spb.edu>
  */
 #ifndef ASSERTIONS_H
 #define ASSERTIONS_H 1

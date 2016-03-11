@@ -18,34 +18,35 @@
  */
 /** @file
  * @brief Generic stack routines
+ * @generic
  *
  * @author Artem V. Andreev <artem@AA5779.spb.edu>
  */
-/* HEADER */
+/** @cond HEADER */
 #include "compiler.h"
-/* END */
+/** @endcond */
 
-/* parameter */
-#define STACK_TYPE /* required */
-/* parameter */
+/** @public */
+#define STACK_TYPE STACK_TYPE
+/** @public */
 #define STACK_NAME STACK_TYPE
-/* parameter */
+/** @public */
 #define ELEMENT_TYPE /* required */
-/* parameter */
+/** @public */
 #define ALLOC_NAME ELEMENT_TYPE
-/* parameter */
+/** @public */
 #define ELTS_FIELD data
-/* parameter */
+/** @public */
 #define SIZE_FIELD size
-/* parameter */
+/** @public */
 #define TOP_FIELD top
-/* parameter */
+/** @public */
 #define GROW_RESERVE 0
 
-/* parameter */
+/** @public */
 #define POP_CLEANUP_CODE(_obj) {}
 
-/* TESTS */
+/** @cond TESTS */
 #include "assertions.h"
 #define TESTSUITE "Stacks"
 
@@ -57,7 +58,7 @@ typedef struct simple_stack {
 
 #define STACK_TAG STATIC_ARBITRARY(16)
 
-/* instantiate */
+/** @cond GENERIC */
 #define STACK_TYPE simple_stack
 #define ELEMENT_TYPE unsigned
 #define ALLOC_TYPE ELEMENT_TYPE
@@ -68,15 +69,15 @@ typedef struct simple_stack {
 #include "array_impl.c"
 #include "stack_api.h"
 #include "stack_impl.c"
-/* end */
+/** @endcond */
 
-/* END */
+/** @endcond */
 
 
-/* local */
+/** @private */
 #define init_stack_TYPE QNAME(init_stack, STACK_NAME)
 
-/* public */
+/** @public */
 static inline arguments(not_null)
 void init_stack_TYPE(STACK_TYPE *stack)
 {
@@ -87,10 +88,10 @@ void init_stack_TYPE(STACK_TYPE *stack)
 }
 
 
-/* local */
+/** @private */
 #define push_TYPE QNAME(push, STACK_NAME)
 
-/* public */
+/** @public */
 static inline returns(not_null) arguments(not_null) returns(important)
 ELEMENT_TYPE *push_TYPE(STACK_TYPE *stack, size_t n)
 {
@@ -136,10 +137,10 @@ static void test_push(testval_small_uint_t n)
     ASSERT_EQ(unsigned, stk.top, 0);
 }
 
-/* local */
+/** @private */
 #define pop_TYPE QNAME(pop, STACK_NAME)
 
-/* public */
+/** @public */
 static inline arguments(not_null) returns(important)
 ELEMENT_TYPE pop_TYPE(STACK_TYPE *stack)
 {
@@ -174,10 +175,10 @@ static void test_push_pop(testval_small_uint_t n, testval_tag_t tag)
     clear_simple_stack(&stk);
 }
 
-/* local */
+/** @private */
 #define clear_TYPE QNAME(clear, STACK_NAME)
 
-/* public */
+/** @public */
 static inline arguments(not_null)
 void clear_TYPE(STACK_TYPE *stack)
 {

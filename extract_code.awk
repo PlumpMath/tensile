@@ -6,37 +6,58 @@ BEGIN {
     header_guard = gensub(/\W/, "_", "g", toupper(header_file));
 }
 
-!in_tests && !in_public && /^\/\*\s*HEADER\s*\*\/\s*$/ {
-    initialize_header();
-    printf "#line %d \"%s\"\n", FNR + 1, FILENAME >header_file
-    while (getline > 0) {
-        if (/^\/\*\s*END\s*\*\/\s*$/)
-            break
-        print >header_file
-    }
+/^\/\*\*\s*@cond\s+\w+\s*\*\/\s*$/ {
     printf "#line %d \"%s\"\n", FNR + 1, FILENAME
-    next
-}
-
-!in_tests && !in_public && /^\/\*\s*TESTS\s*\*\/\s*$/ {
-    printf "#line %d \"%s\"\n", FNR + 1, FILENAME >tests_file
-    in_tests = 1
-    next
-}
-
-in_tests && /^\/\*\s*END\s*\*\/\s*$/ {
-    printf "#line %d \"%s\"\n", FNR + 1, FILENAME
-    in_tests = 0
-    next
-}
-
-function collect_macro(  result) {
-    while (getline > 0) {
-        result = result $0 "\n"
-        if (!/\\$/)
-            break;
+    cond_nesting++
+    cond_name[cond_nesting] = gensub(/^\/\*\*\s*@cond\s+(\w+)\s*\*\/\s*$/, "\\1", "1");
+    cond_start[cond_nesting] = FNR
+    if (cond_name[cond_nesting] == "HEADER") {
+        initialize_header();
+        in_header = 1;
+        printf "#line %d \"%s\"\n", FNR + 1, FILENAME >header_file        
     }
-    return result
+    else if (cond_name[cond_nesting] == "TESTS") {
+        in_tests = 1;
+        printf "#line %d \"%s\"\n", FNR + 1, FILENAME >tests_file
+    } else if (cond_name[cond_nesting] == "GENERIC") {
+        do_instantiate = 1
+        instantiate_public = 0
+    } 
+    next
+}
+
+/^\/\*\*\s*@endcond\s*\*\/\s*$/ {
+    if (cond_nesting == 0) {
+        print FILENAME, FNR ":", "@endcond without @cond" >"/dev/stderr"
+        exit 1
+    }
+    if (cond_name[cond_nesting] == "HEADER") {
+        in_header = 0;
+        printf "#line %d \"%s\"\n", FNR + 1, FILENAME
+    } else if (cond_name[cond_nesting] == "TESTS") {
+        in_tests = 0;
+        printf "#line %d \"%s\"\n", FNR + 1, FILENAME
+    } else if (cond_name[cond_nesting] == "GENERIC") {
+        if (instantiate_args) {
+            $0 = $0 "\n" instantiate_args sprintf("\n#line %d \"%s\"", FNR + 1, FILENAME)
+            instantiate_args = ""
+        }
+        do_instantiate = 0;
+        print > (in_tests ? tests_file : "/dev/stdout")
+        if (instantiate_public)
+            print > header_file
+    } 
+    cond_nesting--
+    next
+}
+
+/^\/\*\*\s*@endcond\s+\w+/ {
+    print FILENAME, FNR ":", "garbage after @endcond" >"/dev/stderr"
+    exit 1
+}
+
+function join(line1, line2) {
+    return line1 == "" ? line2 : line1 "\n" line2;
 }
 
 function initialize_header( hdef) {
@@ -48,111 +69,118 @@ function initialize_header( hdef) {
     header_initialized = 1
 }
 
-function dump_public_section(  decl, def, header) {
-    header = gensub(/^(\s*(\/\*([^*]+|\*+[^*/])*\*+\/)?\s*).*$/, "\\1", "1", public_section);
-    public_section = substr(public_section, length(header) + 1);
+function dump_section(what, section_start, section, mode,   decl, def, macro_name, macro_body) {
+    sub(/^\s+/, "", section);
     
-    if (in_public == "define" ||
-        in_public == "include" || public_section ~ /^static\>/)
+    if (what == "define" && is_generic) {
+        macro_name = gensub(/^#\s*define\s+(\w+).*$/, "\\1", "1", section);
+        what = "generic_define"
+
+        if (do_instantiate)
+        {
+            instantiate_args = join(instantiate_args, "#undef " macro_name)
+            if (mode != "private")
+                instantiate_public = 1;
+        } else if (mode != "private")
+        {
+            macro_body = gensub(/^#\s*define\s+\w+(\([^)]*\))?\s+(\w+)\s*$/, "\\2", "1", section);
+            if (macro_body == macro_name)
+            {
+                section = sprintf("#ifndef %s\n#error \"%s is not defined\"\n#endif", macro_name, macro_name);
+            }
+            else
+            {
+                section = sprintf("#ifndef %s\n%s\n#define %s__default 1\n#endif", macro_name, section, macro_name);
+                aftermath = join(aftermath,
+                                 sprintf("#ifdef %s__default\n#undef %s\n#undef %s__default\n#endif", macro_name, macro_name, macro_name));
+            }
+        }
+        else
+        {
+            aftermath = join(aftermath, "#undef " macro_name)
+            mode = "protected"
+        }
+    }
+    
+    if (what == "define" || what == "if" || section ~ /^static\>/)
     {
-        decl = public_section
+        decl = section
         def = ""
     }
-    else if (in_public == "if")
+    else if (what == "generic_define")
     {
-        decl = public_section
-        def = public_section
+        decl = section
+        def = section
     }
-    else if (in_public == "instantiate")
+    else if (section ~ /^typedef\>/)
     {
-        decl = gensub(/(#\s*include\s+[<"][^>"]+)_impl\.c([>"])/, "\\1_api.h\\2", "g", public_section);
-        def = public_section
-    }
-    else if (public_section ~ /^typedef\>/)
-    {
-        if (public_section !~ /\/\*\s*abstract\s*\*\//)
+        if (mode != "protected")
         {
-            decl = public_section
+            decl = section
             def = ""
         }
         else
         {
-            decl = gensub(/^([^{]*)\{.*\}([^}]*)$/, "\\1\\2", "1", public_section);
-            def = gensub(/^typedef\s*(.*\})([^}]*)$/, "\\1;\n", "1", public_section);
+            decl = gensub(/^([^{]*)\{.*\}([^}]*)$/, "\\1\\2", "1", section);
+            def = gensub(/^typedef\s*(.*\})([^}]*)$/, "\\1;", "1", section);
         }
     }
     else
     {
-        decl = "extern " gensub(/[={].*$/, ";\n", "1", public_section);
-        def = public_section;
+        decl = "extern " gensub(/[={].*$/, ";\n", "1", section);
+        def = section;
     }
+    if (mode == "private")
+        decl = "";
+    
     if (decl)
     {
         initialize_header();
-        printf "#line %d \"%s\"\n%s%s", public_section_start, FILENAME, header, decl >header_file
+        printf "#line %d \"%s\"\n%s\n", section_start, FILENAME, decl >header_file
     }
     if (def)
     {
-        printf "#line %d \"%s\"\n%s%s", public_section_start, FILENAME, header, def
+        printf "#line %d \"%s\"\n%s\n", section_start, FILENAME, def
+        printf "#line %d \"%s\"\n", FNR + 1, FILENAME
     }
-    public_section = ""
-    in_public = ""
 }
 
-!in_tests && !in_public && /^\s*\/\*\s*local\s*\*\/\s*$/ {
-    start_fnr = FNR + 1
-    macro_def = collect_macro();
-    macro_name = gensub(/^\s*#\s*define\s+(\w+).*$/, "\\1", "1", macro_def);
-    aftermath = aftermath "#undef " macro_name "\n"
-    initialize_header();
-    printf "#line %d \"%s\"\n%s", start_fnr, FILENAME, macro_def >header_file
-    printf "#line %d \"%s\"\n%s", start_fnr, FILENAME, macro_def
-    printf "#line %d \"%s\"\n", FNR + 1, FILENAME
-    next
-}
-
-!in_tests && !in_public && /^\s*\/\*\s*parameter\s*\*\/\s*$/ {
-    is_generic = 1;
-    start_fnr = FNR + 1
-    macro_def = collect_macro();
-    macro_name = gensub(/^\s*#\s*define\s+(\w+).*$/, "\\1", "1", macro_def);
-
-    if (macro_def ~ /\/\*\s*required\s*\*\//)
-    {
-        macro_def = sprintf("#ifndef %s\n#error \"%s is not defined\"\n#endif\n", macro_name, macro_name);
-    }
-    else
-    {
-        macro_def = sprintf("#ifndef %s\n%s#define %s__default 1\n#endif\n", macro_name, macro_def, macro_name);
-        aftermath = aftermath sprintf("#ifdef %s__default\n#undef %s\n#undef %s__default\n#endif\n", macro_name, macro_name, macro_name);
-    }
-    initialize_header();
-    printf "#line %d \"%s\"\n%s", start_fnr, FILENAME, macro_def >header_file
-    printf "#line %d \"%s\"\n%s", start_fnr, FILENAME, macro_def
-    printf "#line %d \"%s\"\n", FNR + 1, FILENAME
-    next
-}
-
-!in_tests && !in_public && ((/^\s*\/\*\*.*\*\/\s*$/ && !/^\s*\/\*\*\s*@testcase\>/) || /^\s*\/\*\s*public\s*\*\/\s*$/) {
-    sub(/^\s*\/\*\s*public\s*\*\//, "");
-    sub(/^\s*\/\*\*.*\*\/\s*$/, "");
-    in_public = "start"
-    public_section = ""
-    public_section_start = FNR
-}
-
-!in_public && /^\s*\/\*\*\s*@testcase\>/ {
-    printf "#line %d \"%s\"\n", FNR, FILENAME >tests_file
-    testdef = $0 "\n"
+function process_section(mode,  what, section, section_start)
+{
+    section_start = FNR + 1
     while (getline > 0) {
-        testdef = testdef $0 "\n"
+        section = join(section, $0)
+        if (!what) {
+            if (/^#\s*define/)
+                what = "define"
+            else if (/^#\s*if/)
+                what = "if"
+            else if (/\{/)
+                what = "brace"
+            else if (/;/)
+                break;
+        }
+        if (what == "define" && !/\\$/)
+            break;
+        if (what == "brace" && /^\}/)
+            break
+        if (what == "if" && /^\s*#\s*endif/)
+            break
+    }
+    dump_section(what, section_start, section, mode);
+}
+
+function process_testcase(comment,  testdef, test_descr, test_condition, test_name, test_args, current_case,
+                          test_call_args, test_arg_list, i, n, arg_name, arg_type, arg_type_id) {
+    printf "#line %d \"%s\"\n", FNR + 1, FILENAME >tests_file
+    while (getline > 0) {
+        testdef = join(testdef, $0)
         if (/{/)
             break;
     }
-    test_descr = gensub(/^\s*\/\*\*\s*@testcase\s*([^\n]*\S)\s*\n.*$/, "\\1", "1", testdef);
-    printf "%s", testdef >tests_file
-
-    gsub(/\/\*([^*]+|\*+[^*/])*\*+\//, " ", testdef);
+    test_descr = gensub(/^\s*\/\*\*\s*([^\n]+).*$/, "\\1", "1", comment);
+    gsub(/\s*@testcase\s*/, "", test_descr);
+    print testdef >tests_file
 
     test_condition = ""
     if (testdef ~ /^\s*#\s*if/) {
@@ -198,12 +226,12 @@ function dump_public_section(  decl, def, header) {
                                    "#define TESTVAL_LOG_ARGS_%s(_val) (_val)\n" \
                                    "#endif\n"                           \
                                    "TESTVAL_LOG(%s, %s, *%s);\n"        \
-                                   "%s"                                 \
+                                   "%s\n"                                 \
                                    "#ifdef TESTVAL_CLEANUP__%s\n"       \
                                    "TESTVAL_CLEANUP__%s(*%s);\n"        \
                                    "#endif\n"                           \
                                    "}\n"                                \
-                                   "}\n",
+                                   "}",
                                    test_name, i,
                                    arg_type, arg_name, arg_type_id,
                                    arg_type, arg_name,
@@ -226,47 +254,51 @@ function dump_public_section(  decl, def, header) {
                            current_case);
 
     if (test_condition) {
-        current_case = sprintf("%s\n%s#else\nTEST_SKIP(\"%s\");\n#endif\n",
+        current_case = sprintf("%s\n%s#else\nTEST_SKIP(\"%s\");\n#endif",
                                test_condition,
                                current_case,
                                gensub(/"/, "\\\\\"", "g", test_descr));
     }
 
-    testcases = testcases current_case "\n"
-    if (!in_tests) {
-        while (getline > 0) {
-            print >tests_file
-            if (test_condition ? /^\s*#\s*endif/ : /^}/)
-                break;
-        }
+    testcases = join(testcases, current_case)
+    
+    while (getline > 0) {
+        print >tests_file
+        if (test_condition ? /^\s*#\s*endif/ : /^}/)
+            break;
+    }
+    if (!in_tests)
         printf "#line %d \"%s\"\n", FNR + 1, FILENAME
+}
+
+
+/^\s*\/\*\*/ {
+    comment = $0
+    if (!/\*\/\s*$/) {
+        while (getline > 0) {
+            comment = join(comment, $0)
+            if (/\*\/\s*$/)
+                break
+        }
+    }
+    print comment 
+    if (comment ~ /@public\>/) {
+        process_section("public")
+    } else if (comment ~ /@protected\>/) {
+        process_section("protected")
+    } else if (comment ~ /@private\>/) {
+        process_section("private")
+    } else if (comment ~ /@generic\>/) {
+        is_generic = 1
+    } else if (comment ~ /@testcase\>/) {
+        process_testcase(comment);
     }
     next
 }
 
-/^\s*\/\*\s*instantiate\s*\*\/\s*$/ {
-    do_instantiate = 1
-}
-
 do_instantiate && /^\s*#\s*define/ {
     macro_name = gensub(/^\s*#\s*define\s+(\w+).*$/, "\\1", "1");
-    instantiate_args = instantiate_args "\n#undef " macro_name
-}
-
-instantiate_args && /^\s*\/\*\s*end\s*\*\/\s*$/ {
-    $0 = $0 instantiate_args sprintf("\n#line %d \"%s\"", FNR + 1, FILENAME)
-    instantiate_args = ""
-    do_instantiate = 0;
-}
-
-/^\s*#\s*if/ {
-    ifs_nesting = (in_public ? "+" : "-") ifs_nesting
-}
-
-/^\s*#\s*(else|elif|endif)/ && !in_public && ifs_nesting ~ /^\+/ {
-    in_public = "start"
-    public_section = ""
-    public_section_start = FNR
+    instantiate_args = join(instantiate_args, "#undef " macro_name)
 }
 
 in_tests && /STATIC_ARBITRARY\([0-9]+\)/ {
@@ -275,67 +307,25 @@ in_tests && /STATIC_ARBITRARY\([0-9]+\)/ {
 }
 
 {
-    if (in_public)
-        public_section = public_section $0 "\n"
+    if (in_header)
+        print >header_file
     else if (in_tests)
-        print > tests_file
+        print >tests_file
     else
         print
 }
 
-/^\s*#\s*endif/ {
-    ifs_nesting = substr(ifs_nesting, 2)
-}
-
-in_public == "start" {
-    if (/^\s*#\s*(if|else|elif|endif)/)
-    {
-        in_public = "if"
-        dump_public_section();
-    }
-    else if (/^\s*#\s*define/)
-        in_public = "define"
-    else if (/^\s*\/\*\s*instantiate\s*\*\/\s*$/)
-    {
-        in_public = "instantiate"
-    }
-    else if (/\{/)
-    {
-        in_public = "brace";
-    }
-    else if (/;/)
-    {
-        dump_public_section();
-    }
-}
-
-in_public == "define" && !/\\$/ {
-    dump_public_section();
-}
-
-in_public == "brace" && /^}/ {
-    dump_public_section();
-}
-
-in_public == "instantiate" && /^\s*\/\*\s*end\s*\*\/\s*/ {
-    dump_public_section();
-}
-
 END {
-    if (in_tests)
+    if (cond_nesting > 0)
     {
-        print FILENAME ": tests section is not properly closed" >"/dev/stderr"
+        print FILENAME, cond_start[cond_nesting] ": conditional section", cond_name[cond_nesting], "not terminated" >"/dev/stderr"
         exit 1
     }
-    if (do_instantiate)
-    {
-        print FILENAME ": unterminated instantiation specification" >"/dev/stderr"
-        exit 1
-    }
+
     if (header_initialized)
     {
-        printf "%s", aftermath
-        printf "%s#ifdef __cplusplus\n} /* extern \"C\" */\n#endif\n#endif /* %s */\n", aftermath, header_guard >header_file
+        print aftermath
+        printf "%s\n#ifdef __cplusplus\n} /* extern \"C\" */\n#endif\n#endif /* %s */\n", aftermath, header_guard >header_file
         if (is_generic)
             printf "#undef %s\n", header_guard >header_file
     }

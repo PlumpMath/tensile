@@ -17,57 +17,58 @@
  */
 /** @file
  * @brief Generic allocator routines
+ * @generic
  *
  * @author Artem V. Andreev <artem@AA5779.spb.edu>
  */
-/* HEADER */
+/** @cond HEADER */
 #include "compiler.h"
-/* END */
+/** @endcond */
 #include "allocator_common.h"
 
-/* parameter */
-#define ALLOC_TYPE /* required */
-/* parameter */
+/** @public */
+#define ALLOC_TYPE ALLOC_TYPE
+/** @public */
 #define ALLOC_NAME ALLOC_TYPE
 
-/* parameter */
+/** @public */
 #define TYPE_IS_REFCNTED false
 
-/* parameter */
+/** @public */
 #define TRACK_ALLOCATOR false
 
-/* parameter */
+/** @public */
 #define ALLOC_CONSTRUCTOR_ARGS void
 
-/* parameter */
+/** @public */
 #define ALLOC_CONSTRUCTOR_CODE(_obj) {}
-/* parameter */
+/** @public */
 #define ALLOC_DESTRUCTOR_CODE(_obj) {}
-/* parameter */
+/** @public */
 #define ALLOC_COPY_CODE(_obj) {}
 
-/* local */
+/** @private */
 #define ALLOC_PREFIX(_name) QNAME(_name, ALLOC_NAME)
 
-/* local */
+/** @private */
 #define freelists_TYPE ALLOC_PREFIX(freelists)
 
-/* local */
+/** @private */
 #define tracks_TYPE ALLOC_PREFIX(tracks)
 
 
-/* parameter */
+/** @public */
 #define USE_ALLOC_POOL false
-/* parameter */
+/** @public */
 #define ALLOC_POOL_PTR NULL
-/* parameter */
+/** @public */
 #define ALLOC_POOL_SIZE NULL
-/* parameter */
+/** @public */
 #define ALLOC_POOL_ALIGN_AS double
 
-/* local */
+/** @private */
 #define freelist_TYPE ALLOC_PREFIX(freelist)
-/* local */
+/** @private */
 #define track_TYPE ALLOC_PREFIX(track)
 
 static freelist_t *freelist_TYPE;
@@ -75,7 +76,7 @@ static freelist_t *freelist_TYPE;
 static size_t track_TYPE;
 #endif
 
-/* TESTS */
+/** @cond TESTS */
 #include "assertions.h"
 #define TESTSUITE "Allocator"
 
@@ -91,7 +92,7 @@ typedef struct simple_type {
     enum object_state state;
 } simple_type;
 
-/* instantiate */
+/** @cond GENERIC */
 #define ALLOC_TYPE simple_type
 #define TRACK_ALLOCATOR true
 #define ALLOC_CONSTRUCTOR_ARGS testval_tag_t tag
@@ -104,11 +105,11 @@ typedef struct simple_type {
 #define ALLOC_DESTRUCTOR_CODE(_obj) (_obj)->state = STATE_FINALIZED
 #include "allocator_api.h"
 #include "allocator_impl.c"
-/* end */
+/** @endcond */
 
-/* END */
+/** @endcond */
 
-/* local */
+/** @private */
 #define alloc_TYPE ALLOC_PREFIX(alloc)
 
 static returns(not_null) returns(fresh_pointer) returns(important)
@@ -142,10 +143,10 @@ ALLOC_TYPE *alloc_TYPE(void)
     return frlmalloc(sizeof(*obj));
 }
 
-/* local */
+/** @private */
 #define new_TYPE ALLOC_PREFIX(new)
 
-/* public */
+/** @public */
 returns(not_null) returns(important)
 ALLOC_TYPE *new_TYPE(ALLOC_CONSTRUCTOR_ARGS)
 {
@@ -195,10 +196,10 @@ static void allocate_free_allocate(testval_tag_t tag)
     free_simple_type(st1);
 }
 
-/* local */
+/** @private */
 #define unshare_TYPE ALLOC_PREFIX(unshare)
 
-/* public */
+/** @public */
 static inline arguments(not_null)
 void unshare_TYPE(unused ALLOC_TYPE *_obj)
 {
@@ -208,10 +209,10 @@ void unshare_TYPE(unused ALLOC_TYPE *_obj)
     ALLOC_COPY_CODE(_obj);
 }
 
-/* local */
+/** @private */
 #define copy_TYPE ALLOC_PREFIX(copy)
 
-/* public */
+/** @public */
 returns(not_null) returns(important) arguments(not_null)
 ALLOC_TYPE *copy_TYPE(const ALLOC_TYPE *_orig)
 {
@@ -254,10 +255,10 @@ static void deallocate_and_copy(testval_tag_t tag)
     ASSERT_EQ(unsigned, track_simple_type, 0);
 }
 
-/* local */
+/** @private */
 #define free_TYPE ALLOC_PREFIX(free)
 
-/* public */
+/** @public */
 void free_TYPE(ALLOC_TYPE *_obj)
 {
     if (_obj == NULL) {
@@ -315,15 +316,15 @@ static void free_null(void)
     ASSERT_EQ(unsigned, track_simple_type, 0);
 }
 
-/* TESTS */
+/** @cond TESTS */
 
-/* instantiate */
+/** @cond GENERIC */
 #define ALLOC_TYPE short
 #define TRACK_ALLOCATOR true
 #define ALLOC_CONSTRUCTOR_CODE(_obj) *(_obj) = (short)STATE_INITIALIZED
 #include "allocator_api.h"
 #include "allocator_impl.c"
-/* end */
+/** @endcond */
 
 /** @testcase Allocate and free a small object */
 static void alloc_small(void)
@@ -346,7 +347,7 @@ static void alloc_small(void)
 static void *shared_pool_ptr;
 static size_t shared_pool_size;
 
-/* instantiate */
+/** @cond GENERIC */
 #define ALLOC_TYPE simple_type
 #define ALLOC_NAME pool_simple_type
 #define USE_ALLOC_POOL true
@@ -363,7 +364,7 @@ static size_t shared_pool_size;
 #define ALLOC_DESTRUCTOR_CODE(_obj) (_obj)->state = STATE_FINALIZED
 #include "allocator_api.h"
 #include "allocator_impl.c"
-/* end */
+/** @endcond */
 
 /** @testcase Allocate from pool */
 static void alloc_from_pool(testval_tag_t tag)
@@ -439,7 +440,7 @@ static void alloc_from_pool_and_reverse_free(testval_tag_t tag)
     shared_pool_ptr = NULL;
 }
 
-/* instantiate */
+/** @cond GENERIC */
 #define ALLOC_TYPE short
 #define ALLOC_NAME pool_short
 #define USE_ALLOC_POOL true
@@ -450,7 +451,7 @@ static void alloc_from_pool_and_reverse_free(testval_tag_t tag)
 #define ALLOC_CONSTRUCTOR_CODE(_obj) *(_obj) = val
 #include "allocator_api.h"
 #include "allocator_impl.c"
-/* end */
+/** @endcond */
 
 /** @testcase Allocate pool from with alignment */
 static void alloc_from_pool_align(testval_tag_t tag)
@@ -478,15 +479,15 @@ static void alloc_from_pool_align(testval_tag_t tag)
     free(pool_base);
 }
     
-/* END */
+/** @endcond */
 
-/* public */
+/** @public */
 #if TYPE_IS_REFCNTED
 
-/* local */
+/** @private */
 #define use_TYPE ALLOC_PREFIX(use)
 
-/* public */
+/** @public */
 static inline
 ALLOC_TYPE *use_TYPE(ALLOC_TYPE *val)
 {
@@ -498,7 +499,7 @@ ALLOC_TYPE *use_TYPE(ALLOC_TYPE *val)
     return val;
 }
 
-/* local */
+/** @private */
 #define maybe_copy_TYPE ALLOC_PREFIX(maybe_copy)
 
 static inline returns(important)
@@ -517,10 +518,10 @@ ALLOC_TYPE *maybe_copy_TYPE(ALLOC_TYPE *val)
     }
 }
 
-/* local */
+/** @private */
 #define assign_TYPE ALLOC_PREFIX(assign)
 
-/* public */
+/** @public */
 static inline argument(not_null, 1)
 void assign_TYPE(ALLOC_TYPE **loc, ALLOC_TYPE *val)
 {
@@ -530,10 +531,10 @@ void assign_TYPE(ALLOC_TYPE **loc, ALLOC_TYPE *val)
     *loc = val;
 }
 
-/* local */
+/** @private */
 #define move_TYPE ALLOC_PREFIX(move)
 
-/* public */
+/** @public */
 static inline argument(not_null, 1)
 void move_TYPE(ALLOC_TYPE **loc, ALLOC_TYPE *val)
 {
@@ -541,7 +542,7 @@ void move_TYPE(ALLOC_TYPE **loc, ALLOC_TYPE *val)
     free_TYPE(val);
 }
 
-/* TESTS */
+/** @cond TESTS */
 typedef struct refcnt_type {
     void *placeholder;
     unsigned refcnt;
@@ -549,7 +550,7 @@ typedef struct refcnt_type {
     enum object_state state;
 } refcnt_type;
 
-/* instantiate */
+/** @cond GENERIC */
 #define TYPE_IS_REFCNTED true
 #define ALLOC_TYPE refcnt_type
 #define TRACK_ALLOCATOR true
@@ -563,7 +564,7 @@ typedef struct refcnt_type {
 #define ALLOC_DESTRUCTOR_CODE(_obj) (_obj)->state = STATE_FINALIZED
 #include "allocator_api.h"
 #include "allocator_impl.c"
-/* end */
+/** @endcond */
 
 /** @testcase Allocate refcounted */
 static void allocate_refcnted(testval_tag_t tag)
@@ -710,6 +711,6 @@ static void move_refcnt(testval_tag_t tag)
     ASSERT_EQ(unsigned, track_refcnt_type, 0);
 }
 
-/* END */
+/** @endcond */
 
 #endif /* TYPE_IS_REFCNTED */

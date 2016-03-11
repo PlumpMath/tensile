@@ -21,15 +21,15 @@
  *
  * @author Artem V. Andreev <artem@AA5779.spb.edu>
  */
-/* HEADER */
+/** @cond HEADER */
 #include "compiler.h"
-/* END */
+/** @endcond */
 #include "bitops_api.h"
 
 
-/** Count leading */
-/**
+/** Count leading zeroes
  * @return The number of upper zero bits before the first 1
+ * @public
  */
 static inline global_state(none)
 unsigned count_leading_zeroes(size_t i)
@@ -57,7 +57,7 @@ unsigned count_leading_zeroes(size_t i)
 #endif
 }
 
-/* TESTS */
+/** @cond TESTS */
 #include "assertions.h"
 #include "bitops_impl.c"
 #define TESTSUITE "Bit operations"
@@ -85,4 +85,4 @@ static void test_one_bit(testval_bitnum_size_t bit)
               sizeof(size_t) * CHAR_BIT - bit - 1);
 }
 
-/* END */
+/** @endcond */

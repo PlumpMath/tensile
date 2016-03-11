@@ -109,7 +109,7 @@ check : $(addsuffix .c.gcov,$(TESTABLES))
 ifneq ($(GCOV),)
 
 %.c.gcov : tests/%_ts.gcda %.c
-	$(GCOV) -r -l -s $(TOPDIR) -o $(patsubst %.gcda,%.o,$(filter %.gcda,$^)) $(filter %.c,$^)
+	$(GCOV) -r -l -s $(TOPDIR) -o $(patsubst %.gcda,%.o,$(filter %.gcda,$^)) $(filter %.c,$^) 2>&1 | grep -E '^File|Lines'
 
 %_ts.gcda : %_ts
 	$(RM) $@
