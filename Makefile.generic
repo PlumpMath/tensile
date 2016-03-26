@@ -39,8 +39,8 @@ TEST_CPPFLAGS = -DTEST_REPEAT_ARBITRARY=2 -DUSE_ANSI_TERM_STRINGS=1
 CFLAGS += $(ICU_CFLAGS)
 
 LDFLAGS = -Wl,-export-dynamic
-LDLIBS = $(ICU_LIBS) -lm -ldl 
-MFLAGS = -MM -MT $(<:.c=.o)
+LDLIBS = $(ICU_LIBS) -lm -ldl
+MFLAGS = -MM -MT '$@ $(patsubst %.d,%.o,$@) $(patsubst %.d,tests/%_ts.o,$@)'
 
 -include $(TOPDIR)/setup/$(PLATFORM_OS).mk
 -include $(TOPDIR)/setup/$(PLATFORM_ARCH).mk
@@ -54,21 +54,16 @@ endif
 
 .SECONDARY :
 
-C_SOURCES = bitops.c
+C_SOURCES = selftest.c # bitops.c allocator.c array.c stack.c #queue.c
 
-GENERIC_C_SOURCES = allocator.c array.c stack.c #queue.c
+GENERATED_SOURCES = tensile.tab.c lex.yy.c
 
-IMPL_SOURCES = $(C_SOURCES:.c=_impl.c)
-IMPL_SOURCES += tensile.tab.c lex.yy.c
-
-GENERATED_FILES = $(IMPL_SOURCES) $(C_SOURCES:.c=_api.h)
-GENERATED_FILES += $(GENERIC_C_SOURCES:.c=_impl.c) $(GENERIC_C_SOURCES:.c=_api.h)
-
-TESTABLES = bitops allocator array stack #queue
+SOURCES = $(C_SOURCES)
+SOURCES += $(GENERATED_SOURCES)
 
 APPLICATION = tensile
 
-$(APPLICATION) : $(IMPL_SOURCES:.c=.o)
+$(APPLICATION) : $(SOURCES:.c=.o)
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS)
 
 tensile.tab.o lex.yy.o : CFLAGS += $(GENERATED_CFLAGS)
@@ -83,28 +78,23 @@ lex.yy.o lex.yy.d : lex.yy.c tensile.tab.h
 
 %.tab.h : %.tab.c ;
 
-%_api.h : %_impl.c ;
-
-%_impl.c : %.c $(TOPDIR)/extract_code.awk
-	$(AWK) -f $(filter %.awk,$^) $< $(patsubst %_impl.c,%_api.h,$@) $(patsubst %_impl.c,tests/%_ts.c,$@) >$@
-
-tests/%.o : CPPFLAGS += $(TEST_CPPFLAGS)
+tests/%.o : CPPFLAGS += $(TEST_CPPFLAGS) -DDO_TESTS=1
 tests/%_ts : CFLAGS += $(TEST_CFLAGS)
-
-tests/%_ts.c : %_impl.c ;
 
 %_ts : %_ts.o
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS)
 
-ifneq ($(MAKECMDGOALS),clean)
-Makefile Makefile.generic : $(GENERATED_FILES)
+tests/%_ts.o : %.c
+	$(CC) -c -o $@ $(CFLAGS) $(CPPFLAGS) $<
 
-include $(C_SOURCES:.c=_impl.d)
-include $(patsubst %,tests/%_ts.d,$(TESTABLES))
+ifneq ($(MAKECMDGOALS),clean)
+Makefile Makefile.generic : $(GENERATED_SOURCES)
+
+include $(C_SOURCES:.c=.d)
 endif
 
 .PHONY : check
-check : $(addsuffix .c.gcov,$(TESTABLES))
+check : $(addsuffix .gcov,$(C_SOURCES))
 
 ifneq ($(GCOV),)
 
@@ -145,9 +135,8 @@ clean :
 %.o : %.c
 	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $<
 
-%.d : %.c | $(GENERATED_FILES)
+%.d : %.c | $(GENERATED_SOURCES)
 	@set -e; $(RM) $@; \
-	$(CC) $(MFLAGS) $(CPPFLAGS) $< > $@.$$$$; \
-	$(SED) 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
-	$(RM) $@.$$$$
+	$(CC) $(MFLAGS) $(CPPFLAGS) $< > $@
+
 

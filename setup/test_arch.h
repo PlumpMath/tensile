@@ -4,8 +4,7 @@
 #else
 "amd64"
 #endif
-#endif
-#if defined(__i386__)
+#elif defined(__i386__)
 #if defined(__i686__)
 "i686"
 #elif defined(__i586__)
