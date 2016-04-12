@@ -40,7 +40,7 @@ CFLAGS += $(ICU_CFLAGS)
 
 LDFLAGS = -Wl,-export-dynamic
 LDLIBS = $(ICU_LIBS) -lm -ldl
-MFLAGS = -MM -MT '$@ $(patsubst %.d,%.o,$@) $(patsubst %.d,tests/%_ts.o,$@)'
+MFLAGS = -MM -MT '$@ $(patsubst %.d,%.o,$@)'
 
 -include $(TOPDIR)/setup/$(PLATFORM_OS).mk
 -include $(TOPDIR)/setup/$(PLATFORM_ARCH).mk
@@ -54,7 +54,7 @@ endif
 
 .SECONDARY :
 
-C_SOURCES = selftest.c # bitops.c allocator.c array.c stack.c #queue.c
+C_SOURCES = selftest.c bitops.c allocator.c # array.c stack.c #queue.c
 
 GENERATED_SOURCES = tensile.tab.c lex.yy.c
 
@@ -79,6 +79,7 @@ lex.yy.o lex.yy.d : lex.yy.c tensile.tab.h
 %.tab.h : %.tab.c ;
 
 tests/%.o : CPPFLAGS += $(TEST_CPPFLAGS) -DDO_TESTS=1
+tests/%.d : CPPFLAGS += $(TEST_CPPFLAGS) -DDO_TESTS=1
 tests/%_ts : CFLAGS += $(TEST_CFLAGS)
 
 %_ts : %_ts.o
@@ -91,6 +92,7 @@ ifneq ($(MAKECMDGOALS),clean)
 Makefile Makefile.generic : $(GENERATED_SOURCES)
 
 include $(C_SOURCES:.c=.d)
+include $(patsubst %.c,tests/%_ts.d,$(C_SOURCES))
 endif
 
 .PHONY : check
@@ -99,11 +101,11 @@ check : $(addsuffix .gcov,$(C_SOURCES))
 ifneq ($(GCOV),)
 
 %.c.gcov : tests/%_ts.gcda %.c
-	$(GCOV) -r -l -s $(TOPDIR) -o $(patsubst %.gcda,%.o,$(filter %.gcda,$^)) $(filter %.c,$^) 2>&1 | grep -E '^File|Lines'
+	@$(GCOV) -r -l -s $(TOPDIR) -o $(patsubst %.gcda,%.o,$(filter %.gcda,$^)) $(filter %.c,$^) 2>&1 | grep -E '^File|Lines'
 
 %_ts.gcda : %_ts
-	$(RM) $@
-	$(abspath $<)
+	@$(RM) $@
+	@$(abspath $<)
 
 else
 
@@ -139,4 +141,7 @@ clean :
 	@set -e; $(RM) $@; \
 	$(CC) $(MFLAGS) $(CPPFLAGS) $< > $@
 
+tests/%_ts.d : %.c
+	@set -e; $(RM) $@; \
+	$(CC) $(MFLAGS) $(CPPFLAGS) $< > $@
 

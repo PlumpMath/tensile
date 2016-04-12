@@ -1,6 +1,5 @@
-/* 
+/*
  * Copyright (c) 2016  Artem V. Andreev
- *
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
@@ -15,74 +14,35 @@
  * along with this program; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301, USA.
+ *
  */
 /** @file
- * @brief Bitwise operations
- *
  * @author Artem V. Andreev <artem@AA5779.spb.edu>
  */
-/** @cond HEADER */
-#include "compiler.h"
-/** @endcond */
-#include "bitops_api.h"
 
-
-/** Count leading zeroes
- * @return The number of upper zero bits before the first 1
- * @public
- */
-static inline global_state(none)
-unsigned count_leading_zeroes(size_t i)
-{
-#if __GNUC__ >= 4
-    if (i == 0u) {
-        return sizeof(i) * CHAR_BIT;
-    }
-    return (unsigned)__builtin_clzl(i);
-#else
-    unsigned j;
-
-    if (i == 0)
-    {
-        return sizeof(i) * CHAR_BIT;
-    }
-    for (j = sizeof(i) * CHAR_BIT - 1; j > 0; j--)
-    {
-        if ((i & (1ul << j)) != 0)
-        {
-            return (unsigned)sizeof(i) * CHAR_BIT - 1 - j;
-        }
-    }
-    return sizeof(i) * CHAR_BIT - 1;
-#endif
-}
-
-/** @cond TESTS */
+#include "bitops.h"
 #include "assertions.h"
-#include "bitops_impl.c"
-#define TESTSUITE "Bit operations"
 
-/** @testcase Count leading zeroes in 0 */
-static void test_zero(void)
+TEST_SPEC(test_zero, "Count leading zeroes in 0", false,
 {
     ASSERT_EQ(unsigned, count_leading_zeroes(0), sizeof(size_t) * CHAR_BIT);
-}
+});
 
-/** @testcase Count leading zeroes in all ones */
-static void test_all_ones(void)
-{
-    ASSERT_EQ(unsigned, count_leading_zeroes(SIZE_MAX), 0);
-}
+TEST_SPEC(test_all_ones, "Count leading zeroes in all ones", false,
+          {
+              ASSERT_EQ(unsigned, count_leading_zeroes(SIZE_MAX), 0);
+          });
 
-/** @testcase Leading zeroes for a single bit */
-static void test_one_bit(testval_bitnum_size_t bit)
-{
-    ASSERT_EQ(unsigned,
-              count_leading_zeroes(1UL << bit),
-              sizeof(size_t) * CHAR_BIT - bit - 1);
-    ASSERT_EQ(unsigned,
-              count_leading_zeroes((1UL << bit) | 1),
-              sizeof(size_t) * CHAR_BIT - bit - 1);
-}
+TEST_SPEC(test_one_bit, "Leading zeroes for a single bit", false,
+          TEST_ITERATE(bit, testval_bitnum_size_t,
+                       {
+                           ASSERT_EQ(unsigned,
+                                     count_leading_zeroes(1UL << bit),
+                                     sizeof(size_t) * CHAR_BIT - bit - 1);
+                           ASSERT_EQ(unsigned,
+                                     count_leading_zeroes((1UL << bit) | 1),
+                                     sizeof(size_t) * CHAR_BIT - bit - 1);
+                       }));
 
-/** @endcond */
+RUN_TESTSUITE("Bit operations");
+

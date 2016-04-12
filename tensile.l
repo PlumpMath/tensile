@@ -40,6 +40,7 @@ _ { return TOK_WILDCARD; }
 "->" { return TOK_PUT; }
 "->>" { return TOK_PUT_ALL; }
 "->!" { return TOK_PUT_NEXT; }
+"?=" { return TOK_ASSIGN_ONCE; }
 "*?" { return TOK_PEEK; }
 "++" { return TOK_APPEND; }
 "--" { return TOK_CHOP; }
@@ -82,7 +83,6 @@ need { return TOK_NEED; }
 null { yylval->value = NULL_VALUE;  return TOK_NULL; }
 partition { return TOK_PARTITION; }
 passive { return TOK_PASSIVE; }
-poll { return TOK_POLL; }
 pragma { return TOK_PRAGMA; }
 private { return TOK_PRIVATE; }
 protected { return TOK_PROTECTED; }
@@ -95,6 +95,7 @@ switch { return TOK_SWITCH; }
 then { return TOK_THEN; }
 tracing { return TOK_TRACING; }
 true { return TOK_TRUE; }
+try { return TOK_TRY; }
 typecase { return TOK_TYPECASE; }
 typeof { return TOK_TYPEOF; }
 watch { return TOK_WATCH; }

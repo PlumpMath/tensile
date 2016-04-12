@@ -46,30 +46,33 @@ extern "C"
  * of the attributes, hence we need to wrap them into macros, conditioned by
  * the compiler version
  */
+
+#define annotation(_kind, ...) ANNOTATION_##_kind(__VA_ARGS__)
+
 /**@{*/
 
 /**
  * Return value annotation
  */
-#define returns(_x) ANNOTATION_RETURNS_##_x
+#define ANNOTATION_returns(_x) ANNOTATION_returns__##_x
 
 /**
  * Indicates that the function returns
  * a pointer to unaliased uninitalized memory
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96)
-#define ANNOTATION_RETURNS_fresh_pointer __attribute__((__malloc__))
+#define ANNOTATION_returns__fresh_pointer __attribute__((__malloc__))
 #else
-#define ANNOTATION_RETURNS_fresh_pointer
+#define ANNOTATION_returns__fresh_pointer
 #endif
 
 /**
  * Indicates that a function returns a non-NULL pointer
  */
 #if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9)
-#define ANNOTATION_RETURNS_not_null __attribute__((__returns_nonnull__))
+#define ANNOTATION_returns__not_null __attribute__((__returns_nonnull__))
 #else
-#define ANNOTATION_RETURNS_not_null
+#define ANNOTATION_returns__not_null
 #endif
 
 /**
@@ -77,25 +80,25 @@ extern "C"
  * of the function is thrown away
  */
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
-#define ANNOTATION_RETURNS_important            \
+#define ANNOTATION_returns__important            \
     __attribute__((__warn_unused_result__))
 #else
-#define ANNOTATION_RETURNS_important
+#define ANNOTATION_returns__important
 #endif
 
 /**
  * Argument list annotations
  */
-#define arguments(_x) ANNOTATION_ARGUMENTS_##_x
+#define ANNOTATION_arguments(_x) ANNOTATION_arguments__##_x
 
 /**
  * Indicates that a vararg function shall have NULL
  * at the end of varargs
  */
 #if __GNUC__ >= 4
-#define ANNOTATION_ARGUMENTS_sentinel  __attribute__((__sentinel__))
+#define ANNOTATION_arguments__sentinel  __attribute__((__sentinel__))
 #else
-#define ANNOTATION_ARGUMENTS_sentinel
+#define ANNOTATION_arguments__sentinel
 #endif
 
 /**
@@ -103,15 +106,15 @@ extern "C"
  * ever be passed NULL
  */
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR >= 3)
-#define ANNOTATION_ARGUMENTS_not_null __attribute__ ((__nonnull__))
+#define ANNOTATION_arguments__not_null __attribute__ ((__nonnull__))
 #else
-#define ANNOTATION_ARGUMENTS_not_null
+#define ANNOTATION_arguments__not_null
 #endif
 
 /**
  * Specific argument annotations
  */
-#define argument(_x, ...) ANNOTATION_ARGUMENT_##_x(__VA_ARGS__)
+#define ANNOTATION_argument(_x, ...) ANNOTATION_argument__##_x(__VA_ARGS__)
 
 /**
  * Indicates that a function returns
@@ -122,10 +125,21 @@ extern "C"
  * the y'th argument
  */
 #if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3)
-#define ANNOTATION_ARGUMENT_storage_size(...)       \
+#define ANNOTATION_argument__storage_size(...)      \
     __attribute__((__alloc_size__(__VA_ARGS__)))
 #else
-#define ANNOTATION_ARGUMENT_storage_size(...)
+#define ANNOTATION_argument__storage_size(...)
+#endif
+
+/**
+ * Indicates that a function returns
+ * a pointer to memory, the alignment of which is given in its _x'th argument.
+ */
+#if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9)
+#define ANNOTATION_argument__storage_align(...)     \
+    __attribute__((__alloc_align__(__VA_ARGS__)))
+#else
+#define ANNOTATION_argument__storage_align(...)
 #endif
 
 /**
@@ -134,10 +148,10 @@ extern "C"
  * the arguments start at _y
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
-#define ANNOTATION_ARGUMENT_printf(_x, _y)              \
+#define ANNOTATION_argument__printf(_x, _y)             \
     __attribute__((__format__ (__printf__, _x, _y)))
 #else
-#define ANNOTATION_ARGUMENT_printf(_x, _y)
+#define ANNOTATION_argument__printf(_x, _y)
 #endif
 
 /**
@@ -146,10 +160,10 @@ extern "C"
  * the arguments start at _y
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
-#define ANNOTATION_ARGUMENT_scanf(_x, _arg_y)       \
+#define ANNOTATION_argument__scanf(_x, _arg_y)      \
     __attribute__((__format__ (__scanf__, _x, _y)))
 #else
-#define ANNOTATION_ARGUMENT_scanf(_x, _y)
+#define ANNOTATION_argument__scanf(_x, _y)
 #endif
 
 /**
@@ -158,10 +172,10 @@ extern "C"
  * and returned by the function
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
-#define ANNONATION_ARGUMENT_format_string(_x) \
+#define ANNONATION_argument__format_string(_x)  \
     __attribute__((__format_arg__ (_x)))
 #else
-#define ANNOTATION_ARGUMENT_format_string(_x)
+#define ANNOTATION_argument__format_string(_x)
 #endif
 
 
@@ -170,31 +184,31 @@ extern "C"
  * `_args` are never `NULL`
  */
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR >= 3)
-#define ANNOTATION_ARGUMENT_not_null(...) \
+#define ANNOTATION_argument__not_null(...)      \
     __attribute__ ((__nonnull__ (__VA_ARGS__)))
 #else
-#define ANNOTATION_ARGUMENT_not_null(...)
+#define ANNOTATION_argument__not_null(...)
 #endif
 
 /**
  * Global state affected by the function
  */
-#define global_state(_x) ANNOTATION_GLOBAL_STATE_##_x
+#define ANNOTATION_global_state(_x) ANNOTATION_global_state__##_x
 
 /**
  * Global state may be modified. This is the default, so
  * it is expanded to nothing and is provided only for completeness
  */
-#define ANNOTATION_GLOBAL_STATE_modify
+#define ANNOTATION_global_state__modify
 
 /**
  * Global state may be read but not modified. In particular,
  * that means a function cannot produce any observable side effects
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96)
-#define ANNOTATION_GLOBAL_STATE_read __attribute__((__pure__))
+#define ANNOTATION_global_state__read __attribute__((__pure__))
 #else
-#define ANNOTATION_GLOBAL_STATE_read
+#define ANNOTATION_global_state__read
 #endif
 
 /**
@@ -203,24 +217,24 @@ extern "C"
  * arguments
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
-#define ANNOTATION_GLOBAL_STATE_none  __attribute__((__const__))
+#define ANNOTATION_global_state__none  __attribute__((__const__))
 #else
-#define ANNOTATION_GLOBAL_STATE_none
+#define ANNOTATION_global_state__none
 #endif
 
 /**
  * Additional linkage modes
  */
-#define linkage(_x) ANNOTATION_LINKAGE_##_x
+#define linkage(_x) LINKAGE__##_x
 
 /**
  * Weak symbol (a library symbol that may be overriden
  * by the application
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
-#define ANNOTATION_LINKAGE_weak __attribute__((__weak__))
+#define LINKAGE__weak __attribute__((__weak__))
 #else
-#define ANNOTATION_LINKAGE_weak
+#define LINKAGE__weak
 #endif
 
 /** @def ANNOTATION_LINKAGE_export
@@ -231,11 +245,11 @@ extern "C"
  * For POSIX systems these two modes are void.
  */
 #if __WIN32
-#define ANNOTATION_LINKAGE_export __declspec(dllexport)
-#define ANNOTATION_LINKAGE_import __declspec(dllimport)
+#define LINKAGE__export __declspec(dllexport)
+#define LINKAGE__import __declspec(dllimport)
 #else
-#define ANNOTATION_LINKAGE_export
-#define ANNOTATION_LINKAGE_import
+#define LINKAGE__export
+#define LINKAGE__import
 #endif
 
 /** @def ANNOTATION_LINKAGE_local
@@ -248,13 +262,13 @@ extern "C"
  * modules even indirectly (e.g. through a function pointer)
  */
 #if (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR >= 3)) && __ELF__
-#define ANNOTATION_LINKAGE_local                \
+#define LINKAGE__local                \
     __attribute__ ((__visibility__ ("hidden")))
-#define ANNOTATION_LINKAGE_internal                 \
+#define LINKAGE__internal                 \
     __attribute__ ((__visibility__ ("internal")))
 #else
-#define ANNOTATION_LINKAGE_local
-#define ANNOTATION_LINKAGE_internal
+#define LINKAGE__local
+#define LINKAGE__internal
 #endif
 
 
@@ -262,9 +276,9 @@ extern "C"
  * The symbol should not be used and triggers a warning
  */
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)
-#define ANNOTATION_LINKAGE_deprecated __attribute__((__deprecated__))
+#define LINKAGE__deprecated __attribute__((__deprecated__))
 #else
-#define ANNOTATION_LINKAGE_deprecated
+#define LINKAGE__deprecated
 #endif
 
 /**

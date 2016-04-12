@@ -32,7 +32,8 @@ extern "C"
 
 #define TEST_SPEC(_name, _descr, _skip, _body) struct fake
 #define TEST_PARAM(_name, _type, _min, _max) struct fake
-#define RUN_TESTS struct fake
+#define TEST_INIT(_id, _code) struct fake
+#define RUN_TESTSUITE(_name) struct fake
 
 #else
 
@@ -578,6 +579,15 @@ static test_description *last_test;
         _name = ARBITRARY(_type, _min, _max);   \
     }                                           \
     struct fake
+
+#define TEST_INIT(_id, _code)                   \
+    static TEST_INITIALIZATION                  \
+    void testinit_user_##_id(void)              \
+    {                                           \
+        _code;                                  \
+    }                                           \
+    struct fake
+    
 
 #if NONFATAL_ASSERTIONS
 #define TEST_CHECK_FAIL                                                 \

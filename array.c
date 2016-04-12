@@ -113,43 +113,6 @@ typedef struct simple_type {
 /** @private */
 #define alloc_TYPE ALLOC_PREFIX(alloc)
 
-static returns(not_null) returns(fresh_pointer) returns(important)
-ALLOC_TYPE *alloc_TYPE(size_t n)
-{
-    size_t n_bucket = alloc_calculate_bucket(n, BUCKET_SIZE,
-                                             BUCKET_LOG2_SCALE);
-    ALLOC_TYPE *obj;
-
-    n = alloc_bucket_size(n_bucket, BUCKET_SIZE,
-                          BUCKET_LOG2_SCALE);
-
-#if TRACK_ALLOCATOR
-    track_TYPE[n_bucket > MAX_BUCKET ? MAX_BUCKET : n_bucket]++;
-#endif
-
-#if USE_ALLOC_POOL
-    assert(ALLOC_POOL_PTR != NULL);
-    if (n_bucket < MAX_BUCKET)
-    {
-        obj = pool_alloc(&ALLOC_POOL_PTR, &ALLOC_POOL_SIZE,
-                         sizeof(*obj) * n, sizeof(ALLOC_POOL_ALIGN_AS));
-        if (obj != NULL)
-        {
-            return obj;
-        }
-    }
-#endif
-
-    if (n_bucket < MAX_BUCKET && freelist_TYPE[n_bucket] != NULL)
-    {
-        obj = (ALLOC_TYPE *)freelist_TYPE[n_bucket];
-        freelist_TYPE[n_bucket] = freelist_TYPE[n_bucket]->chain;
-
-        return obj;
-    }
-
-    return frlmalloc(sizeof(*obj) * n);
-}
 
 /** @private */
 #define new_TYPE ALLOC_PREFIX(new)

@@ -27,7 +27,6 @@
 %token TOK_END                        
                         
 %token TOK_MODULE
-%token TOK_PRIVATE
 %token TOK_LOCAL
 %token TOK_PROTECTED
 %token TOK_PUBLIC
@@ -42,11 +41,11 @@
 %left ','
 %nonassoc TOK_RULE
 %nonassoc TOK_FOREIGN                        
-%nonassoc '='
+%nonassoc '=' TOK_ASSIGN_ONCE
 %right TOK_THEN                        
 %right TOK_HOT TOK_COLD TOK_IDLE TOK_GREEDY TOK_PASSIVE
 %nonassoc TOK_ELSE
-%right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_TYPECASE TOK_POLL TOK_FREEZE TOK_WATCH TOK_WITH TOK_LET
+%right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_TRY TOK_TYPECASE TOK_FREEZE TOK_WATCH TOK_WITH TOK_LET
 %nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_YIELD TOK_RECEIVE TOK_ERROR TOK_GOTO TOK_ASSERT TOK_NEED
 %right TOK_PUT TOK_PUT_ALL TOK_PUT_NEXT 
 %left TOK_PUT_BACK
@@ -63,8 +62,8 @@
 %left '[' 
 %right '!' TOK_TRACING TOK_PEEK TOK_UMINUS TOK_TYPEOF
 %left '.'
-%nonassoc TOK_HOOK                        
-%nonassoc TOK_ID 
+%nonassoc TOK_HOOK
+%nonassoc TOK_ID
 %{
 extern int yylex(YYSTYPE* yylval_param, YYLTYPE * yylloc_param, exec_context *context);
 static void yyerror(YYLTYPE * yylloc_param, exec_context *context, const char *msg);
@@ -124,7 +123,7 @@ modulecontents:  /*empty*/
         |       modulecontents errordef ';'
         |       modulecontents pragma ';'
         |       modulecontents moduleconditional
-        |       modulecontents scope declaration
+        |       modulecontents declscope declaration
         |       modulecontents augment
         |       modulecontents moduleforeign ';'
                 ;
@@ -143,8 +142,9 @@ moduleforeign: TOK_FOREIGN TOK_STRING
 errordef:       TOK_ERROR TOK_ID '=' TOK_STRING
         ;
 
-scope:          /*empty*/
+declscope:          /*empty*/
         |       TOK_PUBLIC
+        |       TOK_PROTECTED
         |       TOK_LOCAL
                 ;
 
@@ -178,7 +178,7 @@ importalias:    /*empty*/
 nodedecl:       nodepriority nodedecl1
                 ;
 
-nodedecl1:      TOK_ID '(' nodeargs0 ')' nodedef
+nodedecl1:      TOK_ID nodedef
         |       TOK_PARTITION TOK_ID partition_channels '{' modulecontents '}'
                 ;
 
@@ -207,27 +207,7 @@ nodedef:        instantiate ';'
         |       nodeblock
                 ;
 
-nodeargs0:      /*              empty */
-        |       nodeargs
-        ;
-
-nodeargs:       nodearg
-        |       nodeargs ',' nodearg
-                ;
-
-nodearg:        nodeargname
-        |       nodeargname '=' expression
-                ;
-
-nodeargname:    argscope TOK_ID
-        ;
-
-argscope:       scope
-        |       TOK_PRIVATE
-        |       TOK_PROTECTED
-        ;
-
-instantiate:    '=' noderef '(' instanceargs0 ')' ';'
+instantiate:    '=' noderef '(' instanceargs0 ')' local_augments ';'
                 ;
 
 instanceargs0:  /*empty*/
@@ -257,20 +237,11 @@ statelabel:     TOK_ID
         |       TOK_KILL
         ;
 
-augment:        TOK_AUGMENT hookref nodeargs00 block
-        ;
-
-nodeargs00: /*              empty */
-        |       '(' nodeargs0 ')'
+augment:        TOK_AUGMENT hookref block
         ;
 
 noderef:        TOK_ID
         |       TOK_ID '.' TOK_ID %prec '.'
-                ;
-
-varref:         TOK_ID
-        |       '.' assockey
-        |       varref '.' assockey
                 ;
 
 hookref:        TOK_ID '.' TOK_ID  %prec '.'
@@ -360,7 +331,7 @@ expression: literal
         |       TOK_FOREACH '(' foreach_spec ')' expression %prec TOK_FOREACH
         |       TOK_FREEZE '(' expression ')' expression %prec TOK_FREEZE
         |       TOK_SWITCH '(' expression ')' '{' alternatives '}' %prec TOK_SWITCH
-        |       TOK_POLL '{' select_alternatives '}' %prec TOK_POLL
+        |       TOK_TRY '{' try_alternatives '}' %prec TOK_TRY
         |       TOK_TYPECASE '(' expression ')' '{' generic_alternatives '}' %prec TOK_TYPECASE
         |       TOK_WATCH '(' expression TOK_RULE expression ')' expression %prec TOK_WATCH
         |       TOK_WITH  '(' expression ')' expression %prec TOK_WITH
@@ -389,7 +360,7 @@ callexpr:       expression
         ;
 
 local_augments: /* empty */
-        |       local_augments TOK_AUGMENT TOK_ID nodeargs00 block
+        |       local_augments TOK_AUGMENT TOK_ID block
 
 expression0:    /*empty*/
         |       expression
@@ -399,9 +370,19 @@ bindings:       binding
         |       bindings ';' binding
                 ;
 
-binding: TOK_ID '=' expression
+binding: binding_scope TOK_ID assign_op expression %prec '='
         | pragma
                 ;
+
+assign_op:      '='
+        |       TOK_ASSIGN_ONCE
+        ;
+
+binding_scope:  TOK_LOCAL
+        |       TOK_PUBLIC
+        |       TOK_PROTECTED
+        |       TOK_MODULE TOK_PUBLIC
+        ;
 
 block:   '{'    sequence '}'
                 ;
@@ -433,6 +414,7 @@ xassockey:      assockey
 assockey:       TOK_ID
         |       TOK_REGEXP
         |       literal
+        |       block
         ;
 
 foreach_spec:   generators foreach_dest
@@ -453,29 +435,34 @@ alternatives:   alternative
         |       alternatives ';' alternative
         ;
 
-alternative:    pattern TOK_RULE expression
-        |       pattern TOK_IF '(' expression ')' TOK_RULE expression
+alternative:    patternseq TOK_RULE expression
+        ;
+
+patternseq:     lastpattern
+        |       cpatternseq
+        |       cpatternseq ',' lastpattern
+        |       TOK_ELSE
+                ;
+
+lastpattern: '?' guarded_pattern
+        ;
+
+cpatternseq:    guarded_pattern
+        |       cpatternseq ',' guarded_pattern
+                ;
+
+guarded_pattern:pattern
+        |       pattern TOK_IF '(' expression ')'
+                
+try_alternatives:
+                try_alternative
+        |       try_alternatives ';' try_alternative
+        ;
+
+try_alternative:    expression TOK_RULE expression
         |       TOK_ELSE TOK_RULE expression
         ;
 
-select_alternatives:
-                select_alternative
-        |       select_alternatives ';' select_alternative
-        ;
-
-select_alternative:    selector TOK_RULE expression
-        |       TOK_ELSE TOK_RULE expression
-        ;
-
-selector:       varref
-        |       varref '[' expression ']'
-        |       '!' varref
-        |       '^' varref 
-        |       '(' selector ')'
-        |       selector '&' selector
-        |       selector '|' selector
-        |       selector '^' selector                
-        ;
 
 generic_alternatives:
                 generic_alternative
