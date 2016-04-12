@@ -141,6 +141,11 @@ TEST_SPEC(allocate_zero, "Allocate zero-sized array", false,
               ASSERT_NULL(alloc_storage(&test_allocator, 0));
           });
 
+static shared_pool_t shared_pool;
+
+static allocator_t shared_test_allocator =
+    INIT_ALLOCATOR(sizeof(short), ALLOC_N_BUCKETS, 1, false, &shared_pool);
+
 #endif
 
 void dispose_storage(allocator_t *alloc, size_t n, void *obj)
@@ -245,6 +250,89 @@ TEST_SPEC(allocate_free_allocate,
                        }
               ));
 
+TEST_SPEC(alloc_from_pool,
+          "Allocate from pool", false,
+          {
+              /* that's the space for arrays up to 10 short's +
+               * double-boundary alignment
+               */              
+              shared_pool.available = 4 * sizeof(double) +
+                  4 * 2 * sizeof(double) +
+                  3 * sizeof(double);
+              shared_pool.base = shared_pool.current = malloc(shared_pool.available);
+
+              TEST_ITERATE(n, testval_small_uint_t,
+                           {
+                               short *obj = alloc_storage(&shared_test_allocator, n + 1);
+                               void *pool_ptr = shared_pool.current;
+                               
+                               ASSERT_NOT_NULL(obj);
+                               if (n < shared_test_allocator.n_buckets)
+                               {
+                                   ASSERT_EQ(ptr, obj, pool_ptr);
+                                   ASSERT_EQ(unsigned,
+                                             (uintptr_t)obj % sizeof(double), 0);
+                               }
+                               else
+                               {
+                                   ASSERT_NEQ(ptr, obj, pool_ptr);
+                                   dispose_storage(&shared_test_allocator, n + 1, obj);
+                               }
+                           });
+              ASSERT_EQ(unsigned, shared_pool.available, 0);
+              free(shared_pool.base);
+              shared_pool.base = NULL;
+          });
+
+#if 0
+/** @testcase Allocate from pool and immediately free */
+static void alloc_from_pool_and_return(testval_small_uint_t n)
+{
+    short *st;
+    static void *pool_base;
+
+
+    if (n == 0)
+    {
+        shared_pool_size = 3 * sizeof(double);
+        pool_base = shared_pool_ptr = malloc(shared_pool_size);
+    }
+    st = new_pool_short(n + 1);
+    if (n < TESTVAL_SMALL_UINT_MAX)
+        ASSERT_EQ(ptr, st, pool_base);
+    free_pool_short(n + 1, st);
+    ASSERT_EQ(unsigned, shared_pool_size, 3 * sizeof(double));
+    ASSERT_NULL(freelist_pool_short[n]);
+
+    if (n == TESTVAL_SMALL_UINT_MAX)
+    {
+        free(pool_base);
+        pool_base = NULL;
+    }
+}
+
+/** @testcase Malloc when no space in the pool */
+static void alloc_not_from_pool(testval_small_uint_t n)
+{
+    void *pool_base;
+    short *st;
+
+    shared_pool_size = sizeof(short) * (n + 1) - 1;
+    shared_pool_ptr = pool_base = malloc(shared_pool_size);
+    st = new_pool_short(n + 1);
+    ASSERT_NOT_NULL(st);
+    ASSERT_NEQ(ptr, st, pool_base);
+    ASSERT_EQ(ptr, pool_base, shared_pool_ptr);
+    ASSERT_EQ(unsigned, shared_pool_size, sizeof(short) * (n + 1) - 1);
+    free_pool_short(n + 1, st);
+    ASSERT_EQ(ptr, pool_base, shared_pool_ptr);
+    ASSERT_EQ(unsigned, shared_pool_size, sizeof(short) * (n + 1) - 1);
+    if (n < TESTVAL_SMALL_UINT_MAX)
+        ASSERT_EQ(ptr, freelist_pool_short[n], st);
+    free(pool_base);
+}
+#endif
+
 
 #endif
 
@@ -304,7 +392,7 @@ void *copy_storage(allocator_t *alloc, size_t n, const void *objs)
 }
 
 #if DO_TESTS
-TEST_SPEC(copy, "Copy",
+TEST_SPEC(copy, "Copy", false,
           TEST_ITERATE(n, testval_small_uint_t,
                        {
                            void *objs = alloc_storage(&test_allocator, n + 1);
@@ -312,50 +400,36 @@ TEST_SPEC(copy, "Copy",
 
                            memset(objs, ARBITRARY(uint8_t, 0, UINT8_MAX), n);
                            objs1 = copy_storage(&test_allocator, n + 1, objs);
+                           ASSERT_ALLOCATED(test_allocator, n, 2);
                            ASSERT_NOT_NULL(objs1);
                            ASSERT(memcmp(objs, objs1, n) == 0);
-                       }
+                           dispose_storage(&test_allocator, n + 1, objs);
+                           dispose_storage(&test_allocator, n + 1, objs1);
+                           ASSERT_ALLOCATED(test_allocator, n, 0);
+                       }));
 
-static void test_copy(testval_small_uint_t n)
-{
-    simple_type *st = new_simple_type(n + 1);
-    simple_type *st1;
-    unsigned i;
-
-    st1 = copy_simple_type(n + 1, st);
-    ASSERT_NEQ(ptr, st, st1);
-
-    for (i = 0; i < n + 1; i++)
-    {
-        ASSERT_EQ(unsigned, st1[i].tag, SIMPLE_TYPE_TAG);
-        ASSERT_EQ(unsigned, st1[i].state, STATE_COPIED);
-    }
-    ASSERT_EQ(unsigned, track_simple_type[n], 2);
-    free_simple_type(n + 1, st);
-    free_simple_type(n + 1, st1);
-    ASSERT_EQ(unsigned, track_simple_type[n], 0);
-}
-
-/** @testcase Deallocate and copy */
-static void deallocate_and_copy(testval_small_uint_t n)
-{
-    if (n == TESTVAL_SMALL_UINT_MAX)
-        return;
-    else
-    {
-        simple_type *st = new_simple_type(n + 1);
-        simple_type *st1 = new_simple_type(n + 1);
-        simple_type *st2 = NULL;
-
-        free_simple_type(n + 1, st);
-        st2 = copy_simple_type(n + 1, st1);
-        ASSERT_EQ(ptr, st2, st);
-        free_simple_type(n + 1, st1);
-        free_simple_type(n + 1, st2);
-        ASSERT_EQ(unsigned, track_simple_type[n], 0);
-    }
-}
-
+TEST_SPEC(deallocate_and_copy, 
+          "Deallocate and copy", false,
+          TEST_ITERATE(n, testval_small_uint_t,
+                       {
+                           if (n == TESTVAL_SMALL_UINT_MAX)
+                               continue;
+                           else
+                           {
+                               void *objs = alloc_storage(&test_allocator, n + 1);
+                               void *objs1 = alloc_storage(&test_allocator, n + 1);
+                               void *objs2 = NULL;
+                               
+                               dispose_storage(&test_allocator, n + 1, objs);
+                               objs2 = copy_storage(&test_allocator, n + 1, objs1);
+                               ASSERT_NEQ(ptr, objs2, objs1);
+                               ASSERT_EQ(ptr, objs2, objs);
+                               ASSERT_ALLOCATED(test_allocator, n, 2);
+                               dispose_storage(&test_allocator, n + 1, objs1);
+                               dispose_storage(&test_allocator, n + 1, objs2);
+                               ASSERT_ALLOCATED(test_allocator, n, 0);
+                           }
+                       }));
 #endif
 
 void *append_storage(allocator_t *alloc,

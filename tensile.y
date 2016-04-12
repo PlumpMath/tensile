@@ -51,13 +51,14 @@
 %left TOK_PUT_BACK
 %right '?'
 %nonassoc TOK_MATCH_BINDING TOK_MATCH_BINDING_ALL
-%left '|' '^'
+%left '|'
 %left '&'
 %nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH TOK_IN TOK_ISTYPE
 %right ':'                        
 %left TOK_MAX TOK_MIN 
 %left '+' '-' TOK_APPEND TOK_CHOP TOK_CHOP_HEAD
 %left '*' '/' TOK_DIV TOK_MOD TOK_INTERSPERSE TOK_SPLIT '$' TOK_SUBST_ALL
+%right '^'
 %left TOK_TYPECAST
 %left '[' 
 %right '!' TOK_TRACING TOK_PEEK TOK_UMINUS TOK_TYPEOF
@@ -207,7 +208,10 @@ nodedef:        instantiate ';'
         |       nodeblock
                 ;
 
-instantiate:    '=' noderef '(' instanceargs0 ')' local_augments ';'
+instantiate:    '=' instantiate_expr ';'
+                ;
+
+instantiate_expr: noderef '(' instanceargs0 ')' local_augments
                 ;
 
 instanceargs0:  /*empty*/
@@ -276,13 +280,13 @@ expression: literal
         |       TOK_TYPEOF expression
         |       '!' expression
         |       TOK_PEEK expression
+        |       expression '^' expression 
         |       expression '+' expression 
         |       expression '-' expression 
         |       expression '*' expression 
         |       expression '/' expression 
         |       expression TOK_DIV expression
         |       expression TOK_MOD expression
-        |       expression '^' expression 
         |       expression '&' expression
         |       expression '|' expression
         |       expression '?' expression
@@ -348,16 +352,11 @@ gotodest:       TOK_ID
         |       TOK_PUT_BACK
         ;
 
-anonymous_node: '@' noderef block local_augments
-        |       '@' noderef '(' callexpr ')'
+anonymous_node: '@' instantiate_expr
+        |       '@' nodeblock
         |       '@' TOK_FOR  '(' bindings ';' expression0 ';' bindings ')' expression %prec TOK_FOR
         |       '@' TOK_FOREACH '(' foreach_spec ')' expression %prec TOK_FOREACH
                 ;
-
-callexpr:       expression
-        |       exprlist ',' expression
-        |       assoclist
-        ;
 
 local_augments: /* empty */
         |       local_augments TOK_AUGMENT TOK_ID block
