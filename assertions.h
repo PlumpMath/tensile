@@ -57,10 +57,17 @@ static bool testcase_failed = false;
 
 #if USE_ANSI_TERM_STRINGS
 #define TEST_MSG_HIGHLIGHT_ON "\033[1m"
-#define TEST_MSG_ALERT_ON "\033[3m"  
+#if USE_ANSI_TERM_COLOR
+#define TEST_MSG_SUCCESS_ON "\033[32m"
+#define TEST_MSG_ALERT_ON "\033[31m"
+#else
+#define TEST_MSG_SUCCESS_ON "\033[1m"
+#define TEST_MSG_ALERT_ON "\033[3m"
+#endif
 #define TEST_MSG_NORMAL_ON "\033[0m"
 #else
 #define TEST_MSG_HIGHLIGHT_ON
+#define TEST_MSG_SUCCESS_ON
 #define TEST_MSG_ALERT_ON
 #define TEST_MSG_NORMAL_ON
 #endif
@@ -233,7 +240,7 @@ void test_set_random_seed(void)
     } while(0)
 
 #define TEST_OK_MSG                                                     \
-    fputs(" " TEST_MSG_HIGHLIGHT_ON "OK" TEST_MSG_NORMAL_ON "\n", stderr)
+    fputs(" " TEST_MSG_SUCCESS_ON "OK" TEST_MSG_NORMAL_ON "\n", stderr)
 #define TEST_FAIL_MSG                                                   \
     fputs(" " TEST_MSG_ALERT_ON "FAIL" TEST_MSG_NORMAL_ON "\n", stderr)
 

@@ -46,6 +46,14 @@ typedef struct shared_pool_t {
     size_t available;
 } shared_pool_t;
 
+static inline void shared_pool_init(shared_pool_t *pool, size_t size)
+{
+    pool->available = size;
+    pool->base = malloc(size);
+    assert(pool->base != NULL);
+    pool->current = pool->base;
+}
+
 typedef struct allocator_t {
     size_t elt_size;
     size_t n_buckets;
