@@ -310,7 +310,6 @@ TEST_SPEC(alloc_from_pool_and_return,
           TEST_ITERATE(alloc, testval_shared_allocator_var,
                        {
                            size_t available = alloc->n_buckets * alloc->elt_size;
-                           unsigned i;
 
                            shared_pool_init(&shared_pool, available);
  
@@ -342,26 +341,49 @@ TEST_SPEC(alloc_from_pool_and_return,
 TEST_SPEC(alloc_not_from_pool,
           "Malloc when no space in the pool", false,
           TEST_ITERATE(n, testval_small_uint_t,
+                       {
+                           size_t available = (n + 1) * shared_test_allocator_big.elt_size - 1;
+                           void *obj;
+                           
+                           shared_pool_init(&shared_pool, available);
+                           obj = alloc_storage(&shared_test_allocator_big, n + 1);
+                           
+                           ASSERT_NOT_NULL(obj);
+                           ASSERT_NEQ(ptr, obj, shared_pool.base);
+                           ASSERT_EQ(ptr, shared_pool.base, shared_pool.current);
+                           ASSERT_EQ(unsigned, shared_pool.available, available);
+                           
+                           dispose_storage(&shared_test_allocator_big, n + 1, obj);
+                           ASSERT_EQ(ptr, shared_pool.base, shared_pool.current);
+                           ASSERT_EQ(unsigned, shared_pool.available, available);
+                           
+                           ASSERT_ALLOC_LIST(shared_test_allocator_big, n, obj);
+                           free(shared_pool.base);
+                           shared_pool.base = NULL;
+                       }));
+
+TEST_SPEC(alloc_from_pool_mixed,
+          "Alloc from pool using different allocators", false,
           {
-          size_t available = (n + 1) * shared_test_allocator_big.elt_size - 1;
-          void *obj;
-
-          shared_pool_init(&shared_pool, available);
-          obj = alloc_storage(&shared_test_allocator_big, n + 1);
-          
-          ASSERT_NOT_NULL(obj);
-          ASSERT_NEQ(ptr, obj, shared_pool.base);
-    ASSERT_EQ(ptr, pool_base, shared_pool_ptr);
-    ASSERT_EQ(unsigned, shared_pool_size, sizeof(short) * (n + 1) - 1);
-    free_pool_short(n + 1, st);
-    ASSERT_EQ(ptr, pool_base, shared_pool_ptr);
-    ASSERT_EQ(unsigned, shared_pool_size, sizeof(short) * (n + 1) - 1);
-    if (n < TESTVAL_SMALL_UINT_MAX)
-        ASSERT_EQ(ptr, freelist_pool_short[n], st);
-    free(pool_base);
-}
-#endif
-
+              void *obj1;
+              void *obj2;
+              void *obj3;
+              
+              shared_pool_init(&shared_pool,
+                               2 * shared_test_allocator_big.elt_size + sizeof(double));
+              obj1 = alloc_storage(&shared_test_allocator_big, 1);
+              ASSERT_EQ(ptr, obj1, shared_pool.base);
+              obj2 = alloc_storage(&shared_test_allocator_small, 1);
+              ASSERT_EQ(ptr, obj2, (uint8_t *)shared_pool.base +
+                        shared_test_allocator_big.elt_size);
+              obj3 = alloc_storage(&shared_test_allocator_big, 1);
+              ASSERT_EQ(ptr, obj3, (uint8_t *)shared_pool.base +
+                        shared_test_allocator_big.elt_size + sizeof(double));
+              free(shared_pool.base);
+              shared_pool.base = NULL;
+              shared_test_allocator_big.buckets[0].n_alloc = 0;
+              shared_test_allocator_small.buckets[0].n_alloc = 0;              
+          });
 
 #endif
 

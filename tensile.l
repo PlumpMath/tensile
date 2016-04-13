@@ -24,7 +24,7 @@ YY_DECL;
 ESCAPE \\([abfnrtv\'\"\\]|u\+?[[:xdigit:]]{4}|U\+?[[:xdigit:]]{8}|[uU]\{[^}]+\})
 %%
 _ { return TOK_WILDCARD; }
-[-+*/^!~(){}.@?,;<>:&|$] { return *yytext; }
+[-+*/^!~(){}.@?,;<>:&|$%] { return *yytext; }
 [][] { return *yytext; }
 "!~" { return TOK_NOT_MATCH; }
 "~~~" { return TOK_MATCH_BINDING_ALL; }
@@ -44,7 +44,7 @@ _ { return TOK_WILDCARD; }
 "*?" { return TOK_PEEK; }
 "++" { return TOK_APPEND; }
 "--" { return TOK_CHOP; }
-"^^" { return TOK_CHOP_HEAD; }
+"%%" { return TOK_CHOP_HEAD; }
 "**" { return TOK_INTERSPERSE; }
 "//" { return TOK_SPLIT; }
 "<>" { return TOK_QUEUE; }
@@ -59,6 +59,7 @@ else { return TOK_ELSE; }
 end { return TOK_END; }
 error { return TOK_ERROR; }
 false { return TOK_FALSE; }
+finally { return TOK_FINALLY; }
 for { return TOK_FOR; }
 foreach { return TOK_FOREACH; }
 foreign { return TOK_FOREIGN; }
@@ -77,19 +78,16 @@ kill { return TOK_KILL; }
 let { return TOK_LET; }
 local { return TOK_LOCAL; }
 me { return TOK_ME; }
-mod { return TOK_MOD; }
 module { return TOK_MODULE; }
 need { return TOK_NEED; }
 null { yylval->value = NULL_VALUE;  return TOK_NULL; }
 partition { return TOK_PARTITION; }
 passive { return TOK_PASSIVE; }
 pragma { return TOK_PRAGMA; }
-private { return TOK_PRIVATE; }
 protected { return TOK_PROTECTED; }
 public { return TOK_PUBLIC; }
 receive { return TOK_RECEIVE; }
 resume { return TOK_RESUME; }
-runtime { return TOK_RUNTIME; }
 suspend { return TOK_SUSPEND; }
 switch { return TOK_SWITCH; }
 then { return TOK_THEN; }

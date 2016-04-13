@@ -17,7 +17,6 @@
 
 %token TOK_ID
 %token TOK_WILDCARD
-%token TOK_RUNTIME
 
 %token TOK_TRUE
 %token TOK_FALSE
@@ -46,7 +45,7 @@
 %right TOK_HOT TOK_COLD TOK_IDLE TOK_GREEDY TOK_PASSIVE
 %nonassoc TOK_ELSE
 %right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_TRY TOK_TYPECASE TOK_FREEZE TOK_WATCH TOK_WITH TOK_LET
-%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_YIELD TOK_RECEIVE TOK_ERROR TOK_GOTO TOK_ASSERT TOK_NEED
+%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_YIELD TOK_RECEIVE TOK_ERROR TOK_GOTO TOK_ASSERT TOK_NEED TOK_FINALLY
 %right TOK_PUT TOK_PUT_ALL TOK_PUT_NEXT 
 %left TOK_PUT_BACK
 %right '?'
@@ -57,7 +56,7 @@
 %right ':'                        
 %left TOK_MAX TOK_MIN 
 %left '+' '-' TOK_APPEND TOK_CHOP TOK_CHOP_HEAD
-%left '*' '/' TOK_DIV TOK_MOD TOK_INTERSPERSE TOK_SPLIT '$' TOK_SUBST_ALL
+%left '*' '/' TOK_DIV '%' TOK_INTERSPERSE TOK_SPLIT '$' TOK_SUBST_ALL
 %right '^'
 %left TOK_TYPECAST
 %left '[' 
@@ -264,7 +263,6 @@ expression: literal
         |       TOK_ID '(' exprlist0 ')'
         |       TOK_HOOK TOK_ID
         |       TOK_ME
-        |       TOK_RUNTIME
         |       TOK_QUEUE
         |       TOK_REGEXP
         |       expression '.' assockey                
@@ -286,7 +284,7 @@ expression: literal
         |       expression '*' expression 
         |       expression '/' expression 
         |       expression TOK_DIV expression
-        |       expression TOK_MOD expression
+        |       expression '%' expression
         |       expression '&' expression
         |       expression '|' expression
         |       expression '?' expression
@@ -328,6 +326,7 @@ expression: literal
         |       TOK_ERROR expression
         |       TOK_ASSERT expression
         |       TOK_NEED expression
+        |       TOK_FINALLY expression
         |       TOK_GOTO gotodest
         |       TOK_IF '(' expression ')' expression %prec TOK_IF
         |       TOK_WHILE '(' expression ')' expression %prec TOK_WHILE
@@ -387,7 +386,6 @@ block:   '{'    sequence '}'
                 ;
 
 sequence:       expression ';'
-        |       bindings ';'
         |       sequence expression ';'
                 ;
 

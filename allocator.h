@@ -29,7 +29,7 @@ extern "C"
 #endif
 
 #include "compiler.h"
-
+#include <stdlib.h>
 
 typedef struct freelist_t {
     struct freelist_t *chain;
