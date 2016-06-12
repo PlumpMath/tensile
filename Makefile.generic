@@ -98,6 +98,10 @@ endif
 .PHONY : check
 check : $(addsuffix .gcov,$(C_SOURCES))
 
+ifeq ($(FORCE_CHECK),1)
+.PHONY : $(patsubst %.c,tests/%_ts,$(C_SOURCES))
+endif
+
 ifneq ($(GCOV),)
 
 %.c.gcov : tests/%_ts.gcda %.c

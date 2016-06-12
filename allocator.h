@@ -123,6 +123,10 @@ extern void *append_storage(allocator_t *alloc,
                             size_t * restrict dest_sz, void ** restrict dest,
                             size_t app_sz, const void *app);
 
+
+annotation(arguments, not_null)
+extern void cleanup_allocator(allocator_t *alloc);
+
 #if 0
 /** @cond TESTS */
 #define TESTSUITE "Allocator"
