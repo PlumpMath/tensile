@@ -37,12 +37,12 @@ typedef struct freelist_t {
 
 typedef struct alloc_bucket_t {
     freelist_t *freelist;
-    unsigned n_alloc;
+    unsigned    n_alloc;
 } alloc_bucket_t;
 
 typedef struct shared_pool_t {
-    void *base;
-    void *current;
+    void  *base;
+    void  *current;
     size_t available;
 } shared_pool_t;
 
@@ -55,13 +55,13 @@ static inline void shared_pool_init(shared_pool_t *pool, size_t size)
 }
 
 typedef struct allocator_t {
-    size_t elt_size;
-    size_t n_buckets;
-    size_t bucket_size;
-    bool log2_bucket;
-    shared_pool_t *pool;
+    size_t          elt_size;
+    size_t          n_buckets;
+    size_t          bucket_size;
+    bool            log2_bucket;
+    shared_pool_t  *pool;
     alloc_bucket_t *buckets;
-    unsigned n_large_alloc;
+    unsigned        n_large_alloc;
 } allocator_t;
 
 #define INIT_ALLOCATOR(_eltsize, _nbuckets, _bucketsize,            \
@@ -126,6 +126,24 @@ extern void *append_storage(allocator_t *alloc,
 
 annotation(arguments, not_null)
 extern void cleanup_allocator(allocator_t *alloc);
+
+
+annotation(returns, fresh_pointer)
+annotation(returns, important)
+annotation(argument, storage_size, 1)
+extern void *rep_malloc(size_t sz);
+
+annotation(returns, fresh_pointer)
+annotation(returns, important)
+annotation(argument, storage_size, 1, 2)
+extern void *rep_calloc(size_t nmemb, size_t sz);
+
+annotation(returns, important)
+annotation(argument, storage_size, 2)
+extern void *rep_realloc(void *ptr, size_t sz);
+
+extern void *rep_free(void *ptr);
+
 
 #if 0
 /** @cond TESTS */
