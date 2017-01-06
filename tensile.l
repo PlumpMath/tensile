@@ -5,6 +5,8 @@
 %{
 
 #include <stdlib.h>
+#include "vmtypes.h"
+#include "ast.h"
 #include "tensile.tab.h"
 
 #define YY_DECL int yylex(YYSTYPE* yylval_param,    \
@@ -23,114 +25,80 @@ YY_DECL;
 
 ESCAPE \\([abfnrtv\'\"\\]|u\+?[[:xdigit:]]{4}|U\+?[[:xdigit:]]{8}|[uU]\{[^}]+\})
 %%
-_ { return TOK_WILDCARD; }
-[-+*/^!~(){}.@?,;<>:&|$%] { return *yytext; }
+[-+*/^!~(){}.?,;<>:&|%=#\\] { return *yytext; }
 [][] { return *yytext; }
+"[|" { return TOK_LDBRACKET; }
+"|]" { return TOK_RDBRACKET; }
+"{|" { return TOK_LDBRACE; }
+"|}" { return TOK_RDBRACE; }
 "!~" { return TOK_NOT_MATCH; }
-"~~~" { return TOK_MATCH_BINDING_ALL; }
-"~~" { return TOK_MATCH_BINDING; }
 "==" { return TOK_EQ; }
 "<=" { return TOK_LE; }
 ">=" { return TOK_GE; }
 "!=" { return TOK_NE; }
 "<:" { return TOK_MIN; }
 ":>" { return TOK_MAX; }
-"=>" { return TOK_RULE; }
-"<-" { return TOK_PUT_BACK; }
-"->" { return TOK_PUT; }
-"->>" { return TOK_PUT_ALL; }
-"->!" { return TOK_PUT_NEXT; }
-"?=" { return TOK_ASSIGN_ONCE; }
-"*?" { return TOK_PEEK; }
+"->" { return TOK_ARROW; }
+"<->" { return TOK_INTERACT; }
+"=>" { return TOK_MAP; }
 "++" { return TOK_APPEND; }
-"--" { return TOK_CHOP; }
-"%%" { return TOK_CHOP_HEAD; }
-"**" { return TOK_INTERSPERSE; }
-"//" { return TOK_SPLIT; }
-"<>" { return TOK_QUEUE; }
-"$$" { return TOK_SUBST_ALL; }
-"/"([^/\\[:space:]]|\\.)+"/" { return TOK_REGEXP; }
-as { return TOK_TYPECAST; }
-assert { return TOK_ASSERT; }
-augment { return TOK_AUGMENT; }
-cold { return TOK_COLD; }
-div { return TOK_DIV; }
+".." { return TOK_RANGE; }
 else { return TOK_ELSE; }
-end { return TOK_END; }
-error { return TOK_ERROR; }
+extern { return TOK_EXTERN; }
 false { return TOK_FALSE; }
-finally { return TOK_FINALLY; }
-for { return TOK_FOR; }
-foreach { return TOK_FOREACH; }
-foreign { return TOK_FOREIGN; }
-freeze { return TOK_FREEZE; }
-goto { return TOK_GOTO; }
-greedy { return TOK_GREEDY; }
-hook { return TOK_HOOK; }
-hot { return TOK_HOT; }
-idle { return TOK_IDLE; }
 if { return TOK_IF; }
-in { return TOK_IN; }
-is { return TOK_ISTYPE; }
 import { return TOK_IMPORT; }
-include { return TOK_INCLUDE; }
-kill { return TOK_KILL; }
-let { return TOK_LET; }
-local { return TOK_LOCAL; }
-me { return TOK_ME; }
-module { return TOK_MODULE; }
-need { return TOK_NEED; }
-null { yylval->value = NULL_VALUE;  return TOK_NULL; }
-partition { return TOK_PARTITION; }
-passive { return TOK_PASSIVE; }
+loop { return TOK_LOOP; }
+new { return TOK_NEW; }
+override { return TOK_OVERRIDE; }
 pragma { return TOK_PRAGMA; }
-protected { return TOK_PROTECTED; }
-public { return TOK_PUBLIC; }
-receive { return TOK_RECEIVE; }
-resume { return TOK_RESUME; }
-suspend { return TOK_SUSPEND; }
 switch { return TOK_SWITCH; }
-then { return TOK_THEN; }
-tracing { return TOK_TRACING; }
 true { return TOK_TRUE; }
-try { return TOK_TRY; }
-typecase { return TOK_TYPECASE; }
 typeof { return TOK_TYPEOF; }
-watch { return TOK_WATCH; }
-while { return TOK_WHILE; }
-with { return TOK_WITH; }
-yield { return TOK_YIELD; }
 [+-]?[0-9]+ {
+    yylval->ast = ast_create_node(AST_LITERAL,
+                                  &vm_root_inttype,
+                                  (union vm_value){.ival = apr_strtoi64(yytext, NULL, 10)});
     return TOK_INTEGER;
 }
 0[xX][[:xdigit:]]+ {
+    yylval->ast = ast_create_node(AST_LITERAL,
+                                  &vm_root_inttype,
+                                  (union vm_value){.ival = apr_strtoi64(yytext + 2, NULL, 16)});
     return TOK_INTEGER;
 }
 0[bB][01]+ {
+    yylval->ast = ast_create_node(AST_LITERAL,
+                                  &vm_root_inttype,
+                                  (union vm_value){.ival = apr_strtoi64(yytext, NULL, 2)});
     return TOK_INTEGER;
 }
-[+-]?([0-9]+\.[0-9]*([eE][+-]?[0-9]+)?|[0-9]+[eE][+-]?[0-9]+) { 
+[+-]?([0-9]+\.[0-9]*([eE][+-]?[0-9]+)?|[0-9]+[eE][+-]?[0-9]+) {
+    yylval->ast = ast_create_node(AST_LITERAL,
+                                  &vm_root_floattype,
+                                  (union vm_value){.dval = strtod(yytext, NULL)});
     return TOK_FLOAT; 
 }
-[0-9]{4}-[0-9]{2}-[0-9]{2}T([0-9]{2}:[0-9]{2}(:[0-9]{2})?)? { 
-    yylval->value = parse_iso_timestamp(context, yytext);
+[0-9]{4}-[0-9]{2}-[0-9]{2}T([0-9]{2}:[0-9]{2}(:[0-9]{2})?)? {
+    time_t ts = parse_iso_timestamp(yytext);
+    
+    yylval->ast = ast_create_node(AST_LITERAL,
+                                  &vm_root_timetype,
+                                  (union vm_value){.tval = ts});
     return TOK_TIMESTAMP; 
 }
 '([^\']|{ESCAPE})' {
     return TOK_CHARACTER; 
-} 
-0[xX]'[[:space:][:punct:]]*([[:xdigit:]]+[[:space:][[:punct:]]*)*' {
-    return TOK_BINARY;
 }
+"/"([^/\\[:space:]]|\\.)+"/" { return TOK_REGEXP; }
 \"([^\"\\]+|{ESCAPE})*\" {
     return TOK_STRING; }
-\{\{([^}]+|\}[^}])*\}\} {
-    return TOK_STRING;
- }
 [[:alpha:]_][[:alnum:]_]* { 
     return TOK_ID; 
 }
-
+`([^`\\]+|{ESCAPE})*` {
+    return TOK_ID;
+}
 ^#[[:space:]]+[0-9]+[[:space:]]+.*\n {
     yylineno = strtoul(yytext + 1, NULL, 10);
 }

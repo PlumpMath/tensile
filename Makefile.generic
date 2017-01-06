@@ -18,12 +18,12 @@ FLEX = flex
 ETAGS = etags
 NM = nm
 AWK = gawk
-ICU_CONFIG = icu-config
+PKG_CONFIG = pkg-config
+PCRE_CONFIG = $(PKG_CONFIG) libpcre
 DOXYGEN = doxygen
 
-ICU_CPPFLAGS := $(shell $(ICU_CONFIG) --cppflags)
-ICU_CFLAGS := $(shell $(ICU_CONFIG) --cflags)
-ICU_LIBS := $(shell $(ICU_CONFIG) --ldflags)
+PCRE_CFLAGS := $(shell $(PCRE_CONFIG) --cflags)
+PCRE_LIBS := $(shell $(PCRE_CONFIG) --libs)
 
 PLATFORM_ARCH_SYMBOL := $(subst :,_,$(subst .,_,$(subst -,_,$(subst +,_,$(PLATFORM_ARCH)))))
 PLATFORM_OS_SYMBOL := $(subst :,_,$(subst .,_,$(subst -,_,$(subst +,_,$(PLATFORM_OS)))))
@@ -36,10 +36,10 @@ endif
 
 TEST_CPPFLAGS = -DTEST_REPEAT_ARBITRARY=2 -DUSE_ANSI_TERM_STRINGS=1 -DUSE_ANSI_TERM_COLOR=1
 
-CFLAGS += $(ICU_CFLAGS)
+CFLAGS += $(PCRE_CFLAGS)
 
 LDFLAGS = -Wl,-export-dynamic
-LDLIBS = $(ICU_LIBS) -lm -ldl
+LDLIBS = $(PCRE_LIBS) -lunistring -lgc -lm -ldl
 MFLAGS = -MM -MT '$@ $(patsubst %.d,%.o,$@)'
 
 -include $(TOPDIR)/setup/$(PLATFORM_OS).mk
@@ -54,14 +54,14 @@ endif
 
 .SECONDARY :
 
-C_SOURCES = selftest.c bitops.c allocator.c # array.c stack.c #queue.c
+C_SOURCES = # array.c stack.c #queue.c
 
 GENERATED_SOURCES = tensile.tab.c lex.yy.c
 
 SOURCES = $(C_SOURCES)
 SOURCES += $(GENERATED_SOURCES)
 
-APPLICATION = tensile
+APPLICATION = tensilec
 
 $(APPLICATION) : $(SOURCES:.c=.o)
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS)
