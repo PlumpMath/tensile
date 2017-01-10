@@ -22,18 +22,20 @@
 %token TOK_PRAGMA
 %token TOK_TYPE
 
-%token '='
-%precedence ':'                        
+%nonassoc '='
+%nonassoc TOK_MAP 
+%left TOK_ALT
+%nonassoc ':'                                                                       
 %precedence TOK_IF
 %token TOK_SWITCH TOK_ELSE
 %precedence TOK_LOOP
 %right TOK_OUTGOING                        
-%left TOK_INCOMING                        
+%left TOK_INCOMING
 %left TOK_INTERACT
-%right TOK_ARROW TOK_MAP
+%right TOK_ARROW
 %left '|'
 %left '&'
-%nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH TOK_IN
+%nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH
 %precedence TOK_RANGE                        
 %nonassoc '#'                       
 %left TOK_MAX TOK_MIN
@@ -103,6 +105,7 @@ comparison:     TOK_EQ
         |       '>'
         |       TOK_LE
         |       TOK_GE
+|
         ;
 
 label:          TOK_ID '='

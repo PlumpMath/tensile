@@ -43,6 +43,9 @@ ESCAPE \\([abfnrtv\'\"\\]|u\+?[[:xdigit:]]{4}|U\+?[[:xdigit:]]{8}|[uU]\{[^}]+\})
 "=>" { return TOK_MAP; }
 "++" { return TOK_APPEND; }
 ".." { return TOK_RANGE; }
+"||" { return TOK_ALT; }
+"->*" { return TOK_OUTGOING; }
+"*->" { return TOK_INCOMING; }
 else { return TOK_ELSE; }
 extern { return TOK_EXTERN; }
 false { return TOK_FALSE; }
