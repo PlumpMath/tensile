@@ -20,12 +20,17 @@
 %token TOK_EXTERN
 %token TOK_IMPORT
 %token TOK_PRAGMA
-%token TOK_TYPE
+%token TOK_OVERRIDE                        
 
-%nonassoc '='
-%nonassoc TOK_MAP 
-%left TOK_ALT
-%nonassoc ':'                                                                       
+%token TOK_ID
+                        
+%token TOK_ALT
+
+%token TOK_LDBRACKET TOK_RDBRACKET TOK_LDBRACE TOK_RDBRACE
+                                                    
+%precedence TOK_MAP
+%nonassoc ':'
+%left '?'                                                                                               
 %precedence TOK_IF
 %token TOK_SWITCH TOK_ELSE
 %precedence TOK_LOOP
@@ -35,17 +40,15 @@
 %right TOK_ARROW
 %left '|'
 %left '&'
-nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH
-%precedence TOK_RANGE                        
+%nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH
+%nonassoc TOK_RANGE                        
 %nonassoc '#'                       
 %left TOK_MAX TOK_MIN
 %left '+' '-' TOK_APPEND
 %left '*' '/' '%'                        
-%precedence TOK_NEW
-%precedence '!' TOK_UMINUS '^'
+%precedence '!' TOK_UMINUS '^' TOK_NEW TOK_TYPEOF
 %precedence '.'
-%precedence '[' '(' '{'
-%token TOK_ID
+%precedence '(' '[' 
 %{
 extern int yylex(YYSTYPE* yylval_param, YYLTYPE * yylloc_param, exec_context *context);
 static void yyerror(YYLTYPE * yylloc_param, exec_context *context, const char *msg);
@@ -105,20 +108,19 @@ comparison:     TOK_EQ
         |       '>'
         |       TOK_LE
         |       TOK_GE
-|
-        ;
-
-label:          TOK_ID '='
+        |       '~'
+        |       TOK_NOT_MATCH
         ;
 
 expression:      literal
         |       TOK_ID
+        |       TOK_EXTERN string0 TOK_ID
         |       '\\' lambda_args TOK_MAP expression
         |       '~' expression %prec TOK_UMINUS
         |       '?' expression %prec TOK_UMINUS
         |       expression '(' application ')'
         |       '(' expression ')'
-        |       '[' expr_list0 ']'
+        |       '[' expr_list ']'
         |       '{' body '}'
         |       '(' expression ',' expression ')'
         |       '+' expression %prec TOK_UMINUS
@@ -142,19 +144,30 @@ expression:      literal
         |       expression TOK_MAX expression
         |       expression TOK_APPEND expression
         |       expression comparison expression %prec TOK_EQ
-        |       expression '~' expression
-        |       expression TOK_NOT_MATCH expression
-        |       expression '[' expression ']'  %prec '['
+        |       expression '[' expression ']'
+        |       expression '[' renaming ']'
+        |       expression TOK_LDBRACKET algebraic_type TOK_RDBRACKET %prec '['
+        |       TOK_LDBRACKET algebraic_type TOK_RDBRACKET %prec '['
+        |       TOK_LDBRACE signature TOK_RDBRACE %prec '['
         |       expression TOK_ARROW expression
         |       expression TOK_INTERACT expression
+        |       expression TOK_INCOMING expression
+        |       expression TOK_OUTGOING expression
+        |       expression TOK_RANGE expression
+        |       TOK_RANGE expression
+        |       expression TOK_RANGE
         |       expression '.' TOK_ID
         |       TOK_ID '^' expression
         |       TOK_IF '(' expression ')' expression TOK_ELSE expression %prec TOK_IF
         |       TOK_LOOP expression
-        |       TOK_SWITCH '(' expression ')' '{' switch_branches '}' %prec TOK_SWITCH
+        |       TOK_SWITCH '(' expr_list1 ')' '{' switch_branches '}' %prec TOK_SWITCH
         |       TOK_NEW expression
         |       expression ':' expression
         |       expression '?' expression
+        ;
+
+string0:        %empty
+        |       TOK_STRING
         ;
 
 lambda_args:    lambda_arg
@@ -176,59 +189,52 @@ expr_list1:     expression
         |       expr_list1 ',' expression
         ;
 
-application:    named_args
-        |       ordered_args
+application:    app_arg
+        |       application ',' app_arg
         ;
 
-named_args:     named_app_arg
-        |       named_args ',' named_app_arg
-        ;
-
-named_app_arg:  label expression
-        |       TOK_TYPE label type_expr
-        ;
-
-ordered_args:   ordered_app_arg
-        |       ordered_args ',' ordered_app_arg
-        ;
-
-ordered_app_arg: expression
-        |       TOK_TYPE type_expr
-        ;
-
-range:          expression TOK_RANGE expression
-        |       expression TOK_RANGE
-        |       TOK_RANGE expression
+app_arg:        expression
+        |       TOK_ID '=' expression
         ;
 
 switch_branches: switch_branch
         |        switch_branches switch_branch
         ;
 
-switch_branch:  switch_tags '=' expression ';'
+switch_branch:  switch_tags TOK_MAP expression ';'
         ;
 
 switch_tags:    TOK_ELSE
-        |       switch_tags1
+        |       expr_list1
                 ;
 
-switch_tags1:   expression
-        |       switch_tags1 ',' expression
+renaming:       renaming_item
+        |       renaming ',' renaming_item
         ;
 
-type_switch_branches: type_switch_branch
-        |       type_switch_branches type_switch_branch
+renaming_item:  port_name TOK_MAP TOK_ID
         ;
 
-type_switch_branch: type_switch_tags '=' expression ';'
+port_name:      TOK_ID
+        |       TOK_ID '^'
         ;
 
-type_switch_tags: TOK_ELSE
-        |       type_switch_tags1
+algebraic_type: algebraic_branch
+        |       algebraic_type TOK_ALT algebraic_branch
         ;
 
-type_switch_tags1: type_expr
-        |       type_switch_tags1 ',' type_expr
+algebraic_branch: algebraic_field
+        |       algebraic_branch ',' algebraic_field
+        ;
+
+algebraic_field: TOK_ID ':' expression defval0
+        ;
+
+signature:      sig_field
+        |       signature ',' sig_field
+        ;
+
+sig_field:      port_name ':' expression
         ;
 
 literal:        TOK_STRING
@@ -238,11 +244,9 @@ literal:        TOK_STRING
         |       TOK_TIMESTAMP
         |       TOK_TRUE
         |       TOK_FALSE
+        |       TOK_REGEXP
                 ;
 
-regexp_match:   '~' TOK_REGEXP
-        |       TOK_NOT_MATCH TOK_REGEXP
-        ;
 
 %%
 
