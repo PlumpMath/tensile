@@ -35,7 +35,7 @@
 %right TOK_ARROW
 %left '|'
 %left '&'
-%nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH
+nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH
 %precedence TOK_RANGE                        
 %nonassoc '#'                       
 %left TOK_MAX TOK_MIN
