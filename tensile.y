@@ -20,22 +20,21 @@
 %token TOK_EXTERN
 %token TOK_IMPORT
 %token TOK_PRAGMA
-%token TOK_OVERRIDE                        
 
-%token TOK_ID
-                        
 %token TOK_ALT
 
-%token TOK_LDBRACKET TOK_RDBRACKET TOK_LDBRACE TOK_RDBRACE
-                                                    
+%token TOK_RDBRACKET TOK_LDBRACE TOK_RDBRACE
+
+%token TOK_FORCE_LET TOK_OVERRIDE
+                        
 %precedence TOK_MAP
 %nonassoc ':'
 %left '?'                                                                                               
 %precedence TOK_IF
 %token TOK_SWITCH TOK_ELSE
 %precedence TOK_LOOP
-%right TOK_OUTGOING                        
-%left TOK_INCOMING
+%left TOK_OUTGOING                        
+%right TOK_INCOMING
 %left TOK_INTERACT
 %right TOK_ARROW
 %left '|'
@@ -47,8 +46,10 @@
 %left '+' '-' TOK_APPEND
 %left '*' '/' '%'                        
 %precedence '!' TOK_UMINUS '^' TOK_NEW TOK_TYPEOF
+%precedence '[' TOK_LDBRACKET 
 %precedence '.'
-%precedence '(' '[' 
+%precedence TOK_ID
+%precedence '('                        
 %{
 extern int yylex(YYSTYPE* yylval_param, YYLTYPE * yylloc_param, exec_context *context);
 static void yyerror(YYLTYPE * yylloc_param, exec_context *context, const char *msg);
@@ -89,17 +90,11 @@ import_item:    TOK_ID
         ;
 
 
-definition:     override0 TOK_ID def_args '=' expression
-        ;
-
-
-override0:      %empty
-        |       TOK_OVERRIDE
-        ;
-
-
-def_args:       %empty
-        |       '(' lambda_args ')'
+definition:     TOK_ID '=' expression
+        |       TOK_ID '(' lambda_args ')' '=' expression
+        |       TOK_OVERRIDE TOK_ID '=' expression
+        |       TOK_OVERRIDE TOK_ID '(' lambda_args ')' '=' expression                
+        |       TOK_ID TOK_FORCE_LET expression
         ;
 
 comparison:     TOK_EQ
@@ -118,7 +113,7 @@ expression:      literal
         |       '\\' lambda_args TOK_MAP expression
         |       '~' expression %prec TOK_UMINUS
         |       '?' expression %prec TOK_UMINUS
-        |       expression '(' application ')'
+        |       expression '(' application ')' %prec '['
         |       '(' expression ')'
         |       '[' expr_list ']'
         |       '{' body '}'
@@ -143,12 +138,13 @@ expression:      literal
         |       expression TOK_MIN expression
         |       expression TOK_MAX expression
         |       expression TOK_APPEND expression
+        |       TOK_APPEND expression
         |       expression comparison expression %prec TOK_EQ
-        |       expression '[' expression ']'
-        |       expression '[' renaming ']'
+        |       expression '[' expression ']' %prec '['
+        |       expression '[' renaming ']' %prec '['
         |       expression TOK_LDBRACKET algebraic_type TOK_RDBRACKET %prec '['
-        |       TOK_LDBRACKET algebraic_type TOK_RDBRACKET %prec '['
-        |       TOK_LDBRACE signature TOK_RDBRACE %prec '['
+        |       TOK_LDBRACKET algebraic_type TOK_RDBRACKET
+        |       TOK_LDBRACE signature TOK_RDBRACE
         |       expression TOK_ARROW expression
         |       expression TOK_INTERACT expression
         |       expression TOK_INCOMING expression
@@ -156,7 +152,7 @@ expression:      literal
         |       expression TOK_RANGE expression
         |       TOK_RANGE expression
         |       expression TOK_RANGE
-        |       expression '.' TOK_ID
+        |       expression '.' TOK_ID %prec '.'
         |       TOK_ID '^' expression
         |       TOK_IF '(' expression ')' expression TOK_ELSE expression %prec TOK_IF
         |       TOK_LOOP expression
@@ -174,7 +170,7 @@ lambda_args:    lambda_arg
         |       lambda_args ',' lambda_arg
         ;
 
-lambda_arg:     override0 TOK_ID defval0
+lambda_arg:     TOK_ID defval0
         ;
 
 defval0:        %empty
@@ -245,6 +241,7 @@ literal:        TOK_STRING
         |       TOK_TRUE
         |       TOK_FALSE
         |       TOK_REGEXP
+        |       '(' ')'
                 ;
 
 

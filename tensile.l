@@ -44,8 +44,9 @@ ESCAPE \\([abfnrtv\'\"\\]|u\+?[[:xdigit:]]{4}|U\+?[[:xdigit:]]{8}|[uU]\{[^}]+\})
 "++" { return TOK_APPEND; }
 ".." { return TOK_RANGE; }
 "||" { return TOK_ALT; }
-"->*" { return TOK_OUTGOING; }
-"*->" { return TOK_INCOMING; }
+">>" { return TOK_OUTGOING; }
+"<<" { return TOK_INCOMING; }
+":=" { return TOK_FORCE_LET; }
 else { return TOK_ELSE; }
 extern { return TOK_EXTERN; }
 false { return TOK_FALSE; }
@@ -93,7 +94,6 @@ typeof { return TOK_TYPEOF; }
 '([^\']|{ESCAPE})' {
     return TOK_CHARACTER; 
 }
-"/"([^/\\[:space:]]|\\.)+"/" { return TOK_REGEXP; }
 \"([^\"\\]+|{ESCAPE})*\" {
     return TOK_STRING; }
 [[:alpha:]_][[:alnum:]_]* { 
@@ -105,6 +105,7 @@ typeof { return TOK_TYPEOF; }
 ^#[[:space:]]+[0-9]+[[:space:]]+.*\n {
     yylineno = strtoul(yytext + 1, NULL, 10);
 }
-^#.*\n {}
+"(:"([^:]+|:+[^+)])":)" { return TOK_REGEXP; }
 [[:space:]]+ {}
+"//".*\n {}
 "/*"([^*]+|\*+[^\/*])*"*/" {}
