@@ -31,6 +31,8 @@ ESCAPE \\([abfnrtv\'\"\\]|u\+?[[:xdigit:]]{4}|U\+?[[:xdigit:]]{8}|[uU]\{[^}]+\})
 "|]" { return TOK_RDBRACKET; }
 "{|" { return TOK_LDBRACE; }
 "|}" { return TOK_RDBRACE; }
+"(|" { return TOK_LLENSE; }
+"|)" { return TOK_RLENSE; }
 "!~" { return TOK_NOT_MATCH; }
 "==" { return TOK_EQ; }
 "<=" { return TOK_LE; }
@@ -47,6 +49,7 @@ ESCAPE \\([abfnrtv\'\"\\]|u\+?[[:xdigit:]]{4}|U\+?[[:xdigit:]]{8}|[uU]\{[^}]+\})
 ">>" { return TOK_OUTGOING; }
 "<<" { return TOK_INCOMING; }
 ":=" { return TOK_FORCE_LET; }
+"@"[[:alpha:]_][[:alnum:]_]* { return TOK_ATTRIBUTE; }
 else { return TOK_ELSE; }
 extern { return TOK_EXTERN; }
 false { return TOK_FALSE; }
@@ -105,7 +108,7 @@ typeof { return TOK_TYPEOF; }
 ^#[[:space:]]+[0-9]+[[:space:]]+.*\n {
     yylineno = strtoul(yytext + 1, NULL, 10);
 }
-"(:"([^:]+|:+[^+)])":)" { return TOK_REGEXP; }
+"{{"([^}]+|\}[^}])*"}}" { return TOK_REGEXP; }
 [[:space:]]+ {}
 "//".*\n {}
 "/*"([^*]+|\*+[^\/*])*"*/" {}

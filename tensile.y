@@ -23,10 +23,12 @@
 
 %token TOK_ALT
 
-%token TOK_RDBRACKET TOK_LDBRACE TOK_RDBRACE
+%token TOK_LDBRACKET TOK_RDBRACKET TOK_LDBRACE TOK_RDBRACE TOK_RLENSE
 
 %token TOK_FORCE_LET TOK_OVERRIDE
-                        
+
+%token TOK_ATTRIBUTE
+                                                
 %precedence TOK_MAP
 %nonassoc ':'
 %left '?'                                                                                               
@@ -46,7 +48,7 @@
 %left '+' '-' TOK_APPEND
 %left '*' '/' '%'                        
 %precedence '!' TOK_UMINUS '^' TOK_NEW TOK_TYPEOF
-%precedence '[' TOK_LDBRACKET 
+%precedence '[' '{' TOK_LLENSE
 %precedence '.'
 %precedence TOK_ID
 %precedence '('                        
@@ -64,7 +66,7 @@ body:           %empty
         |       body body_item ';' 
         ;
 
-body_item:      definition
+body_item:      definition attributes
         |       expression
         |       import
         |       pragma
@@ -116,6 +118,7 @@ expression:      literal
         |       expression '(' application ')' %prec '['
         |       '(' expression ')'
         |       '[' expr_list ']'
+        |       TOK_LDBRACKET expr_list TOK_RDBRACKET
         |       '{' body '}'
         |       '(' expression ',' expression ')'
         |       '+' expression %prec TOK_UMINUS
@@ -124,6 +127,7 @@ expression:      literal
         |       '#' expression %prec TOK_UMINUS
         |       '!' expression
         |       '*' expression %prec TOK_UMINUS
+        |       '&' expression %prec TOK_UMINUS
         |       TOK_TYPEOF expression
         |       TOK_MIN expression %prec TOK_UMINUS
         |       TOK_MAX expression %prec TOK_UMINUS
@@ -140,10 +144,12 @@ expression:      literal
         |       expression TOK_APPEND expression
         |       TOK_APPEND expression
         |       expression comparison expression %prec TOK_EQ
+        |       expression '[' ']' %prec '['
         |       expression '[' expression ']' %prec '['
         |       expression '[' renaming ']' %prec '['
-        |       expression TOK_LDBRACKET algebraic_type TOK_RDBRACKET %prec '['
-        |       TOK_LDBRACKET algebraic_type TOK_RDBRACKET
+        |       expression '{' expression '}' %prec '['                
+        |       expression TOK_LLENSE algebraic_type TOK_RDBRACKET %prec '['
+        |       TOK_LLENSE algebraic_type TOK_RLENSE
         |       TOK_LDBRACE signature TOK_RDBRACE
         |       expression TOK_ARROW expression
         |       expression TOK_INTERACT expression
@@ -223,14 +229,14 @@ algebraic_branch: algebraic_field
         |       algebraic_branch ',' algebraic_field
         ;
 
-algebraic_field: TOK_ID ':' expression defval0
+algebraic_field: TOK_ID ':' expression defval0 attributes
         ;
 
 signature:      sig_field
         |       signature ',' sig_field
         ;
 
-sig_field:      port_name ':' expression
+sig_field:      port_name ':' expression attributes
         ;
 
 literal:        TOK_STRING
@@ -243,6 +249,10 @@ literal:        TOK_STRING
         |       TOK_REGEXP
         |       '(' ')'
                 ;
+
+attributes:     %empty
+        |       attributes TOK_ATTRIBUTE
+        ;
 
 
 %%
