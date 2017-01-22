@@ -1,0 +1,5 @@
+".*\\.[chyl]"    -> lines open:"/*" line:"*" close:"*/" begin:" * " 
+# Misc
+| ".*Makefile.*" -> lines open:"#"  line:"#" close:"#" begin:"# "
+| ".*\\.mk"      -> lines open:"#"  line:"#" close:"#" begin:"# "
+| ".*\\.sh"      -> lines open:"#!/bin/sh"  line:"#" close:"" begin:"# "
