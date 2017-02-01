@@ -1,3 +1,20 @@
+/**************************************************************************
+ * Copyright (c) 2017 Artem V. Andreev
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+**************************************************************************/
+
 %define api.pure full
 %locations
 %error-verbose
@@ -13,57 +30,45 @@
 %token TOK_FLOAT
 %token TOK_TIMESTAMP
 %token TOK_REGEXP
-%token TOK_BINARY
-
-%token TOK_ID
-%token TOK_WILDCARD
 
 %token TOK_TRUE
 %token TOK_FALSE
-%token TOK_NULL
-%token TOK_QUEUE
-%token TOK_ME
-%token TOK_END                        
                         
-%token TOK_MODULE
-%token TOK_LOCAL
-%token TOK_PROTECTED
-%token TOK_PUBLIC
+%token TOK_EXTERN
 %token TOK_IMPORT
-%token TOK_PARTITION
 %token TOK_PRAGMA
-%token TOK_INCLUDE
-%token TOK_AUGMENT
 
+%token TOK_ALT
 
-%left ';'                      
-%left ','
-%nonassoc TOK_RULE
-%nonassoc TOK_FOREIGN                        
-%nonassoc '=' TOK_ASSIGN_ONCE
-%right TOK_THEN                        
-%right TOK_HOT TOK_COLD TOK_IDLE TOK_GREEDY TOK_PASSIVE
-%nonassoc TOK_ELSE
-%right TOK_IF TOK_FOR TOK_FOREACH TOK_WHILE TOK_SWITCH TOK_TRY TOK_TYPECASE TOK_FREEZE TOK_WATCH TOK_WITH TOK_LET
-%nonassoc TOK_KILL TOK_SUSPEND TOK_RESUME TOK_YIELD TOK_RECEIVE TOK_ERROR TOK_GOTO TOK_ASSERT TOK_NEED TOK_FINALLY
-%right TOK_PUT TOK_PUT_ALL TOK_PUT_NEXT 
-%left TOK_PUT_BACK
-%right '?'
-%nonassoc TOK_MATCH_BINDING TOK_MATCH_BINDING_ALL
+%token TOK_LDBRACKET TOK_RDBRACKET TOK_LDBRACE TOK_RDBRACE TOK_RLENSE
+
+%token TOK_FORCE_LET TOK_OVERRIDE
+
+%token TOK_ATTRIBUTE
+                                                
+%precedence TOK_MAP
+%nonassoc ':'
+%left '?'                                                                                               
+%precedence TOK_IF
+%token TOK_SWITCH TOK_ELSE
+%precedence TOK_LOOP
+%left TOK_OUTGOING                        
+%right TOK_INCOMING
+%left TOK_INTERACT
+%right TOK_ARROW
 %left '|'
 %left '&'
-%nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH TOK_IN TOK_ISTYPE
-%right ':'                        
-%left TOK_MAX TOK_MIN 
-%left '+' '-' TOK_APPEND TOK_CHOP TOK_CHOP_HEAD
-%left '*' '/' TOK_DIV '%' TOK_INTERSPERSE TOK_SPLIT '$' TOK_SUBST_ALL
-%right '^'
-%left TOK_TYPECAST
-%left '[' 
-%right '!' TOK_TRACING TOK_PEEK TOK_UMINUS TOK_TYPEOF
-%left '.'
-%nonassoc TOK_HOOK
-%nonassoc TOK_ID
+%nonassoc TOK_EQ TOK_NE '<' '>' TOK_LE TOK_GE '~' TOK_NOT_MATCH
+%nonassoc TOK_RANGE                        
+%nonassoc '#'                       
+%left TOK_MAX TOK_MIN
+%left '+' '-' TOK_APPEND
+%left '*' '/' '%'                        
+%precedence '!' TOK_UMINUS '^' TOK_NEW TOK_TYPEOF
+%precedence '[' '{' TOK_LLENSE
+%precedence '.'
+%precedence TOK_ID
+%precedence '('                        
 %{
 extern int yylex(YYSTYPE* yylval_param, YYLTYPE * yylloc_param, exec_context *context);
 static void yyerror(YYLTYPE * yylloc_param, exec_context *context, const char *msg);
@@ -74,456 +79,198 @@ static void yyerror(YYLTYPE * yylloc_param, exec_context *context, const char *m
 script:         body
                 ;
 
-body:           /*empty*/
-        |       body ';'
-        |       body include ';'
-        |       body module
-        |       body pragma ';'
-        |       body toplevelconditional 
-                ;
+body:           %empty
+        |       body body_item ';' 
+        ;
+
+body_item:      definition attributes
+        |       expression
+        |       import
+        |       pragma
+        ;
+
 
 pragma:         TOK_PRAGMA TOK_ID literal
                 ;
 
-
-module:         TOK_MODULE TOK_ID version0 '{' modulecontents '}'
+import:         TOK_IMPORT TOK_ID importlist0
                 ;
 
-include:        TOK_INCLUDE TOK_STRING 
+importlist0:     %empty
+        |       '(' importlist ')'
+                ;
+
+importlist:     import_item
+        |       importlist ',' import_item
         ;
 
-version0:       /*empty*/
-        |       version
-                ;
-
-version:        TOK_FLOAT
-        |       TOK_TIMESTAMP
-                ;
-
-toplevelconditional: 
-                TOK_IF '(' expression ')' '{' body '}' toplevelelse
-                ;
-
-toplevelelse:   /*empty*/
-        |       TOK_ELSE '{' body '}'
-                ;
-
-versionconstraint: /*empty*/
-        |       TOK_EQ version
-        |       '>' version
-        |       '<' version
-        |       TOK_LE version
-        |       TOK_GE version
-        |       '~' version
-                ;
-
-modulecontents:  /*empty*/
-        |       modulecontents ';'
-        |       modulecontents include ';'
-        |       modulecontents errordef ';'
-        |       modulecontents pragma ';'
-        |       modulecontents moduleconditional
-        |       modulecontents declscope declaration
-        |       modulecontents augment
-        |       modulecontents moduleforeign ';'
-                ;
-
-moduleconditional: 
-                TOK_IF '(' expression ')' '{' modulecontents '}' moduleelse
-                ;
-
-moduleelse:   /*empty*/
-        |       TOK_ELSE '{' modulecontents '}'
-                ;
-
-moduleforeign: TOK_FOREIGN TOK_STRING
-                ;
-
-errordef:       TOK_ERROR TOK_ID '=' TOK_STRING
+import_item:    TOK_ID
+        |       TOK_ID TOK_MAP TOK_ID
         ;
 
-declscope:          /*empty*/
-        |       TOK_PUBLIC
-        |       TOK_PROTECTED
-        |       TOK_LOCAL
-                ;
 
-declaration:    import ';'
-        |       nodedecl
-                ;
-
-import:         TOK_IMPORT importpath versionconstraint importlist importalias
-                ;
-
-importpath:     TOK_ID
-        |       importpath '/' TOK_ID
+definition:     TOK_ID '=' expression
+        |       TOK_ID '(' lambda_args ')' '=' expression
+        |       TOK_OVERRIDE TOK_ID '=' expression
+        |       TOK_OVERRIDE TOK_ID '(' lambda_args ')' '=' expression                
+        |       TOK_ID TOK_FORCE_LET expression
         ;
 
-importlist:     /*empty*/
-        |       '(' idlist0 ')'
-                ;
-
-idlist0:        /*empty*/
-        |       idlist
-                ;
-
-idlist:         TOK_ID
-        |       idlist ',' TOK_ID
-                ;
-
-importalias:    /*empty*/
-        |       TOK_TYPECAST TOK_ID
-                ;
-
-nodedecl:       nodepriority nodedecl1
-                ;
-
-nodedecl1:      TOK_ID nodedef
-        |       TOK_PARTITION TOK_ID partition_channels '{' modulecontents '}'
-                ;
-
-
-nodepriority:   /*empty */
-        |       TOK_IDLE
-        |       hot_priority
-        |       cold_priority
-        |       TOK_GREEDY
-        |       TOK_PASSIVE
+comparison:     TOK_EQ
+        |       TOK_NE
+        |       '<'
+        |       '>'
+        |       TOK_LE
+        |       TOK_GE
+        |       '~'
+        |       TOK_NOT_MATCH
         ;
 
-hot_priority:   TOK_HOT
-        |       hot_priority TOK_HOT
-        ;
-
-cold_priority:  TOK_COLD
-        |       cold_priority TOK_COLD
-        ;
-
-partition_channels: '(' idlist ')'
-        |       '(' idlist0 TOK_RULE idlist0 ')'
-        ;
-
-nodedef:        instantiate ';'
-        |       nodeblock
-                ;
-
-instantiate:    '=' instantiate_expr ';'
-                ;
-
-instantiate_expr: noderef '(' instanceargs0 ')' local_augments
-                ;
-
-instanceargs0:  /*empty*/
-        |       instanceargs
-                ;
-
-instanceargs:   instancearg
-        |       instanceargs ',' instancearg
-        ;
-
-instancearg:    TOK_ID '=' expression
-                ;
-
-nodeblock:   '{' sequence  '}'
-        |    '{' states '}'
-                ;
-
-states:         state
-        |       states state
-        ;
-
-state:          statelabel TOK_RULE sequence
-        ;
-
-statelabel:     TOK_ID
-        |       TOK_ERROR
-        |       TOK_KILL
-        ;
-
-augment:        TOK_AUGMENT hookref block
-        ;
-
-noderef:        TOK_ID
-        |       TOK_ID '.' TOK_ID %prec '.'
-                ;
-
-hookref:        TOK_ID '.' TOK_ID  %prec '.'
-        |       TOK_ID '.' TOK_ID '.' TOK_ID %prec '.' 
-                ;
-
-expression: literal
-        |       '[' exprlist0 ']'
-        |       '[' assoclist ']' 
-        |       '(' expression ')' 
-        |       '.' assockey
-        |       block
-        |       anonymous_node
+expression:      literal
         |       TOK_ID
-        |       TOK_WILDCARD
-        |       TOK_ID '(' exprlist0 ')'
-        |       TOK_HOOK TOK_ID
-        |       TOK_ME
-        |       TOK_QUEUE
-        |       TOK_REGEXP
-        |       expression '.' assockey                
-        |       expression '[' expression0 ']'
-        |       '+' expression %prec TOK_UMINUS 
-        |       '-' expression %prec TOK_UMINUS 
-        |       '*' expression %prec TOK_UMINUS 
-        |       '^' expression %prec TOK_UMINUS
-        |       TOK_TRACING expression
-        |       '?' expression  %prec TOK_UMINUS
-        |       '&' expression  %prec TOK_UMINUS
-        |       '~' pattern  %prec TOK_UMINUS
-        |       TOK_TYPEOF expression
+        |       TOK_EXTERN string0 TOK_ID
+        |       '\\' lambda_args TOK_MAP expression
+        |       '~' expression %prec TOK_UMINUS
+        |       '?' expression %prec TOK_UMINUS
+        |       expression '(' application ')' %prec '['
+        |       '(' expression ')'
+        |       '[' expr_list ']'
+        |       TOK_LDBRACKET expr_list TOK_RDBRACKET
+        |       '{' body '}'
+        |       '(' expression ',' expression ')'
+        |       '+' expression %prec TOK_UMINUS
+        |       '-' expression %prec TOK_UMINUS
+        |       '^' expression
+        |       '#' expression %prec TOK_UMINUS
         |       '!' expression
-        |       TOK_PEEK expression
-        |       expression '^' expression 
-        |       expression '+' expression 
-        |       expression '-' expression 
-        |       expression '*' expression 
-        |       expression '/' expression 
-        |       expression TOK_DIV expression
+        |       '*' expression %prec TOK_UMINUS
+        |       '&' expression %prec TOK_UMINUS
+        |       TOK_TYPEOF expression
+        |       TOK_MIN expression %prec TOK_UMINUS
+        |       TOK_MAX expression %prec TOK_UMINUS
+        |       expression '+' expression
+        |       expression '-' expression
+        |       expression '*' expression
+        |       expression '/' expression
         |       expression '%' expression
+        |       expression '#' expression
         |       expression '&' expression
         |       expression '|' expression
-        |       expression '?' expression
-        |       expression ':' expression
-        |       expression TOK_ELSE expression
-        |       expression TOK_MIN expression 
+        |       expression TOK_MIN expression
         |       expression TOK_MAX expression
         |       expression TOK_APPEND expression
-        |       expression TOK_INTERSPERSE expression
-        |       expression TOK_CHOP expression
-        |       expression TOK_CHOP_HEAD expression
-        |       expression '$' expression
-        |       expression TOK_SUBST_ALL expression
-        |       expression TOK_SPLIT expression
-        |       expression TOK_TYPECAST typename
-        |       expression TOK_THEN expression                
-        |       expression TOK_EQ expression
-        |       expression TOK_NE expression
-        |       expression '<' expression
-        |       expression '>' expression
-        |       expression TOK_LE expression
-        |       expression TOK_GE expression
-        |       expression '~' pattern
-        |       expression TOK_MATCH_BINDING pattern
-        |       expression TOK_MATCH_BINDING_ALL pattern                                
-        |       expression TOK_NOT_MATCH pattern
-        |       expression TOK_IN expression
-        |       expression TOK_ISTYPE typename
-        |       expression '=' expression
-        |       expression TOK_PUT expression
-        |       expression TOK_PUT_ALL expression
-        |       expression TOK_PUT_NEXT expression
-        |       expression TOK_PUT_BACK expression                
-        |       TOK_KILL expression
-        |       TOK_SUSPEND expression
-        |       TOK_RESUME expression
-        |       TOK_YIELD expression
-        |       TOK_RECEIVE expression                
-        |       TOK_ERROR expression
-        |       TOK_ASSERT expression
-        |       TOK_NEED expression
-        |       TOK_FINALLY expression
-        |       TOK_GOTO gotodest
-        |       TOK_IF '(' expression ')' expression %prec TOK_IF
-        |       TOK_WHILE '(' expression ')' expression %prec TOK_WHILE
-        |       TOK_FOR '(' bindings ';' expression ';' bindings ')' expression %prec TOK_FOR
-        |       TOK_FOREACH '(' foreach_spec ')' expression %prec TOK_FOREACH
-        |       TOK_FREEZE '(' expression ')' expression %prec TOK_FREEZE
-        |       TOK_SWITCH '(' expression ')' '{' alternatives '}' %prec TOK_SWITCH
-        |       TOK_TRY '{' try_alternatives '}' %prec TOK_TRY
-        |       TOK_TYPECASE '(' expression ')' '{' generic_alternatives '}' %prec TOK_TYPECASE
-        |       TOK_WATCH '(' expression TOK_RULE expression ')' expression %prec TOK_WATCH
-        |       TOK_WITH  '(' expression ')' expression %prec TOK_WITH
-        |       TOK_LET '(' bindings ')' expression %prec TOK_LET
-        |       TOK_HOT expression
-        |       TOK_COLD expression
-        |       TOK_IDLE expression
-        |       TOK_GREEDY expression
-        |       TOK_FOREIGN  TOK_ID '(' exprlist0 ')' TOK_STRING %prec TOK_FOREIGN
+        |       TOK_APPEND expression
+        |       expression comparison expression %prec TOK_EQ
+        |       expression '[' ']' %prec '['
+        |       expression '[' expression ']' %prec '['
+        |       expression '[' renaming ']' %prec '['
+        |       expression '{' expression '}' %prec '['                
+        |       expression TOK_LLENSE algebraic_type TOK_RDBRACKET %prec '['
+        |       TOK_LLENSE algebraic_type TOK_RLENSE
+        |       TOK_LDBRACE signature TOK_RDBRACE
+        |       expression TOK_ARROW expression
+        |       expression TOK_INTERACT expression
+        |       expression TOK_INCOMING expression
+        |       expression TOK_OUTGOING expression
+        |       expression TOK_RANGE expression
+        |       TOK_RANGE expression
+        |       expression TOK_RANGE
+        |       expression '.' TOK_ID %prec '.'
+        |       TOK_ID '^' expression
+        |       TOK_IF '(' expression ')' expression TOK_ELSE expression %prec TOK_IF
+        |       TOK_LOOP expression
+        |       TOK_SWITCH '(' expr_list1 ')' '{' switch_branches '}' %prec TOK_SWITCH
+        |       TOK_NEW expression
+        |       expression ':' expression
+        |       expression '?' expression
+        ;
+
+string0:        %empty
+        |       TOK_STRING
+        ;
+
+lambda_args:    lambda_arg
+        |       lambda_args ',' lambda_arg
+        ;
+
+lambda_arg:     TOK_ID defval0
+        ;
+
+defval0:        %empty
+        |       '=' expression
+        ;
+
+expr_list:      %empty
+        |       expr_list1
+        ;
+
+expr_list1:     expression
+        |       expr_list1 ',' expression
+        ;
+
+application:    app_arg
+        |       application ',' app_arg
+        ;
+
+app_arg:        expression
+        |       TOK_ID '=' expression
+        ;
+
+switch_branches: switch_branch
+        |        switch_branches switch_branch
+        ;
+
+switch_branch:  switch_tags TOK_MAP expression ';'
+        ;
+
+switch_tags:    TOK_ELSE
+        |       expr_list1
                 ;
 
-gotodest:       TOK_ID
-        |       TOK_WILDCARD
-        |       TOK_PUT_BACK
+renaming:       renaming_item
+        |       renaming ',' renaming_item
         ;
 
-anonymous_node: '@' instantiate_expr
-        |       '@' nodeblock
-        |       '@' TOK_FOR  '(' bindings ';' expression0 ';' bindings ')' expression %prec TOK_FOR
-        |       '@' TOK_FOREACH '(' foreach_spec ')' expression %prec TOK_FOREACH
-                ;
-
-local_augments: /* empty */
-        |       local_augments TOK_AUGMENT TOK_ID block
-
-expression0:    /*empty*/
-        |       expression
+renaming_item:  port_name TOK_MAP TOK_ID
         ;
 
-bindings:       binding 
-        |       bindings ';' binding
-                ;
-
-binding: binding_scope TOK_ID assign_op expression %prec '='
-        | pragma
-                ;
-
-assign_op:      '='
-        |       TOK_ASSIGN_ONCE
+port_name:      TOK_ID
+        |       TOK_ID '^'
         ;
 
-binding_scope:  TOK_LOCAL
-        |       TOK_PUBLIC
-        |       TOK_PROTECTED
-        |       TOK_MODULE TOK_PUBLIC
+algebraic_type: algebraic_branch
+        |       algebraic_type TOK_ALT algebraic_branch
         ;
 
-block:   '{'    sequence '}'
-                ;
-
-sequence:       expression ';'
-        |       sequence expression ';'
-                ;
-
-exprlist0:      /*empty*/
-        |       exprlist
-                ;
-
-exprlist:       expression
-        |       exprlist ',' expression
-                ;
-
-assoclist:      assoc
-        |       assoclist ',' assoc
-                ;
-
-assoc:          xassockey TOK_RULE expression
-                ;
-
-xassockey:      assockey
-        |       '~' pattern
-                ;
-
-assockey:       TOK_ID
-        |       TOK_REGEXP
-        |       literal
-        |       block
+algebraic_branch: algebraic_field
+        |       algebraic_branch ',' algebraic_field
         ;
 
-foreach_spec:   generators foreach_dest
+algebraic_field: TOK_ID ':' expression defval0 attributes
         ;
 
-generators:     generator
-        |       generators ';' generator
+signature:      sig_field
+        |       signature ',' sig_field
         ;
 
-generator:      TOK_ID TOK_IN expression
-        ;
-
-foreach_dest:   /*empty*/
-        |       TOK_RULE TOK_ID
-        ;
-
-alternatives:   alternative
-        |       alternatives ';' alternative
-        ;
-
-alternative:    patternseq TOK_RULE expression
-        ;
-
-patternseq:     lastpattern
-        |       cpatternseq
-        |       cpatternseq ',' lastpattern
-        |       TOK_ELSE
-                ;
-
-lastpattern: '?' guarded_pattern
-        ;
-
-cpatternseq:    guarded_pattern
-        |       cpatternseq ',' guarded_pattern
-                ;
-
-guarded_pattern:pattern
-        |       pattern TOK_IF '(' expression ')'
-                
-try_alternatives:
-                try_alternative
-        |       try_alternatives ';' try_alternative
-        ;
-
-try_alternative:    expression TOK_RULE expression
-        |       TOK_ELSE TOK_RULE expression
-        ;
-
-
-generic_alternatives:
-                generic_alternative
-        |       generic_alternatives ';' generic_alternative
-                ;
-
-generic_alternative: typechoice TOK_RULE expression
-        |       TOK_ELSE TOK_RULE expression
-        ;
-
-typechoice:     typename
-        |       typechoice '|' typename %prec '.'
-        ;
-
-typename:       TOK_ID
-        |       TOK_NULL
-        |       TOK_END
-        |       TOK_TYPEOF expression
-        ;
-
-pattern:        TOK_ID
-        |       TOK_WILDCARD
-        |       literal
-        |       TOK_REGEXP
-        |       '(' pattern ')'
-        |       block                
-        |       TOK_ID '=' pattern %prec TOK_EQ
-        |       TOK_ID '(' patternlist0 ')' %prec '('
-        |       '[' patternlist ']'
-        |       '[' patternassoclist ']'
-        |       pattern ':' pattern
-        |       pattern '|' pattern
-        ;
-
-patternlist0: /*empty*/
-        |       patternlist
-        ;
-
-patternlist:    pattern
-        |       patternlist ',' pattern
-        ;
-
-patternassoclist:   patternassoc
-        |       patternassoclist ',' patternassoc
-        ;
-
-patternassoc:   passockey TOK_RULE pattern
-        ;
-
-passockey:      assockey
-        |       TOK_WILDCARD
+sig_field:      port_name ':' expression attributes
         ;
 
 literal:        TOK_STRING
         |       TOK_INTEGER
-        |       TOK_CHARACTER
-        |       TOK_BINARY
         |       TOK_FLOAT
+        |       TOK_CHARACTER
         |       TOK_TIMESTAMP
-        |       TOK_NULL
         |       TOK_TRUE
         |       TOK_FALSE
-        |       TOK_END
+        |       TOK_REGEXP
+        |       '(' ')'
                 ;
+
+attributes:     %empty
+        |       attributes TOK_ATTRIBUTE
+        ;
+
 
 %%
 
