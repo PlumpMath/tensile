@@ -27,7 +27,7 @@
  * also implement various versions of ISO C (sometimes, only partially).
  * This file offers compatibility wrappers around some of those extensions.
  *
- * @author Artem V. Andreev <artem@AA5779.spb.edu>
+ * @author Artem V. Andreev <artem@iling.spb.ru>
  */
 #ifndef COMPILER_H
 #define COMPILER_H 1
@@ -43,6 +43,9 @@ extern "C"
 #include <inttypes.h>
 #include <assert.h>
 
+#ifdef NDEBUG
+#error "Must not compile with disabled assertions"
+#endif
 
 /**
  * Indicates that the function returns
@@ -144,10 +147,22 @@ extern "C"
  * the arguments start at _y
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
-#define hint_scanf_like(_x, _arg_y)                      \
+#define hint_scanf_like(_x, _y)                     \
     __attribute__((__format__ (__scanf__, _x, _y)))
 #else
 #define hint_scanf_like(_x, _y)
+#endif
+
+/**
+ * Indicates that a function is strftime-like,
+ * and the format string is in the _x'th argument, and
+ * the arguments start at _y
+ */
+#if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
+#define hint_strftime_like(_x)                          \
+    __attribute__((__format__ (__strftime__, _x, 0)))
+#else
+#define hint_strftime_like(_x, _y)
 #endif
 
 /**
@@ -222,12 +237,12 @@ extern "C"
 #define dll_import_linkage
 #endif
 
-/** @def ANNOTATION_LINKAGE_local
+/** @def LINKAGE__local
  * symbol is **not** exported from a shared library
  * (but unlike static symbols, it is visible to all compilation units
  * comprising the library itself)
  */
-/**  @def ANNOTATION_LINKAGE_internal
+/**  @def LINKAGE__internal
  * Like `local`, but the symbol cannot be accessed by other
  * modules even indirectly (e.g. through a function pointer)
  */

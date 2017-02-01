@@ -62,7 +62,7 @@ TEST_CPPFLAGS = -DTEST_REPEAT_ARBITRARY=2 -DUSE_ANSI_TERM_STRINGS=1 -DUSE_ANSI_T
 CFLAGS += $(PCRE_CFLAGS)
 
 LDFLAGS = -Wl,-export-dynamic
-LDLIBS = $(PCRE_LIBS) -lunistring -lgc -lm -ldl
+LDLIBS = $(PCRE_LIBS) -lunistring -lgc -lm -ldl -lcom_err
 MFLAGS = -MM -MT '$@ $(patsubst %.d,%.o,$@)'
 
 -include $(TOPDIR)/setup/$(PLATFORM_OS).mk
@@ -77,12 +77,14 @@ endif
 
 .SECONDARY :
 
-C_SOURCES = # array.c stack.c #queue.c
+C_SOURCES = status.c dstring.c
 
 GENERATED_SOURCES = tensile.tab.c lex.yy.c
 
 SOURCES = $(C_SOURCES)
 SOURCES += $(GENERATED_SOURCES)
+
+TESTABLES = status dstring
 
 APPLICATION = tensilec
 
@@ -119,10 +121,10 @@ include $(patsubst %.c,tests/%_ts.d,$(C_SOURCES))
 endif
 
 .PHONY : check
-check : $(addsuffix .gcov,$(C_SOURCES))
+check : $(addsuffix .c.gcov,$(TESTABLES))
 
 ifeq ($(FORCE_CHECK),1)
-.PHONY : $(patsubst %.c,tests/%_ts,$(C_SOURCES))
+.PHONY : $(patsubst %,tests/%_ts,$(TESTABLES))
 endif
 
 ifneq ($(GCOV),)
@@ -130,18 +132,18 @@ ifneq ($(GCOV),)
 %.c.gcov : tests/%_ts.gcda %.c
 	@$(GCOV) -r -l -s $(TOPDIR) -o $(patsubst %.gcda,%.o,$(filter %.gcda,$^)) $(filter %.c,$^) 2>&1 | grep -E '^File|Lines'
 
-%_ts.gcda : %_ts
-	@$(RM) $@
-	@$(abspath $<)
+%.gcda : %.out ;
 
 else
 
-%.c.gcov : tests/%_ts
-	@$(abspath $<)
+%.c.gcov : tests/%_ts.out
 	@echo "No coverage" >$@
 
 endif
 
+%_ts.out : %_ts ../../../%.exp
+	@$(RM) $<.gcda
+	@$(abspath $<) 2>&1 | diff -u $(filter %.exp,$^) - >$@
 
 .PHONY : doc
 doc :
@@ -152,7 +154,7 @@ TAGS : $(C_SOURCES)
 	$(ETAGS) $^
 
 
-.PHONY : clean 
+.PHONY : clean
 clean :
 	$(RM) *.o
 	$(RM) *.d
