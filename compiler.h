@@ -39,40 +39,24 @@ extern "C"
 #include <inttypes.h>
 #include <assert.h>
 
-/** @name Annotations
- * Modern compilers, in particular GCC and Clang, support a rich set of
- * annotations to improve code quality.
- * Unfortunately, various versions of those compilers implement various sets
- * of the attributes, hence we need to wrap them into macros, conditioned by
- * the compiler version
- */
-
-#define annotation(_kind, ...) ANNOTATION_##_kind(__VA_ARGS__)
-
-/**@{*/
-
-/**
- * Return value annotation
- */
-#define ANNOTATION_returns(_x) ANNOTATION_returns__##_x
 
 /**
  * Indicates that the function returns
  * a pointer to unaliased uninitalized memory
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96)
-#define ANNOTATION_returns__fresh_pointer __attribute__((__malloc__))
+#define hint_returns_fresh_pointer __attribute__((__malloc__))
 #else
-#define ANNOTATION_returns__fresh_pointer
+#define hint_returns_fresh_pointer
 #endif
 
 /**
  * Indicates that a function returns a non-NULL pointer
  */
 #if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9)
-#define ANNOTATION_returns__not_null __attribute__((__returns_nonnull__))
+#define hint_returns_not_null __attribute__((__returns_nonnull__))
 #else
-#define ANNOTATION_returns__not_null
+#define hint_returns_not_null
 #endif
 
 /**
@@ -80,25 +64,19 @@ extern "C"
  * of the function is thrown away
  */
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
-#define ANNOTATION_returns__important            \
-    __attribute__((__warn_unused_result__))
+#define warn_unused_result     __attribute__((__warn_unused_result__))
 #else
-#define ANNOTATION_returns__important
+#define warn_unused_result
 #endif
-
-/**
- * Argument list annotations
- */
-#define ANNOTATION_arguments(_x) ANNOTATION_arguments__##_x
 
 /**
  * Indicates that a vararg function shall have NULL
  * at the end of varargs
  */
 #if __GNUC__ >= 4
-#define ANNOTATION_arguments__sentinel  __attribute__((__sentinel__))
+#define warn_last_vararg_not_null  __attribute__((__sentinel__))
 #else
-#define ANNOTATION_arguments__sentinel
+#define warn_last_vararg_not_null
 #endif
 
 /**
@@ -106,15 +84,11 @@ extern "C"
  * ever be passed NULL
  */
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR >= 3)
-#define ANNOTATION_arguments__not_null __attribute__ ((__nonnull__))
+#define warn_any_null_arg  __attribute__ ((__nonnull__))
 #else
-#define ANNOTATION_arguments__not_null
+#define warn_any_null_arg
 #endif
 
-/**
- * Specific argument annotations
- */
-#define ANNOTATION_argument(_x, ...) ANNOTATION_argument__##_x(__VA_ARGS__)
 
 /**
  * Indicates that a function returns
@@ -125,10 +99,15 @@ extern "C"
  * the y'th argument
  */
 #if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3)
-#define ANNOTATION_argument__storage_size(...)      \
-    __attribute__((__alloc_size__(__VA_ARGS__)))
+#define hint_malloc_like(_arg)                  \
+    hint_returns_fresh_pointer                  \
+    __attribute__((__alloc_size__(_arg)))
+#define hint_calloc_like(_arg1, _arg2)              \
+    hint_returns_fresh_pointer                      \
+    __attribute__((__alloc_size__(_arg1, _arg2)))
 #else
-#define ANNOTATION_argument__storage_size(...)
+#define hint_malloc_like(_arg) hint_returns_fresh_pointer
+#define hint_calloc_like(_arg1, _arg2) hint_returns_fresh_pointer
 #endif
 
 /**
@@ -136,10 +115,11 @@ extern "C"
  * a pointer to memory, the alignment of which is given in its _x'th argument.
  */
 #if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9)
-#define ANNOTATION_argument__storage_align(...)     \
-    __attribute__((__alloc_align__(__VA_ARGS__)))
+#define hint_memalign_like(_arg1, _arg2)                  \
+    __attribute__((__alloc_align__(_arg1)))               \
+    hint_malloc_like(_arg2)
 #else
-#define ANNOTATION_argument__storage_align(...)
+#define hint_memalign_like(_arg1, _arg2) hint_malloc_like(_arg2)
 #endif
 
 /**
@@ -148,10 +128,10 @@ extern "C"
  * the arguments start at _y
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
-#define ANNOTATION_argument__printf(_x, _y)             \
+#define hint_printf_like(_x, _y)                        \
     __attribute__((__format__ (__printf__, _x, _y)))
 #else
-#define ANNOTATION_argument__printf(_x, _y)
+#define hint_printf_like(_x, _y)
 #endif
 
 /**
@@ -160,10 +140,10 @@ extern "C"
  * the arguments start at _y
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
-#define ANNOTATION_argument__scanf(_x, _arg_y)      \
+#define hint_scanf_like(_x, _arg_y)                      \
     __attribute__((__format__ (__scanf__, _x, _y)))
 #else
-#define ANNOTATION_argument__scanf(_x, _y)
+#define hint_scanf_like(_x, _y)
 #endif
 
 /**
@@ -172,10 +152,10 @@ extern "C"
  * and returned by the function
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
-#define ANNONATION_argument__format_string(_x)  \
+#define hint_arg_format_string(_x)  \
     __attribute__((__format_arg__ (_x)))
 #else
-#define ANNOTATION_argument__format_string(_x)
+#define hint_arg_format_string(_x)
 #endif
 
 
@@ -184,31 +164,21 @@ extern "C"
  * `_args` are never `NULL`
  */
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR >= 3)
-#define ANNOTATION_argument__not_null(...)      \
+#define warn_null_args(...)                     \
     __attribute__ ((__nonnull__ (__VA_ARGS__)))
 #else
-#define ANNOTATION_argument__not_null(...)
+#define warn_null_args(...)
 #endif
 
-/**
- * Global state affected by the function
- */
-#define ANNOTATION_global_state(_x) ANNOTATION_global_state__##_x
-
-/**
- * Global state may be modified. This is the default, so
- * it is expanded to nothing and is provided only for completeness
- */
-#define ANNOTATION_global_state__modify
 
 /**
  * Global state may be read but not modified. In particular,
  * that means a function cannot produce any observable side effects
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96)
-#define ANNOTATION_global_state__read __attribute__((__pure__))
+#define hint_no_side_effects __attribute__((__pure__))
 #else
-#define ANNOTATION_global_state__read
+#define hint_no_side_effects
 #endif
 
 /**
@@ -217,24 +187,20 @@ extern "C"
  * arguments
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
-#define ANNOTATION_global_state__none  __attribute__((__const__))
+#define hint_no_shared_state  __attribute__((__const__))
 #else
-#define ANNOTATION_global_state__none
+#define hint_no_shared_state
 #endif
 
-/**
- * Additional linkage modes
- */
-#define linkage(_x) LINKAGE__##_x
 
 /**
  * Weak symbol (a library symbol that may be overriden
  * by the application
  */
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
-#define LINKAGE__weak __attribute__((__weak__))
+#define weak_linkage __attribute__((__weak__))
 #else
-#define LINKAGE__weak
+#define weak_linkage
 #endif
 
 /** @def ANNOTATION_LINKAGE_export
@@ -245,11 +211,11 @@ extern "C"
  * For POSIX systems these two modes are void.
  */
 #if __WIN32
-#define LINKAGE__export __declspec(dllexport)
-#define LINKAGE__import __declspec(dllimport)
+#define dll_export_linkage __declspec(dllexport)
+#define dll_import_linkage __declspec(dllimport)
 #else
-#define LINKAGE__export
-#define LINKAGE__import
+#define dll_export_linkage
+#define dll_import_linkage
 #endif
 
 /** @def ANNOTATION_LINKAGE_local
@@ -262,13 +228,13 @@ extern "C"
  * modules even indirectly (e.g. through a function pointer)
  */
 #if (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR >= 3)) && __ELF__
-#define LINKAGE__local                \
+#define local_linkage                           \
     __attribute__ ((__visibility__ ("hidden")))
-#define LINKAGE__internal                 \
+#define internal_linkage                            \
     __attribute__ ((__visibility__ ("internal")))
 #else
-#define LINKAGE__local
-#define LINKAGE__internal
+#define local_linkage
+#define internal_linkage
 #endif
 
 
@@ -276,9 +242,9 @@ extern "C"
  * The symbol should not be used and triggers a warning
  */
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)
-#define LINKAGE__deprecated __attribute__((__deprecated__))
+#define deprecated __attribute__((__deprecated__))
 #else
-#define LINKAGE__deprecated
+#define deprecated
 #endif
 
 /**
@@ -356,6 +322,14 @@ extern "C"
 #define noreturn __attribute__((__noreturn__))
 #else
 #define noreturn
+#endif
+
+#if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
+#define constructor static __attribute__((__constructor__))
+#define destructor static __attribute__((__destructor__))
+#else
+#define constructor constructors_are_not_supported
+#define destructor constructors_are_not_supported
 #endif
 
 /**@}*/

@@ -1,13 +1,31 @@
 #!/bin/sh
 
-CC="${1:-cc}"
+for arg; do
+    case "$arg" in
+        --cc=*)
+            CC="${arg#--cc=}"
+            ;;
+        --variant=*)
+            PLATFORM_VARIANT="${arg#--variant=}"
+            test -f "setup/${PLATFORM_VARIANT}.mk" || {
+                echo "Variant $PLATFORM_VARIANT is unknown"
+                exit 1
+            }
+            ;;
+        *)
+            echo "Unknown arg $arg" >&2
+            exit 1
+            ;;
+    esac
+done
+
+test -n "$CC" || CC=c99
 
 NORMALIZE='/^#/d; s/[^[:alnum:]_.+:-]//g; /^$/d'
 
 PLATFORM_ARCH="$(${CC} -E setup/test_arch.h | sed -e "$NORMALIZE")"  || PLATFORM_OS=unknown
 PLATFORM_OS="$(${CC} -E setup/test_os.h | sed -e "$NORMALIZE")" || PLATFORM_OS=unknown
 PLATFORM_CC_ID="$(${CC} -E setup/test_cc.h | sed -e "$NORMALIZE")" || PLATFORM_CC_ID=unknown
-PLATFORM_VARIANT="$2"
 
 case "$PLATFORM_CC_ID" in
     gcc*)
