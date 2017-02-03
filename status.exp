@@ -1,7 +1,10 @@
 test: Permission denied test test
 info: Permission denied info test
 debug: Permission denied debug test
-../../status.c: Invalid argument test_simple_report():92: internal error test
+../../status.c: Invalid argument test_simple_report():125: internal error test
 test: Bad address test
 test: Bad address test
+test_handler: Invalid argument got test from test
+test_double_handler: Invalid argument got test from test
+test_double_handler: Bad file descriptor got test from test
 OK

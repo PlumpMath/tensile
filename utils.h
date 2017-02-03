@@ -37,10 +37,9 @@ extern "C"
 #include "compiler.h"
 #include <gc.h>
 
-annotation(returns, fresh_pointer)
-annotation(returns, important)
-annotation(returns, not_null)
-annotation(argument, storage_size, 1)
+warn_unused_result
+hint_returns_not_null
+hint_malloc_like(1)
 static inline void *
 tn_alloc(size_t sz)
 {
@@ -49,10 +48,9 @@ tn_alloc(size_t sz)
     return obj;
 }
 
-annotation(returns, fresh_pointer)
-annotation(returns, important)
-annotation(returns, not_null)
-annotation(argument, storage_size, 1)
+warn_unused_result
+hint_returns_not_null
+hint_malloc_like(1)
 static inline void *
 tn_alloc_blob(size_t sz)
 {
@@ -61,9 +59,8 @@ tn_alloc_blob(size_t sz)
     return obj;
 }
 
-annotation(returns, important)
-annotation(returns, not_null)
-annotation(argument, storage_size, 2)
+warn_unused_result
+hint_returns_not_null
 static inline void *
 tn_realloc(void *ptr, size_t newsz)
 {
@@ -72,9 +69,8 @@ tn_realloc(void *ptr, size_t newsz)
     return obj;
 }
 
-annotation(returns, important)
-annotation(returns, not_null)
-annotation(argument, storage_size, 1)
+warn_unused_result
+hint_returns_not_null
 static inline char *
 tn_cstrdup(const char *str)
 {
@@ -83,6 +79,7 @@ tn_cstrdup(const char *str)
     return copy;
 }
 
+#define TN_NEW(_type) ((_type *)tn_alloc(sizeof(_type)))
 
 typedef GC_finalization_proc tn_finalizer;
 

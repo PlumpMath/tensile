@@ -149,6 +149,7 @@ tn_strcmp(tn_string str1, tn_string str2)
 }
 
 #if DO_TESTS
+hint_no_side_effects
 static void test_strcmp(void)
 {
     tn_string test1 = TN_STRING_LITERAL("abc");
@@ -256,7 +257,9 @@ tn_strcats(size_t n, tn_string strs[var_size(n)], tn_string sep)
             memcpy(ptr, sep.str, sep.len);
             ptr += sep.len;
             memcpy(ptr, strs[i].str, strs[i].len);
+            ptr += strs[i].len;
         }
+        buf[len] = '\0';
 
         return (tn_string){.str = buf, .len = len};
     }
@@ -276,7 +279,13 @@ static void test_strcats(void)
     tn_string sep1 = TN_STRING_LITERAL("\0");
     tn_string result1 = TN_STRING_LITERAL("abcdefgh\0ijkl");
     tn_string result2 = TN_STRING_LITERAL("abc,def,,gh\0i,jkl");
-    tn_string result3 = TN_STRING_LITERAL("abc\0def,,gh\0i,jkl");
+    tn_string result3 = TN_STRING_LITERAL("abc\0def\0\0gh\0i\0jkl");
+
+    assert(tn_strcats(0, strs, sep).str == NULL);
+    assert(tn_strcats(1, strs, sep).str == strs[0].str);
+    assert(tn_strcmp(tn_strcats(5, strs, TN_EMPTY_STRING), result1) == 0);
+    assert(tn_strcmp(tn_strcats(5, strs, sep), result2) == 0);
+    assert(tn_strcmp(tn_strcats(5, strs, sep1), result3) == 0);
 }
 #endif
 
@@ -293,6 +302,22 @@ tn_substr(tn_string str, size_t pos, size_t len)
     return (tn_string){.str = str.str + pos, .len = len};
 }
 
+#if DO_TESTS
+static void test_substr(void)
+{
+    tn_string base = TN_STRING_LITERAL("abcdef");
+    
+    assert(tn_substr(TN_EMPTY_STRING, 1, 1000).str == NULL);
+    assert(tn_strcmp(tn_substr(base, 0, 2), TN_STRING_LITERAL("ab")) == 0);
+    assert(tn_strcmp(tn_substr(base, 2, 4), TN_STRING_LITERAL("cdef")) == 0);    
+    assert(tn_strcmp(tn_substr(base, 0, 1000), base) == 0);
+    assert(tn_substr(base, 100, 10).str == NULL);
+    assert(tn_strcmp(tn_substr(base, 4, 10), TN_STRING_LITERAL("ef")) == 0);
+    assert(tn_substr(base, 0, 0).str == NULL);
+    
+}
+#endif
+
 tn_string
 tn_strcut(tn_string str, size_t pos, size_t len)
 {
@@ -300,7 +325,12 @@ tn_strcut(tn_string str, size_t pos, size_t len)
         return str;
 
     if (pos + len >= str.len)
-        return (tn_string){.str = str.str, .len = pos};
+    {
+        return pos == 0 ? TN_EMPTY_STRING :
+            (tn_string){.str = str.str, .len = pos};
+    }
+    else if (pos == 0)
+        return (tn_string){.str = str.str + len, .len = str.len - len};
     else
     {
         char *buf = tn_alloc_blob(str.len - len + 1);
@@ -312,6 +342,22 @@ tn_strcut(tn_string str, size_t pos, size_t len)
     }
 }
 
+#if DO_TESTS
+static void test_strcut(void)
+{
+    tn_string base = TN_STRING_LITERAL("abcdef");
+    
+    assert(tn_strcut(TN_EMPTY_STRING, 1, 1000).str == NULL);
+    assert(tn_strcmp(tn_strcut(base, 0, 2), TN_STRING_LITERAL("cdef")) == 0);
+    assert(tn_strcmp(tn_strcut(base, 2, 4), TN_STRING_LITERAL("ab")) == 0);    
+    assert(tn_strcut(base, 0, 1000).str == NULL);
+    assert(tn_strcmp(tn_strcut(base, 100, 10), base) == 0);
+    assert(tn_strcmp(tn_strcut(base, 4, 10), TN_STRING_LITERAL("abcd")) == 0);
+    assert(tn_strcmp(tn_strcut(base, 0, 0), base) == 0);
+    assert(tn_strcmp(tn_strcut(base, 2, 3), TN_STRING_LITERAL("abf")) == 0);
+}
+#endif
+
 bool
 tn_strrchr(tn_string str, char ch, size_t *pos)
 {
@@ -321,14 +367,45 @@ tn_strrchr(tn_string str, char ch, size_t *pos)
     {
         if (str.str[i - 1] == ch)
         {
-            if (pos)
-                *pos = i;
+            if (pos != NULL)
+                *pos = i - 1;
             return true;
         }
     }
   
     return false;
 }
+
+#if DO_TESTS
+static void test_strchr_strrchr(void)
+{
+    tn_string str = TN_STRING_LITERAL("abc\0deffed\0cba");
+    size_t pos = (size_t)-1;
+
+    assert(tn_strchr(str, 'a', NULL));
+    assert(tn_strchr(str, 'd', NULL));
+    assert(tn_strchr(str, '\0', NULL));
+    assert(!tn_strchr(str, 'x', NULL));
+
+    assert(tn_strrchr(str, 'a', NULL));
+    assert(tn_strrchr(str, 'd', NULL));
+    assert(tn_strrchr(str, '\0', NULL));
+    assert(!tn_strrchr(str, 'x', NULL));
+
+    assert(tn_strchr(str, 'a', &pos) && pos == 0);
+    assert(tn_strchr(str, 'd', &pos) && pos == 4);
+    assert(tn_strchr(str, '\0', &pos) && pos == 3);
+    assert(!tn_strchr(str, 'x', &pos) && pos == 3);
+
+    assert(tn_strrchr(str, 'a', &pos) && pos == 13);
+    assert(tn_strrchr(str, 'd', &pos) && pos == 9);
+    assert(tn_strrchr(str, '\0', &pos) && pos == 10);
+    assert(!tn_strrchr(str, 'x', &pos) && pos == 10);
+
+    assert(!tn_strchr(TN_EMPTY_STRING, '\0', NULL));
+    assert(!tn_strrchr(TN_EMPTY_STRING, '\0', NULL));
+}
+#endif
 
 bool
 tn_strstr(tn_string str, tn_string sub, size_t *pos)
@@ -337,10 +414,13 @@ tn_strstr(tn_string str, tn_string sub, size_t *pos)
 
     if (sub.len == 0)
     {
-        if (pos)
+        if (pos != NULL)
             *pos = 0;
         return true;
     }
+
+    if (sub.len > str.len)
+        return false;
     
     for (i = 0; i < str.len - sub.len + 1; i++)
     {
@@ -417,6 +497,10 @@ int main()
     test_str2cstr();
     test_strcat();
     test_straddch();
+    test_strcats();
+    test_substr();
+    test_strcut();
+    test_strchr_strrchr();
     puts("OK");
     
     return 0;
