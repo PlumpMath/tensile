@@ -39,17 +39,15 @@
 
 enum tn_severity tn_verbosity_level = TN_INFO;
 
-static volatile tn_status   exception_code;
+static tn_status exception_code;
 static volatile sigjmp_buf *exception_handler;
-static volatile char exception_details[256];
+static char exception_details[256];
+static const char *exception_origin;
 
 void
-tn_report_status(enum tn_severity severity, const char *module,
-                tn_status status, const char *fmt, ...)
+tn_report_statusv(enum tn_severity severity, const char *module,
+                  tn_status status, const char *fmt, va_list args)
 {
-    va_list args;
-    va_start(args, fmt);
-    
     if ((severity != TN_EXCEPTION || !exception_handler) &&
         severity <= tn_verbosity_level)
     {
@@ -65,6 +63,7 @@ tn_report_status(enum tn_severity severity, const char *module,
                 vsnprintf((char *)exception_details, sizeof(exception_details),
                           fmt, args);
                 exception_code = status;
+                exception_origin = module;
                 siglongjmp(*(sigjmp_buf *)exception_handler, 1);
             }
             /* fallthrough */
@@ -75,8 +74,42 @@ tn_report_status(enum tn_severity severity, const char *module,
             /* do nothing */
             break;
     }
+}
 
+void
+tn_report_status(enum tn_severity severity, const char *module,
+                 tn_status status, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+
+    tn_report_statusv(severity, module, status, fmt, args);
+    
     va_end(args);
+}
+
+void
+tn_fatal_error(const char *module, tn_status status, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+
+    tn_report_statusv(TN_FATAL, module, status, fmt, args);
+    
+    va_end(args);
+    abort();
+}
+
+void
+tn_throw_exception(const char *module, tn_status status, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+
+    tn_report_statusv(TN_EXCEPTION, module, status, fmt, args);
+    
+    va_end(args);
+    abort();
 }
 
 #if DO_TESTS
@@ -92,14 +125,17 @@ static void test_simple_report(void)
     tn_internal_error(TN_ERROR, EINVAL, "internal error %s", "test");
 }
 
-static void test_fatal_error(enum tn_severity level)
+static void test_fatal_error(bool is_fatal)
 {
     pid_t child = fork();
 
     assert(child != (pid_t)(-1));
     if (child == 0)
     {
-        tn_report_status(level, "test", EFAULT, "test");
+        if (is_fatal)
+            tn_fatal_error("test", EFAULT, "test");
+        else
+            tn_throw_exception("test", EFAULT, "test");
         exit(0);
     }
     else
@@ -116,7 +152,7 @@ static void test_fatal_error(enum tn_severity level)
 
 tn_status
 tn_with_exception(tn_status (*action)(void *),
-                  tn_status (*handler)(void *, tn_status, const char *),
+                  tn_exception_handler handler,
                   void *data)
 {
     volatile sigjmp_buf current_handler;
@@ -132,8 +168,8 @@ tn_with_exception(tn_status (*action)(void *),
         assert(exception_code != 0);
         if (handler)
         {
-            exception_code = handler(data, exception_code,
-                                     (const char *)exception_details);
+            exception_code = handler(data, exception_origin,
+                                     exception_code, exception_details);
         }
     }
 
@@ -156,7 +192,7 @@ static tn_status test_action2(unused void *arg)
 
 static tn_status test_action3(unused void *arg)
 {
-    tn_report_status(TN_EXCEPTION, "test", EINVAL, "test");
+    tn_throw_exception("test", EINVAL, "test");
     return 0;
 }
 
@@ -164,10 +200,29 @@ static tn_status test_nested_action(void *arg)
 {
     tn_status status = tn_with_exception(test_action3, NULL, arg);
     assert(status == EINVAL);
-    tn_report_status(TN_EXCEPTION, "test", EACCES, "test");
+    tn_throw_exception("test", EACCES, "test");
     return 0;
 }
 
+static tn_status test_handler(unused void *arg, const char *origin,
+                              tn_status status,
+                              const char *msg)
+{
+    tn_report_status(TN_ERROR, __FUNCTION__, status, "got %s from %s",
+                     msg, origin);
+    return EBADF;
+}
+
+static tn_status test_double_handler(unused void *arg, const char *origin,
+                                     tn_status status,
+                                     const char *msg)
+{
+    tn_report_status(TN_ERROR, __FUNCTION__, status, "got %s from %s", msg,
+                     origin);
+    if (status != EBADF)
+        tn_throw_exception("test", EBADF, "test");
+    return EACCES;
+}
 
 static void test_handle_exception(void)
 {
@@ -182,6 +237,12 @@ static void test_handle_exception(void)
     status = tn_with_exception(test_action3, NULL, NULL);
     assert(status == EINVAL);
 
+    status = tn_with_exception(test_action3, test_handler, NULL);
+    assert(status == EBADF);
+
+    status = tn_with_exception(test_action3, test_double_handler, NULL);
+    assert(status == EACCES);
+
     status = tn_with_exception(test_nested_action, NULL, NULL);
     assert(status == EACCES);
 }
@@ -189,8 +250,8 @@ static void test_handle_exception(void)
 int main()
 {
     test_simple_report();
-    test_fatal_error(TN_FATAL);
-    test_fatal_error(TN_EXCEPTION);
+    test_fatal_error(true);
+    test_fatal_error(false);
     test_handle_exception();
     puts("OK");
     return 0;
