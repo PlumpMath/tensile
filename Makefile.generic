@@ -57,7 +57,7 @@ ifneq ($(PLATFORM_VARIANT),)
 CPPFLAGS += -DPLATFORM_VARIANT_IS_$(PLATFORM_VARIANT)=1
 endif
 
-TEST_CPPFLAGS = -DTEST_REPEAT_ARBITRARY=2 -DUSE_ANSI_TERM_STRINGS=1 -DUSE_ANSI_TERM_COLOR=1
+TEST_CPPFLAGS =
 
 CFLAGS += $(PCRE_CFLAGS)
 
@@ -122,6 +122,13 @@ endif
 
 .PHONY : check
 check : $(addsuffix .c.gcov,$(TESTABLES))
+
+ifneq ($(LINT),)
+.PHONY : lint
+lint: $(C_SOURCES)
+	$(LINT) $^
+
+endif
 
 ifeq ($(FORCE_CHECK),1)
 .PHONY : $(patsubst %,tests/%_ts,$(TESTABLES))

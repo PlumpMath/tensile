@@ -86,9 +86,11 @@ hint_no_side_effects
 warn_unused_result
 extern int tn_strcmp(tn_string str1, tn_string str2);
 
+hint_no_side_effects
 warn_unused_result
 extern bool tn_strisprefix(tn_string str1, tn_string str2);
 
+hint_no_side_effects
 warn_unused_result
 extern bool tn_strissuffix(tn_string str1, tn_string str2);
 
@@ -107,6 +109,14 @@ extern tn_string tn_substr(tn_string str, size_t pos, size_t len);
 
 warn_unused_result
 extern tn_string tn_strcut(tn_string str, size_t pos, size_t len);
+
+hint_no_side_effects
+warn_unused_result
+extern tn_string tn_strlcprefix(tn_string str1, tn_string str2);
+
+hint_no_side_effects
+warn_unused_result
+extern tn_string tn_strlcsuffix(tn_string str1, tn_string str2);
 
 warn_unused_result
 static inline bool
@@ -128,7 +138,7 @@ extern bool tn_strstr(tn_string str, tn_string sub, size_t *pos);
 
 warn_unused_result
 warn_null_args(1, 2)
-extern bool tn_strtok(tn_string * restrict src, const char * restrict sep,
+extern bool tn_strtok(tn_string * restrict src, bool (*predicate)(char c),
                       tn_string * restrict tok);
 
 warn_unused_result

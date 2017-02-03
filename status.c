@@ -28,12 +28,12 @@
 #include <stdlib.h>
 #include <setjmp.h>
 #include <stdarg.h>
+#include <stdio.h>
 #if DO_TESTS
 #include <unistd.h>
 #include <sys/wait.h>
 #include <signal.h>
 #include <errno.h>
-#include <stdio.h>
 #endif
 #include "status.h"
 

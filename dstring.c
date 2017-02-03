@@ -303,6 +303,7 @@ tn_substr(tn_string str, size_t pos, size_t len)
 }
 
 #if DO_TESTS
+hint_no_side_effects
 static void test_substr(void)
 {
     tn_string base = TN_STRING_LITERAL("abcdef");
@@ -357,6 +358,64 @@ static void test_strcut(void)
     assert(tn_strcmp(tn_strcut(base, 2, 3), TN_STRING_LITERAL("abf")) == 0);
 }
 #endif
+
+tn_string
+tn_strlcprefix(tn_string str1, tn_string str2)
+{
+    size_t minsize = str1.len < str2.len ? str1.len : str2.len;
+    size_t i;
+
+    for (i = 0; i < minsize; i++)
+    {
+        if (str1.str[i] != str2.str[i])
+            break;
+    }
+    
+    return (tn_string){.str = (i == 0 ? NULL : str1.str), .len = i};
+}
+
+tn_string
+tn_strlcsuffix(tn_string str1, tn_string str2)
+{
+    size_t minsize = str1.len < str2.len ? str1.len : str2.len;
+    size_t i;
+
+    for (i = 0; i < minsize; i++)
+    {
+        if (str1.str[str1.len - i - 1] != str2.str[str2.len - i - 1])
+            break;
+    }
+    
+    return (tn_string){.str = (i == 0 ? NULL : str1.str + str1.len - i),
+                       .len = i};
+}
+
+#if DO_TESTS
+static void test_lc_prefix_suffix(void)
+{
+    tn_string str1 = TN_STRING_LITERAL("abcdef");
+    tn_string str2 = TN_STRING_LITERAL("abcxyz");
+    tn_string str3 = TN_STRING_LITERAL("xyzdef");
+
+    tn_string pfx = TN_STRING_LITERAL("abc");
+    tn_string sfx = TN_STRING_LITERAL("def");
+
+    assert(tn_strcmp(tn_strlcprefix(str1, str2), pfx) == 0);
+    assert(tn_strcmp(tn_strlcsuffix(str1, str3), sfx) == 0);
+
+    assert(tn_strlcprefix(str1, str3).str == NULL);
+    assert(tn_strlcsuffix(str1, str2).str == NULL);
+
+    assert(tn_strcmp(tn_strlcprefix(pfx, str1), pfx) == 0);
+    assert(tn_strcmp(tn_strlcsuffix(str3, sfx), sfx) == 0);
+
+    assert(tn_strlcprefix(TN_EMPTY_STRING, str1).str == NULL);
+    assert(tn_strlcprefix(str2, TN_EMPTY_STRING).str == NULL);
+    assert(tn_strlcsuffix(TN_EMPTY_STRING, str1).str == NULL);
+    assert(tn_strlcsuffix(str3, TN_EMPTY_STRING).str == NULL);
+}
+
+#endif    
 
 bool
 tn_strrchr(tn_string str, char ch, size_t *pos)
@@ -441,15 +500,73 @@ tn_strstr(tn_string str, tn_string sub, size_t *pos)
     return false;
 }
 
+#if DO_TESTS
+hint_no_side_effects
+static void test_strstr(void)
+{
+    tn_string base = TN_STRING_LITERAL("abc\0def\0ghi");
+    size_t pos = (size_t)(-1);
+
+    assert(tn_strstr(base, TN_EMPTY_STRING, NULL));
+    assert(tn_strstr(base, TN_STRING_LITERAL("abc"), NULL));
+    assert(tn_strstr(base, TN_STRING_LITERAL("\0ghi"), NULL));
+    assert(!tn_strstr(base, TN_STRING_LITERAL("xyz"), NULL));
+    assert(!tn_strstr(base, TN_STRING_LITERAL("averyveryveryverylongsubstring"), NULL));
+    assert(tn_strstr(TN_EMPTY_STRING, TN_EMPTY_STRING, NULL));
+    assert(!tn_strstr(TN_EMPTY_STRING, TN_STRING_LITERAL("abc"), NULL));
+
+    assert(tn_strstr(base, TN_EMPTY_STRING, &pos) && pos == 0);
+    assert(tn_strstr(base, TN_STRING_LITERAL("abc"), &pos) && pos == 0);
+    assert(tn_strstr(base, TN_STRING_LITERAL("\0ghi"), &pos) && pos == 7);
+    assert(!tn_strstr(base, TN_STRING_LITERAL("xyz"), &pos) && pos == 7);
+}
+#endif
+
 bool
-tn_strtok(tn_string *src, const char *sep, tn_string *tok)
+tn_strisprefix(tn_string prefix, tn_string str)
+{
+    if (prefix.len > str.len)
+        return false;
+
+    return memcmp(str.str, prefix.str, prefix.len) == 0;
+}
+
+bool
+tn_strissuffix(tn_string suffix, tn_string str)
+{
+    if (suffix.len > str.len)
+        return false;
+
+    return memcmp(str.str + str.len - suffix.len,
+                  suffix.str, suffix.len) == 0;
+}
+
+#if DO_TESTS
+static void test_isprefix_issuffix(void)
+{
+    tn_string base = TN_STRING_LITERAL("abc\0def");
+
+    assert(tn_strisprefix(TN_STRING_LITERAL("abc\0"), base));
+    assert(tn_strissuffix(TN_STRING_LITERAL("\0def"), base));
+    assert(tn_strisprefix(TN_EMPTY_STRING, base));
+    assert(tn_strissuffix(TN_EMPTY_STRING, base));
+    assert(!tn_strisprefix(TN_STRING_LITERAL("abc\0z"), base));
+    assert(!tn_strissuffix(TN_STRING_LITERAL("z\0def"), base));
+
+    assert(!tn_strisprefix(TN_STRING_LITERAL("abc\0defghi"), base));
+    assert(!tn_strissuffix(TN_STRING_LITERAL("abc\0defghi"), base));
+}
+#endif
+
+bool
+tn_strtok(tn_string *src, bool (*predicate)(char c), tn_string *tok)
 {
     size_t i;
     size_t start;
 
     for (i = 0; i < src->len; i++)
     {
-        if (strchr(sep, src->str[i]) == NULL)
+        if (!predicate(src->str[i]))
             break;
     }
     if (i == src->len)
@@ -458,7 +575,7 @@ tn_strtok(tn_string *src, const char *sep, tn_string *tok)
     start = i;
     for (; i < src->len; i++)
     {
-        if (strchr(sep, src->str[i]) != NULL)
+        if (predicate(src->str[i]))
             break;
     }
     if (tok)
@@ -471,6 +588,30 @@ tn_strtok(tn_string *src, const char *sep, tn_string *tok)
 
     return true;
 }
+
+#if DO_TESTS
+hint_no_side_effects
+static bool test_eq_space(char c)
+{
+    return c == ' ';
+}
+
+static void test_strtok(void)
+{
+    tn_string base = TN_STRING_LITERAL("    abc\t    def ghi    ");
+    tn_string token = TN_EMPTY_STRING;
+
+    assert(tn_strtok(&base, test_eq_space, &token) &&
+           tn_strcmp(token, TN_STRING_LITERAL("abc\t")) == 0);
+    assert(tn_strtok(&base, test_eq_space, &token) &&
+           tn_strcmp(token, TN_STRING_LITERAL("def")) == 0);
+    assert(tn_strtok(&base, test_eq_space, &token) &&
+           tn_strcmp(token, TN_STRING_LITERAL("ghi")) == 0);
+    assert(!tn_strtok(&base, test_eq_space, &token) &&
+           tn_strcmp(base, TN_STRING_LITERAL("    ")) == 0 &&
+           tn_strcmp(token, TN_STRING_LITERAL("ghi")) == 0);
+}
+#endif
 
 tn_string tn_strmap(tn_string str, char (*func)(char ch))
 {
@@ -488,6 +629,23 @@ tn_string tn_strmap(tn_string str, char (*func)(char ch))
 }
 
 #if DO_TESTS
+hint_no_side_effects
+static char test_cvt(char c)
+{
+    return c == ' ' ? '+' : c;
+}
+
+static void test_strmap(void)
+{
+    tn_string base = TN_STRING_LITERAL("abc\0def  ghi ");
+
+    assert(tn_strcmp(tn_strmap(base, test_cvt),
+                     TN_STRING_LITERAL("abc\0def++ghi+")) == 0);
+    assert(tn_strmap(TN_EMPTY_STRING, test_cvt).str == NULL);
+}
+#endif
+
+#if DO_TESTS
 int main()
 {
     GC_INIT();
@@ -500,7 +658,13 @@ int main()
     test_strcats();
     test_substr();
     test_strcut();
+    test_lc_prefix_suffix();
     test_strchr_strrchr();
+    test_isprefix_issuffix();
+    test_strstr();
+    test_strtok();
+    test_strmap();
+    
     puts("OK");
     
     return 0;

@@ -29,4 +29,4 @@ GENERATED_CFLAGS = -Wno-conversion -Wno-unused-function
 
 TEST_CFLAGS = 
 
-
+LINT = $(CC) --analyze $(CPPFLAGS) $(CFLAGS)
