@@ -77,7 +77,7 @@ endif
 
 .SECONDARY :
 
-C_SOURCES = status.c dstring.c
+C_SOURCES = status.c dstring.c xdr.c
 
 GENERATED_SOURCES = tensile.tab.c lex.yy.c
 
