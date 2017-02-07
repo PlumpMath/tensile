@@ -40,6 +40,7 @@ extern "C"
 #include <time.h>
 #include <stdarg.h>
 #include "utils.h"
+#include "status.h"
 
 typedef struct tn_string {
     size_t len;
@@ -137,6 +138,9 @@ warn_unused_result
 extern bool tn_strstr(tn_string str, tn_string sub, size_t *pos);
 
 warn_unused_result
+extern size_t tn_strdistance(tn_string str1, tn_string str2);
+
+warn_unused_result
 warn_null_args(1, 2)
 extern bool tn_strtok(tn_string * restrict src, bool (*predicate)(char c),
                       tn_string * restrict tok);
@@ -146,28 +150,39 @@ warn_null_args(2)
 extern tn_string tn_strmap(tn_string str, char (*func)(char ch));
 
 warn_unused_result
+warn_null_args(2)
+extern tn_string tn_strfilter(tn_string str, bool (*predicate)(char ch));
+
+warn_unused_result
+extern tn_string tn_strrepeat(tn_string str, unsigned n);
+
+warn_unused_result
 warn_null_args(1, 2)
 hint_printf_like(2, 3)
-extern bool tn_strprintf(tn_string * restrict dest, const char * restrict fmt, ...);
+extern tn_status tn_strprintf(tn_string * restrict dest,
+                              const char * restrict fmt, ...);
 
 warn_unused_result
 hint_printf_like(2, 0)
-extern bool tn_strvprintf(tn_string * restrict dest, const char * restrict fmt, va_list args);
+extern tn_status tn_strvprintf(tn_string * restrict dest,
+                               const char * restrict fmt, va_list args);
 
 warn_unused_result
 warn_null_args(2)
-hint_scanf_like(2, 3)
-extern unsigned tn_strscanf(tn_string src, const char * restrict fmt, ...);
+hint_scanf_like(3, 4)
+extern tn_status tn_strscanf(tn_string src, unsigned *count, const char * restrict fmt, ...);
 
 warn_unused_result
 warn_null_args(2)
-hint_scanf_like(2, 0)    
-extern unsigned tn_strvscanf(tn_string src, const char * restrict fmt, va_list args);
+hint_scanf_like(3, 0)    
+extern tn_status tn_strvscanf(tn_string src, unsigned *count, const char * restrict fmt,
+                              va_list args);
 
 warn_unused_result
 warn_any_null_arg
 hint_strftime_like(2)
-extern bool tn_strftime(tn_string * restrict dest, const char * restrict fmt, const struct tm * restrict tm);
+extern tn_status tn_strftime(tn_string * restrict dest, const char * restrict fmt,
+                             const struct tm * restrict tm);
 
 #ifdef __cplusplus
 }

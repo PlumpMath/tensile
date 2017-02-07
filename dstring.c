@@ -25,10 +25,14 @@
  * @author Artem V. Andreev <artem@iling.spb.ru>
  */
 
-#if DO_TESTS
+#include <stdarg.h>
 #include <stdio.h>
-#endif
+#include <errno.h>
 #include "dstring.h"
+
+#if DO_TESTS
+#define TEST_START ((void)(fprintf(stderr, "%s():\n", __FUNCTION__)))
+#endif
 
 tn_string
 tn_strdup(const char *str)
@@ -49,6 +53,7 @@ tn_strdup(const char *str)
 #if DO_TESTS
 static void test_strdup(void)
 {
+    TEST_START;
     const char src[] = "abcdefghijk\0mno";
     tn_string s = tn_strdup(src);
 
@@ -82,6 +87,7 @@ tn_strdupmem(size_t len, const uint8_t *data)
 #if DO_TESTS
 static void test_strdupmem(void)
 {
+    TEST_START;
     const char src[] = "abcd\0\0\0efghijk";
     tn_string s = tn_strdupmem(sizeof(src) - 1, (const uint8_t *)src);
 
@@ -117,6 +123,7 @@ tn_str2cstr(tn_string str)
 #if DO_TESTS
 static void test_str2cstr(void)
 {
+    TEST_START;
     static const char literal[] = "abcdefghi";
     tn_string copy;
     const char *chunk;
@@ -149,9 +156,9 @@ tn_strcmp(tn_string str1, tn_string str2)
 }
 
 #if DO_TESTS
-hint_no_side_effects
 static void test_strcmp(void)
 {
+    TEST_START;
     tn_string test1 = TN_STRING_LITERAL("abc");
     tn_string test2 = TN_STRING_LITERAL("def");
     tn_string test3 = TN_STRING_LITERAL("abcdef");
@@ -192,6 +199,7 @@ tn_strcat(tn_string str1, tn_string str2)
 #if DO_TESTS
 static void test_strcat(void)
 {
+    TEST_START;
     tn_string str1 = TN_STRING_LITERAL("abcd\0efghi");
     tn_string str2 = TN_STRING_LITERAL("ijkmn\0opqr");
     tn_string str3 = TN_STRING_LITERAL("abcd\0efghiijkmn\0opqr");
@@ -217,6 +225,7 @@ tn_straddch(tn_string str, char ch)
 #if DO_TESTS
 static void test_straddch(void)
 {
+    TEST_START;
     tn_string str = TN_STRING_LITERAL("abcd\0efghi");
     tn_string str2 = TN_STRING_LITERAL("abcd\0efghiz");
     tn_string str3 = TN_STRING_LITERAL("abcd\0efghi\0");
@@ -268,6 +277,7 @@ tn_strcats(size_t n, tn_string strs[var_size(n)], tn_string sep)
 #if DO_TESTS
 static void test_strcats(void)
 {
+    TEST_START;
     tn_string strs[] = {
         TN_STRING_LITERAL("abc"),
         TN_STRING_LITERAL("def"),
@@ -303,9 +313,9 @@ tn_substr(tn_string str, size_t pos, size_t len)
 }
 
 #if DO_TESTS
-hint_no_side_effects
 static void test_substr(void)
 {
+    TEST_START;
     tn_string base = TN_STRING_LITERAL("abcdef");
     
     assert(tn_substr(TN_EMPTY_STRING, 1, 1000).str == NULL);
@@ -346,6 +356,7 @@ tn_strcut(tn_string str, size_t pos, size_t len)
 #if DO_TESTS
 static void test_strcut(void)
 {
+    TEST_START;
     tn_string base = TN_STRING_LITERAL("abcdef");
     
     assert(tn_strcut(TN_EMPTY_STRING, 1, 1000).str == NULL);
@@ -393,6 +404,7 @@ tn_strlcsuffix(tn_string str1, tn_string str2)
 #if DO_TESTS
 static void test_lc_prefix_suffix(void)
 {
+    TEST_START;
     tn_string str1 = TN_STRING_LITERAL("abcdef");
     tn_string str2 = TN_STRING_LITERAL("abcxyz");
     tn_string str3 = TN_STRING_LITERAL("xyzdef");
@@ -438,6 +450,7 @@ tn_strrchr(tn_string str, char ch, size_t *pos)
 #if DO_TESTS
 static void test_strchr_strrchr(void)
 {
+    TEST_START;
     tn_string str = TN_STRING_LITERAL("abc\0deffed\0cba");
     size_t pos = (size_t)-1;
 
@@ -501,9 +514,9 @@ tn_strstr(tn_string str, tn_string sub, size_t *pos)
 }
 
 #if DO_TESTS
-hint_no_side_effects
 static void test_strstr(void)
 {
+    TEST_START;
     tn_string base = TN_STRING_LITERAL("abc\0def\0ghi");
     size_t pos = (size_t)(-1);
 
@@ -544,6 +557,7 @@ tn_strissuffix(tn_string suffix, tn_string str)
 #if DO_TESTS
 static void test_isprefix_issuffix(void)
 {
+    TEST_START;
     tn_string base = TN_STRING_LITERAL("abc\0def");
 
     assert(tn_strisprefix(TN_STRING_LITERAL("abc\0"), base));
@@ -598,6 +612,7 @@ static bool test_eq_space(char c)
 
 static void test_strtok(void)
 {
+    TEST_START;
     tn_string base = TN_STRING_LITERAL("    abc\t    def ghi    ");
     tn_string token = TN_EMPTY_STRING;
 
@@ -613,7 +628,8 @@ static void test_strtok(void)
 }
 #endif
 
-tn_string tn_strmap(tn_string str, char (*func)(char ch))
+tn_string
+tn_strmap(tn_string str, char (*func)(char ch))
 {
     size_t i;
     char *buf;
@@ -637,11 +653,284 @@ static char test_cvt(char c)
 
 static void test_strmap(void)
 {
+    TEST_START;
     tn_string base = TN_STRING_LITERAL("abc\0def  ghi ");
 
     assert(tn_strcmp(tn_strmap(base, test_cvt),
                      TN_STRING_LITERAL("abc\0def++ghi+")) == 0);
     assert(tn_strmap(TN_EMPTY_STRING, test_cvt).str == NULL);
+}
+#endif
+
+tn_string
+tn_strfilter(tn_string str, bool (*predicate)(char ch))
+{
+    char *buf;
+    size_t i, j;
+    
+    if (str.len == 0)
+        return TN_EMPTY_STRING;
+
+    buf = tn_alloc_blob(str.len + 1);
+    for (i = 0, j = 0; i < str.len; i++)
+    {
+        if (predicate(str.str[i]))
+            buf[j++] = str.str[i];
+    }
+    buf[j] = '\0';
+    buf = tn_realloc(buf, j + 1);
+
+    return (tn_string){.str = buf, .len = j};
+}
+
+#if DO_TESTS
+hint_no_side_effects
+static bool test_neq_space(char c)
+{
+    return c != ' ';
+}
+
+
+static void test_strfilter(void)
+{
+    TEST_START;
+    tn_string base = TN_STRING_LITERAL("  abc   de\0fg i j k   ");
+
+    assert(tn_strcmp(tn_strfilter(base, test_neq_space),
+                     TN_STRING_LITERAL("abcde\0fgijk")) == 0);
+    assert(tn_strfilter(TN_EMPTY_STRING, test_neq_space).str == NULL);
+}
+#endif
+
+tn_string
+tn_strrepeat(tn_string str, unsigned n)
+{
+    if (n == 0 || str.len == 0)
+        return TN_EMPTY_STRING;
+    if (n == 1)
+        return str;
+    else
+    {
+        char *buf = tn_alloc_blob(str.len * n + 1);
+        unsigned i;
+
+        for (i = 0; i < n; i++)
+            memcpy(buf + str.len * i, str.str, str.len);
+        buf[str.len * n] = '\0';
+
+        return (tn_string){.str = buf, .len = str.len * n};
+    }
+}
+
+#if DO_TESTS
+static void test_strrepeat(void)
+{
+    tn_string base = TN_STRING_LITERAL("abc\0");
+
+    assert(tn_strrepeat(base, 0).str == NULL);
+    assert(tn_strrepeat(base, 1).str == base.str);
+    assert(tn_strcmp(tn_strrepeat(base, 2),
+                     TN_STRING_LITERAL("abc\0abc\0")) == 0);
+    assert(tn_strrepeat(TN_EMPTY_STRING, 2).str == NULL);
+}
+#endif
+
+tn_status
+tn_strprintf(tn_string * restrict dest, const char * restrict fmt, ...)
+{
+    va_list args;
+    tn_status rc;
+    
+    va_start(args, fmt);
+    rc = tn_strvprintf(dest, fmt, args);
+    va_end(args);
+
+    return rc;
+}
+
+tn_status
+tn_strvprintf(tn_string * restrict dest, const char * restrict fmt,
+              va_list args)
+{
+    char buf[64];
+    tn_status status = 0;
+    char *result = buf;
+    int rc;
+    va_list args2;
+
+    va_copy(args2, args);
+    rc = vsnprintf(buf, sizeof(buf), fmt, args);
+    if (rc < 0)
+        status = errno;
+    else if ((size_t)rc >= sizeof(buf))
+    {
+        int rc2;
+
+        result = tn_alloc_blob((size_t)rc + 1);
+        
+        rc2 = vsnprintf(result, (size_t)rc + 1, fmt, args2);
+        if (rc2 < 0)
+            status = errno;
+        else if (rc2 != rc)
+            status = EPROTO;
+        else
+        {
+            dest->str = result;
+            dest->len = (size_t)rc;
+        }
+    }
+    else
+    {
+        *dest = tn_strdup(buf);
+    }
+    va_end(args2);
+
+    return status;
+}
+
+#if DO_TESTS
+static void test_sprintf(void)
+{
+    TEST_START;
+    tn_string buffer1 = TN_EMPTY_STRING;
+    tn_string buffer2 = TN_EMPTY_STRING;
+    tn_string longresult =
+        TN_STRING_LITERAL("01234567890123456789012345678901234567890123456789"
+                          "01234567890123456789012345678901234567890123456789");
+
+    assert(tn_strprintf(&buffer1, "%d", 123) == 0);
+    assert(tn_strcmp(buffer1, TN_STRING_LITERAL("123")) == 0);
+
+    assert(tn_strprintf(&buffer2, "%s", longresult.str) == 0);
+    assert(tn_strcmp(buffer2, longresult) == 0);
+    assert(buffer1.str != buffer2.str);
+    
+}
+#endif
+
+tn_status
+tn_strscanf(tn_string src, unsigned *count, const char * restrict fmt, ...)
+{
+    va_list args;
+    tn_status rc;
+    
+    va_start(args, fmt);
+    rc = tn_strvscanf(src, count, fmt, args);
+    va_end(args);
+
+    return rc;
+}
+
+tn_status
+tn_strvscanf(tn_string src, unsigned *count, const char * restrict fmt,
+             va_list args)
+{
+    int rc;
+
+    errno = 0;
+    rc = vsscanf(tn_str2cstr(src), fmt, args);
+    if (rc == EOF)
+    {
+        if (errno == 0)
+            *count = 0;
+        return errno;
+    }
+
+    *count = (unsigned)rc;
+
+    return 0;
+}
+
+#if DO_TESTS
+static void test_sscanf(void)
+{
+    TEST_START;
+    tn_string buffer = TN_STRING_LITERAL("123 134");
+    int v1 = 0, v2 = 0;
+    unsigned count = 0;
+
+    assert(tn_strscanf(buffer, &count, "%d %d", &v1, &v2) == 0);
+    assert(count == 2);
+    assert(v1 == 123 && v2 == 134);
+
+    v1 = v2 = 0;
+    assert(tn_strscanf(tn_substr(buffer, 0, 4), &count, "%d %d", &v1, &v2) == 0);
+    assert(count == 1);
+    assert(v1 == 123);
+    assert(v2 == 0);
+
+    assert(tn_strscanf(TN_EMPTY_STRING, &count, "%d %d", &v1, &v2) == 0);
+    assert(count == 0);
+}
+#endif
+
+tn_status
+tn_strftime(tn_string * restrict dest, const char * restrict fmt,
+            const struct tm * restrict tm)
+{
+    char buf[64];
+    /* This is necessary to shut up the compiler about non-literal format
+     * string, see e.g https://gcc.gnu.org/bugzilla/show_bug.cgi?id=39438
+     */
+#define STRFTIME                                                        \
+    ((size_t (*)(char *, size_t, const char *, const struct tm *))strftime)
+    size_t sz = STRFTIME(buf, sizeof(buf), fmt, tm);
+
+    if (sz != 0)
+    {
+        *dest = tn_strdup(buf);
+    }
+    else
+    {
+        char *dynbuf = NULL;
+        size_t maxsize = 2 * sizeof(buf);
+
+        while (sz == 0)
+        {
+            dynbuf = tn_realloc(dynbuf, maxsize);
+            sz = STRFTIME(dynbuf, maxsize, fmt, tm);
+            maxsize *= 2;
+        }
+
+        dynbuf = tn_realloc(dynbuf, sz + 1);
+        dest->str = dynbuf;
+        dest->len = sz;
+    }
+#undef STRFTIME
+
+    return 0;
+}
+
+#if DO_TESTS
+static void test_strftime(void)
+{
+    TEST_START;
+    tn_string output = TN_EMPTY_STRING;
+    struct tm test_tm = {
+        .tm_year = 114,
+        .tm_mon  = 11,
+        .tm_mday  = 22,
+        .tm_hour = 13,
+        .tm_min  = 28,
+        .tm_sec  = 12,
+    };
+
+    assert(tn_strftime(&output, "%Y-%m-%d %H:%M:%S", &test_tm) == 0);
+    assert(tn_strcmp(output, TN_STRING_LITERAL("2014-12-22 13:28:12")) == 0);
+
+    assert(tn_strftime(&output, "%Y-%m-%d %H:%M:%S %Y-%m-%d %H:%M:%S %Y-%m-%d %H:%M:%S"
+                       "%Y-%m-%d %H:%M:%S %Y-%m-%d %H:%M:%S %Y-%m-%d %H:%M:%S"
+                       "%Y-%m-%d %H:%M:%S %Y-%m-%d %H:%M:%S %Y-%m-%d %H:%M:%S"
+                       "%Y-%m-%d %H:%M:%S %Y-%m-%d %H:%M:%S %Y-%m-%d %H:%M:%S"
+                       "%Y-%m-%d %H:%M:%S %Y-%m-%d %H:%M:%S %Y-%m-%d %H:%M:%S"
+                       "%Y-%m-%d %H:%M:%S %Y-%m-%d %H:%M:%S %Y-%m-%d %H:%M:%S", &test_tm) == 0);
+    assert(tn_strcmp(output,
+                     TN_STRING_LITERAL("2014-12-22 13:28:12 2014-12-22 13:28:12 2014-12-22 13:28:12"
+                                       "2014-12-22 13:28:12 2014-12-22 13:28:12 2014-12-22 13:28:12"
+                                       "2014-12-22 13:28:12 2014-12-22 13:28:12 2014-12-22 13:28:12"
+                                       "2014-12-22 13:28:12 2014-12-22 13:28:12 2014-12-22 13:28:12"
+                                       "2014-12-22 13:28:12 2014-12-22 13:28:12 2014-12-22 13:28:12"
+                                       "2014-12-22 13:28:12 2014-12-22 13:28:12 2014-12-22 13:28:12")) == 0);
 }
 #endif
 
@@ -664,6 +953,11 @@ int main()
     test_strstr();
     test_strtok();
     test_strmap();
+    test_strfilter();
+    test_strrepeat();
+    test_sprintf();
+    test_sscanf();
+    test_strftime();
     
     puts("OK");
     

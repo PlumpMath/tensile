@@ -162,7 +162,7 @@ extern "C"
 #define hint_strftime_like(_x)                          \
     __attribute__((__format__ (__strftime__, _x, 0)))
 #else
-#define hint_strftime_like(_x, _y)
+#define hint_strftime_like(_x)
 #endif
 
 /**
