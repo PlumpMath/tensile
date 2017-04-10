@@ -735,6 +735,72 @@ static void test_strrepeat(void)
 }
 #endif
 
+static size_t
+min_size3(size_t s1, size_t s2, size_t s3)
+{
+    size_t min12 = s1 < s2 ? s1 : s2;
+
+    return min12 < s3 ? min12 : s3;
+}
+
+size_t
+tn_strdistance(tn_string str1, tn_string str2)
+{
+    size_t *prev_row;
+    size_t *cur_row;
+    size_t *swap;
+    size_t i, j;
+    
+    if (tn_strcmp(str1, str2) == 0)
+        return 0;
+    if (str1.len == 0)
+        return str2.len;
+    if (str2.len == 0)
+        return str1.len;
+
+    prev_row = tn_alloc_blob(sizeof(*prev_row) * (str2.len + 1));
+    cur_row  = tn_alloc_blob(sizeof(*cur_row) * (str2.len + 1));
+
+    for (i = 0; i <= str2.len; i++)
+        prev_row[i] = i;
+
+    for (i = 1; i <= str1.len; i++)
+    {
+        cur_row[0] = i;
+        for (j = 1; j <= str2.len; j++)
+        {
+            cur_row[j] = min_size3(cur_row[j - 1] + 1,
+                                   prev_row[j] + 1,
+                                   prev_row[j - 1] +
+                                   (str2.str[j - 1] != str1.str[i - 1]));
+        }
+        swap = prev_row;
+        prev_row = cur_row;
+        cur_row = swap;
+    }
+    return prev_row[str2.len];
+}
+
+#if DO_TESTS
+
+static void test_distance(void)
+{
+    TEST_START;
+    tn_string str1 = TN_STRING_LITERAL("abc");
+    tn_string str2 = TN_STRING_LITERAL("adbecf");
+
+    assert(tn_strdistance(str1, str1) == 0);
+    assert(tn_strdistance(TN_EMPTY_STRING, TN_EMPTY_STRING) == 0);
+    assert(tn_strdistance(str1, TN_EMPTY_STRING) == str1.len);
+    assert(tn_strdistance(TN_EMPTY_STRING, str2) == str2.len);
+
+    assert(tn_strdistance(str1, tn_substr(str1, 0, 2)) == 1);
+    assert(tn_strdistance(str1, str2) == 3);
+    assert(tn_strdistance(str2, str1) == 3);
+}
+
+#endif
+
 tn_status
 tn_strprintf(tn_string * restrict dest, const char * restrict fmt, ...)
 {
@@ -955,6 +1021,7 @@ int main()
     test_strmap();
     test_strfilter();
     test_strrepeat();
+    test_distance();
     test_sprintf();
     test_sscanf();
     test_strftime();

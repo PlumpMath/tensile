@@ -79,12 +79,30 @@ tn_xdr_mem_reader(tn_xdr_stream * restrict stream, void * restrict dest,
 warn_unused_result
 warn_any_null_arg
 static inline tn_status
-tn_xdr_mem_writer(tn_xdr_stream * restrict stream, void * restrict dest,
-                  size_t sz)
+tn_xdr_mem_writer(tn_xdr_stream * restrict stream,
+                  const void * restrict dest, size_t sz)
 {
     memcpy(stream->data, dest, sz);
     stream->data = (uint8_t *)stream->data + sz;
     return 0;
+}
+
+warn_unused_result
+warn_any_null_arg
+static inline tn_status
+tn_xdr_dummy_reader(unused tn_xdr_stream * restrict stream,
+                   unused void * restrict dest, unused size_t sz)
+{
+    return ENOMSG;
+}
+
+warn_unused_result
+warn_any_null_arg
+static inline tn_status
+tn_xdr_dummy_writer(unused tn_xdr_stream * restrict stream,
+                    unused const void * restrict dest, unused size_t sz)
+{
+    return ENOSPC;
 }
 
 #define TN_XDR_STREAM_STATIC_ARRAY(_array) \
@@ -109,7 +127,7 @@ static inline tn_status
 tn_xdr_encode_int32(tn_xdr_stream * restrict stream,
                     const int32_t * restrict data)
 {
-    int32_t val = htonl(*data);
+    int32_t val = (int32_t)htonl((uint32_t)*data);
     return tn_xdr_write_to_stream(stream, &val, sizeof(val));
 }
 
@@ -122,7 +140,7 @@ tn_xdr_decode_int32(tn_xdr_stream * restrict stream, int32_t * restrict data)
     
     if (rc != 0)
         return rc;
-    *data = ntohl(val);
+    *data = (int32_t)ntohl((uint32_t)val);
     return 0;
 }
 
@@ -175,14 +193,22 @@ static inline tn_status
 tn_xdr_encode_float(tn_xdr_stream * restrict stream,
                     const float * restrict data)
 {
-    return tn_xdr_write_to_stream(stream, data, sizeof(*data));
+    uint32_t tmp;
+    memcpy(&tmp, data, sizeof(tmp));
+    return tn_xdr_encode_uint32(stream, &tmp);
 }
 
 warn_unused_result warn_any_null_arg
 static inline tn_status
 tn_xdr_decode_float(tn_xdr_stream * restrict stream, float * restrict data)
 {
-    return tn_xdr_read_from_stream(stream, data, sizeof(*data));
+    tn_status rc;
+    uint32_t tmp;
+    rc = tn_xdr_decode_uint32(stream, &tmp);
+    if (rc != 0)
+        return rc;
+    memcpy(data, &tmp, sizeof(tmp));
+    return 0;
 }
 
 warn_unused_result warn_any_null_arg
@@ -190,15 +216,33 @@ static inline tn_status
 tn_xdr_encode_double(tn_xdr_stream * restrict stream,
                      const double * restrict data)
 {
-    return tn_xdr_write_to_stream(stream, data, sizeof(*data));
+    uint64_t tmp;
+    memcpy(&tmp, data, sizeof(tmp));
+    return tn_xdr_encode_uint64(stream, &tmp);
 }
 
 warn_unused_result warn_any_null_arg
 static inline tn_status
 tn_xdr_decode_double(tn_xdr_stream * restrict stream, double * restrict data)
 {
-    return tn_xdr_read_from_stream(stream, data, sizeof(*data));
+    tn_status rc;
+    uint64_t tmp;
+    rc = tn_xdr_decode_uint64(stream, &tmp);
+    if (rc != 0)
+        return rc;
+    memcpy(data, &tmp, sizeof(tmp));
+    return 0;
 }
+
+warn_unused_result
+warn_any_null_arg
+extern tn_status tn_xdr_encode_length(tn_xdr_stream * restrict stream,
+                                      size_t length);
+
+warn_unused_result
+warn_any_null_arg
+extern tn_status tn_xdr_decode_length(tn_xdr_stream * restrict stream,
+                                      size_t * restrict length);
 
 warn_unused_result
 warn_any_null_arg
@@ -227,6 +271,20 @@ extern tn_status tn_xdr_decode_var_bytes(tn_xdr_stream * restrict stream,
                                          size_t * restrict len,
                                          uint8_t ** restrict data);
 
+warn_unused_result warn_any_null_arg
+static inline tn_status tn_xdr_encode_cstring(tn_xdr_stream * restrict stream,
+                                              const char * restrict str)
+{
+    return tn_xdr_encode_var_bytes(stream, strlen(str),
+                                   (const uint8_t *)str);
+}
+
+warn_unused_result
+warn_any_null_arg
+extern tn_status tn_xdr_decode_cstring(tn_xdr_stream * restrict stream,
+                                       char ** restrict str);
+
+
 typedef struct tn_xdr_element_descr {
     size_t elsize;
     tn_xdr_encoder encode;
@@ -246,8 +304,7 @@ warn_any_null_arg
 extern tn_status tn_xdr_decode_array(
         tn_xdr_stream * restrict stream,
         const tn_xdr_element_descr * restrict elt,
-        size_t len,
-        const void * restrict data);
+        size_t len, void * restrict data);
 
 warn_unused_result
 warn_any_null_arg
@@ -262,8 +319,8 @@ warn_any_null_arg
 extern tn_status tn_xdr_decode_var_array(
         tn_xdr_stream * restrict stream,
         const tn_xdr_element_descr * restrict elt,
-        void ** restrict data,
-        size_t *len);
+        size_t *len,
+        void ** restrict data);
 
 warn_unused_result
 warn_any_null_arg
@@ -271,7 +328,7 @@ extern tn_status tn_xdr_encode_struct(
         tn_xdr_stream * restrict stream,
         size_t nelts,
         const tn_xdr_element_descr elt[restrict var_size(nelts)],
-        const void *data);
+        const void * restrict data);
 
 warn_unused_result
 warn_any_null_arg
@@ -279,7 +336,7 @@ extern tn_status tn_xdr_decode_struct(
         tn_xdr_stream * restrict stream,
         size_t nelts,
         const tn_xdr_element_descr elt[restrict var_size(nelts)],
-        void *data);
+        void * restrict data);
 
 warn_unused_result
 warn_any_null_arg
@@ -288,16 +345,16 @@ extern tn_status tn_xdr_encode_union(
         size_t nelts,
         const tn_xdr_element_descr elt[restrict var_size(nelts)],
         unsigned discr,
-        const void *data);
+        const void * restrict data);
 
 warn_unused_result
 warn_any_null_arg
-extern tn_status tn_xdr_decode_struct(
+extern tn_status tn_xdr_decode_union(
         tn_xdr_stream * restrict stream,
         size_t nelts,
         const tn_xdr_element_descr elt[restrict var_size(nelts)],
         unsigned * restrict discr,
-        void *data);
+        void * restrict data);
 
 warn_unused_result warn_any_null_arg
 static inline tn_status
@@ -323,7 +380,7 @@ tn_xdr_decode_void(unused tn_xdr_stream * restrict stream,
                             const _type * restrict data)                \
     {                                                                   \
         return tn_xdr_encode_##_xdrsuffix(stream,                       \
-                                          (_xdrtype)*data);             \
+                                          (_xdrtype *)data);            \
     }                                                                   \
     struct fake
 
@@ -407,6 +464,15 @@ tn_xdr_decode_size_t(tn_xdr_stream * restrict stream,
 DEFINE_XDR_SMALL_VALUE_ENCODER(size_t, size_t, uint64, uint64_t);
 DEFINE_XDR_SMALL_UVALUE_DECODER(size_t, size_t, uint64, uint64_t, SIZE_MAX);
 #endif
+
+#define DEFINE_XDR_PTR_ENCODER_THUNK(_name, _type, _call)               \
+    warn_unused_result warn_any_null_arg                                \
+    static inline tn_status                                             \
+    _name(tn_xdr_stream * restrict stream, const void * restrict data)  \
+    {                                                                   \
+        return _call(stream, *(_type const *)data);                     \
+    }                                                                   \
+    struct fake
 
 #ifdef __cplusplus
 }

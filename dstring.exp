@@ -14,6 +14,7 @@ test_strstr():
 test_strtok():
 test_strmap():
 test_strfilter():
+test_distance():
 test_sprintf():
 test_sscanf():
 test_strftime():

@@ -84,7 +84,7 @@ GENERATED_SOURCES = tensile.tab.c lex.yy.c
 SOURCES = $(C_SOURCES)
 SOURCES += $(GENERATED_SOURCES)
 
-TESTABLES = status dstring
+TESTABLES = status xdr dstring
 
 APPLICATION = tensilec
 

@@ -29,6 +29,7 @@
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 #if DO_TESTS
 #include <unistd.h>
 #include <sys/wait.h>
@@ -168,8 +169,18 @@ tn_with_exception(tn_status (*action)(void *),
         assert(exception_code != 0);
         if (handler)
         {
-            exception_code = handler(data, exception_origin,
-                                     exception_code, exception_details);
+            tn_status rc = handler(data, exception_origin,
+                                   exception_code, exception_details);
+            if (rc == EAGAIN)
+            {
+                char rethrow_details[256];
+                
+                strcpy(rethrow_details, exception_details);
+                exception_handler = previous_handler;
+                tn_throw_exception(exception_origin, exception_code,
+                                   "%s", rethrow_details);
+            }
+            exception_code = rc;
         }
     }
 
@@ -224,6 +235,24 @@ static tn_status test_double_handler(unused void *arg, const char *origin,
     return EACCES;
 }
 
+static tn_status test_rethrow_handler(unused void *arg, const char *origin,
+                                      tn_status status,
+                                      const char *msg)
+{
+    tn_report_status(TN_ERROR, __FUNCTION__, status, "got %s from %s", msg,
+                     origin);
+    return EAGAIN;
+}
+
+static tn_status test_rethrow_action(void *arg)
+{
+    tn_status status = tn_with_exception(test_action3, test_rethrow_handler,
+                                         arg);
+    assert(0);
+    return status;
+}
+
+
 static void test_handle_exception(void)
 {
     tn_status status;
@@ -245,6 +274,10 @@ static void test_handle_exception(void)
 
     status = tn_with_exception(test_nested_action, NULL, NULL);
     assert(status == EACCES);
+
+    status = tn_with_exception(test_rethrow_action,
+                               test_handler, NULL);
+    assert(status == EBADF);
 }
 
 int main()

@@ -42,43 +42,52 @@ YY_DECL;
 
 ESCAPE \\([abfnrtv\'\"\\]|u\+?[[:xdigit:]]{4}|U\+?[[:xdigit:]]{8}|[uU]\{[^}]+\})
 %%
-[-+*/^!~(){}.?,;<>:&|%=#\\] { return *yytext; }
+[-+*/^!~(){}.?,;<>:&|%=\\] { return *yytext; }
 [][] { return *yytext; }
 "[|" { return TOK_LDBRACKET; }
 "|]" { return TOK_RDBRACKET; }
-"{|" { return TOK_LDBRACE; }
-"|}" { return TOK_RDBRACE; }
-"(|" { return TOK_LLENSE; }
-"|)" { return TOK_RLENSE; }
 "!~" { return TOK_NOT_MATCH; }
+"~~" { return TOK_MATCH_RESULT; }
 "==" { return TOK_EQ; }
 "<=" { return TOK_LE; }
 ">=" { return TOK_GE; }
 "!=" { return TOK_NE; }
-"<:" { return TOK_MIN; }
-":>" { return TOK_MAX; }
 "->" { return TOK_ARROW; }
-"<->" { return TOK_INTERACT; }
 "=>" { return TOK_MAP; }
 "++" { return TOK_APPEND; }
+"--" { return TOK_DISTANCE; }
 ".." { return TOK_RANGE; }
-"||" { return TOK_ALT; }
-">>" { return TOK_OUTGOING; }
-"<<" { return TOK_INCOMING; }
-":=" { return TOK_FORCE_LET; }
-"@"[[:alpha:]_][[:alnum:]_]* { return TOK_ATTRIBUTE; }
+"::" { return TOK_TYPECHECK; }
+assert { return TOK_ASSERT; }
+atexit { return TOK_ATEXIT; }
+break { return TOK_BREAK; }
+case { return TOK_CASE; }
+continue { return TOK_CONTINUE; }
+dispatch { return TOK_DISPATCH; }
 else { return TOK_ELSE; }
+enum { return TOK_ENUM; }
+exit { return TOK_EXIT; }
 extern { return TOK_EXTERN; }
 false { return TOK_FALSE; }
+for { return TOK_FOR; }
+foreach { return TOK_FOREACH; }
+gather { return TOK_GATHER; }
+generic { return TOK_GENERIC; }
 if { return TOK_IF; }
+loop { return TOK_LOOP }
 import { return TOK_IMPORT; }
-loop { return TOK_LOOP; }
-new { return TOK_NEW; }
-override { return TOK_OVERRIDE; }
+nothing { return TOK_NOTHING; }
 pragma { return TOK_PRAGMA; }
+return { return TOK_RETURN; }
+select { return TOK_SELECT; }
+sizeof { return TOK_SIZEOF; }
+static { return TOK_STATIC; }
+struct { return TOK_STRUCT; }
 switch { return TOK_SWITCH; }
 true { return TOK_TRUE; }
-typeof { return TOK_TYPEOF; }
+typedef { return TOK_TYPEDEF; }
+union { return TOK_UNION; }
+while { return TOK_WHILE; }
 [+-]?[0-9]+ {
     yylval->ast = ast_create_node(AST_LITERAL,
                                   &vm_root_inttype,
@@ -95,7 +104,7 @@ typeof { return TOK_TYPEOF; }
     yylval->ast = ast_create_node(AST_LITERAL,
                                   &vm_root_inttype,
                                   (union vm_value){.ival = apr_strtoi64(yytext, NULL, 2)});
-    return TOK_INTEGER;
+    return TOK_BITSTRING;
 }
 [+-]?([0-9]+\.[0-9]*([eE][+-]?[0-9]+)?|[0-9]+[eE][+-]?[0-9]+) {
     yylval->ast = ast_create_node(AST_LITERAL,
@@ -114,7 +123,7 @@ typeof { return TOK_TYPEOF; }
 '([^\']|{ESCAPE})' {
     return TOK_CHARACTER; 
 }
-\"([^\"\\]+|{ESCAPE})*\" {
+[uU]?\"([^\"\\]+|{ESCAPE})*\" {
     return TOK_STRING; }
 [[:alpha:]_][[:alnum:]_]* { 
     return TOK_ID; 
@@ -125,7 +134,7 @@ typeof { return TOK_TYPEOF; }
 ^#[[:space:]]+[0-9]+[[:space:]]+.*\n {
     yylineno = strtoul(yytext + 1, NULL, 10);
 }
-"{{"([^}]+|\}[^}])*"}}" { return TOK_REGEXP; }
+"/"[^[:space:]/]+"/" { return TOK_REGEXP; }
 [[:space:]]+ {}
-"//".*\n {}
+"#".*\n {}
 "/*"([^*]+|\*+[^\/*])*"*/" {}
